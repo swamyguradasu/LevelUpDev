@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users Collection Security Rules for CSV Roster Persistence across devices
+    match /users/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

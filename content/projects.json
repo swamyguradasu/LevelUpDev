@@ -1,0 +1,32 @@
+[
+  {
+    "projectId": "task-queue",
+    "title": "Asynchronous Task Processing Engine",
+    "description": "A lightweight, asynchronous task processing queue built with Python, Redis, and WebSockets featuring automatic retry policies, background worker processes, and execution dashboards.",
+    "suggestedTech": ["Python", "Redis", "AsyncIO", "WebSockets", "Docker"]
+  },
+  {
+    "projectId": "expense-tracker",
+    "title": "Personal Expense & Budget Tracker",
+    "description": "A full-stack financial dashboard for tracking daily expenses, categorized analytics, budget goals, and monthly CSV exports.",
+    "suggestedTech": ["TypeScript", "React", "Node.js", "PostgreSQL", "TailwindCSS"]
+  },
+  {
+    "projectId": "weather-dashboard",
+    "title": "Real-time Weather & Air Quality Dashboard",
+    "description": "An interactive meteorological dashboard featuring 7-day weather forecasts, geolocation lookup, and interactive radar map visualization.",
+    "suggestedTech": ["JavaScript", "OpenWeather API", "Chart.js", "Leaflet"]
+  },
+  {
+    "projectId": "url-shortener",
+    "title": "High-Throughput URL Shortener",
+    "description": "A scalable URL shortening microservice with custom link alias generation, analytics click tracking, and rate limiting.",
+    "suggestedTech": ["Go", "Redis", "MongoDB", "REST API"]
+  },
+  {
+    "projectId": "quiz-app",
+    "title": "Interactive Engineering Quiz App",
+    "description": "A real-time multiplayer trivia platform for testing computer science fundamentals, algorithm puzzles, and timed code challenges.",
+    "suggestedTech": ["React", "Firebase", "TailwindCSS", "WebSockets"]
+  }
+]

@@ -1,0 +1,52 @@
+{
+  "skillId": "javascript",
+  "title": "Modern JavaScript & Async",
+  "icon": "javascript",
+  "description": "Master ES6+ features, closures, promises, async/await, and event loop mechanics.",
+  "modules": [
+    {
+      "moduleId": "m1",
+      "title": "Module 1: ES6+ Fundamentals",
+      "topics": [
+        {
+          "name": "Let, Const & Arrow Functions",
+          "summary": "Understand block scoping, temporal dead zone, lexical `this` binding in arrow functions."
+        },
+        {
+          "name": "Destructuring & Rest/Spread",
+          "summary": "Unpack arrays and objects concisely, use spread operator for immutability."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "q1",
+            "question": "What happens when reassigning a variable declared with `const`?",
+            "options": ["Silent fallback", "TypeError is thrown", "Variable becomes global", "Syntax warning"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m2",
+      "title": "Module 2: Asynchronous JS",
+      "topics": [
+        {
+          "name": "Promises & Async/Await",
+          "summary": "Handle asynchronous operations gracefully using Promise.all, try/catch, and async functions."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "q2",
+            "question": "What does an `async` function always return?",
+            "options": ["A callback", "A Promise", "Undefined", "The resolved value directly"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    }
+  ]
+}

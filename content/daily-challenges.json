@@ -1,0 +1,26 @@
+[
+  {
+    "date": "2026-08-22",
+    "title": "Two Sum (DSA Foundation)",
+    "leetcodeUrl": "https://leetcode.com/problems/two-sum/",
+    "notes": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. Aim for O(N) time complexity using a hash map."
+  },
+  {
+    "date": "2026-08-21",
+    "title": "Valid Anagram",
+    "leetcodeUrl": "https://leetcode.com/problems/valid-anagram/",
+    "notes": "Given two strings s and t, return true if t is an anagram of s, and false otherwise. Try frequency counting or sorting."
+  },
+  {
+    "date": "2026-08-20",
+    "title": "Reverse Linked List",
+    "leetcodeUrl": "https://leetcode.com/problems/reverse-linked-list/",
+    "notes": "Given the head of a singly linked list, reverse the list, and return the reversed list. Solve iteratively or recursively."
+  },
+  {
+    "date": "2026-08-23",
+    "title": "Container With Most Water",
+    "leetcodeUrl": "https://leetcode.com/problems/container-with-most-water/",
+    "notes": "Find two lines that together with the x-axis form a container, such that the container contains the most water. Use the two-pointer technique."
+  }
+]

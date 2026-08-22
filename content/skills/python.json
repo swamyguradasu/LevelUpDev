@@ -1,0 +1,320 @@
+{
+  "skillId": "python",
+  "title": "Python Programming",
+  "icon": "python",
+  "description": "Master Python from fundamental syntax and control flow to data structures, string manipulation, and function definitions.",
+  "modules": [
+    {
+      "moduleId": "m1",
+      "title": "Module 1: Python Basics",
+      "topics": [
+        {
+          "name": "What is Python, installing Python and an IDE (VS Code/PyCharm)",
+          "summary": "Python is a versatile, high-level programming language known for clean syntax and a vast ecosystem. Installing Python along with an Integrated Development Environment (IDE) like VS Code or PyCharm provides the essential environment to edit, debug, and execute code."
+        },
+        {
+          "name": "Writing and running your first script",
+          "summary": "Creating a Python script involves writing code in files with a .py extension and executing them using terminal commands or IDE run buttons. Running scripts allows you to verify logic step-by-step and inspect console output."
+        },
+        {
+          "name": "Variables and naming rules",
+          "summary": "Variables act as labeled containers that store data values in computer memory. In Python, variable names must begin with a letter or underscore, avoid reserved keywords, and follow snake_case naming conventions."
+        },
+        {
+          "name": "Data types: int, float, str, bool",
+          "summary": "Python features built-in primitive types to represent whole integers, decimal floating-point numbers, text strings, and boolean True or False conditions. Understanding data types ensures accurate mathematical operations and logic handling."
+        },
+        {
+          "name": "print() and input() functions",
+          "summary": "The print() function outputs formatted text and variables to the screen, while input() prompts users to supply keyboard data. Combining print and input creates interactive CLI programs."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m1-q1",
+            "question": "Which function is used to accept keyboard input from a user in Python?",
+            "options": ["read()", "input()", "get()", "scan()"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m1-q2",
+            "question": "Which of the following is a valid Python variable name?",
+            "options": ["2my_var", "my-var", "my_var", "class"],
+            "correctAnswer": 2
+          },
+          {
+            "id": "m1-q3",
+            "question": "What is the data type of the expression type(3.14)?",
+            "options": ["<class 'int'>", "<class 'float'>", "<class 'str'>", "<class 'bool'>"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m2",
+      "title": "Module 2: Operators & Type Conversion",
+      "topics": [
+        {
+          "name": "Arithmetic, comparison, logical, assignment operators",
+          "summary": "Arithmetic operators perform mathematical calculations, while comparison and logical operators evaluate conditional relationships that result in booleans. Assignment operators simplify reassigning updated variable values."
+        },
+        {
+          "name": "Operator precedence",
+          "summary": "Operator precedence governs the order in which Python evaluates complex mathematical and logical expressions. Parentheses have the highest priority, followed by exponentiation, multiplication, division, and addition."
+        },
+        {
+          "name": "Type casting: int(), float(), str()",
+          "summary": "Type casting explicitly converts data from one data type to another using built-in functions like int(), float(), and str(). Converting types prevents unexpected errors when processing mixed user input."
+        },
+        {
+          "name": "Basic errors when mixing types",
+          "summary": "Attempting incompatible operations across different types—such as adding text strings directly to numbers—triggers a TypeError. Checking data types and performing explicit casting prevents script crashes."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m2-q1",
+            "question": "What is the result of type(str(42)) in Python?",
+            "options": ["<class 'int'>", "<class 'str'>", "<class 'float'>", "<class 'type'>"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m2-q2",
+            "question": "Which operator performs floor division (integer division) in Python?",
+            "options": ["/", "//", "%", "**"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m2-q3",
+            "question": "What error occurs if you try to compute '10' + 5 without casting?",
+            "options": ["SyntaxError", "ValueError", "TypeError", "NameError"],
+            "correctAnswer": 2
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m3",
+      "title": "Module 3: Conditional Statements",
+      "topics": [
+        {
+          "name": "if, elif, else",
+          "summary": "Conditional statements execute specified code blocks based on whether expressions evaluate to True or False. Using if, elif, and else keywords forms decision trees for dynamic script execution."
+        },
+        {
+          "name": "Nested conditionals",
+          "summary": "Nesting involves placing conditional blocks inside another if statement to evaluate multi-level requirements. Proper indentation ensures nested logic runs only when parent conditions pass."
+        },
+        {
+          "name": "Comparison chaining",
+          "summary": "Comparison chaining allows checking multiple bounds continuously, such as 10 < x < 20. This shorthand provides concise, highly readable code compared to writing explicit logical AND checks."
+        },
+        {
+          "name": "Truthy/falsy values",
+          "summary": "Python evaluates non-zero numbers and populated collections as truthy, whereas 0, empty strings '', None, and empty lists [] evaluate as falsy in conditional contexts."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m3-q1",
+            "question": "Which of the following values evaluates to Falsy in a conditional statement?",
+            "options": ["1", "'hello'", "0", "[1, 2]"],
+            "correctAnswer": 2
+          },
+          {
+            "id": "m3-q2",
+            "question": "Which keyword handles additional condition checks between 'if' and 'else'?",
+            "options": ["then", "elif", "else if", "switch"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m3-q3",
+            "question": "What does the expression (1 < 5 < 10) evaluate to?",
+            "options": ["True", "False", "SyntaxError", "10"],
+            "correctAnswer": 0
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m4",
+      "title": "Module 4: Loops",
+      "topics": [
+        {
+          "name": "for loop with range()",
+          "summary": "A for loop iterates over sequences of elements or numerical ranges generated by range(start, stop, step). It provides finite, predictable iteration ideal for repeating tasks a known number of times."
+        },
+        {
+          "name": "while loop",
+          "summary": "A while loop repeatedly executes a block of code as long as a given boolean condition remains True. Modifying loop control variables inside the block ensures loops terminate properly."
+        },
+        {
+          "name": "break and continue",
+          "summary": "The break statement terminates and exits loop execution immediately, while continue skips the rest of the current iteration and moves to the next cycle."
+        },
+        {
+          "name": "Nested loops",
+          "summary": "Nested loops consist of one loop placed inside another to process multi-dimensional data structures like grids or matrices. Inner loops complete all iterations for each pass of the outer loop."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m4-q1",
+            "question": "Which keyword immediately exits a loop entirely?",
+            "options": ["stop", "break", "continue", "exit"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m4-q2",
+            "question": "What elements are generated by list(range(1, 4))?",
+            "options": ["[1, 2, 3, 4]", "[1, 2, 3]", "[0, 1, 2, 3]", "[1, 4]"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m4-q3",
+            "question": "What happens when the 'continue' keyword is executed inside a loop?",
+            "options": ["The loop stops running", "It skips to the next iteration", "It restarts from index 0", "It throws an error"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m5",
+      "title": "Module 5: Strings",
+      "topics": [
+        {
+          "name": "String indexing and slicing",
+          "summary": "Strings are ordered sequences of characters accessed via zero-based indexing and slicing syntax [start:stop:step]. Slicing enables extracting substrings, reversing text, or obtaining character ranges."
+        },
+        {
+          "name": "String methods: upper(), lower(), strip(), split(), replace(), find()",
+          "summary": "Built-in string methods transform text case, strip surrounding whitespace, split strings into lists, or replace characters. String methods return new string instances without mutating the original text."
+        },
+        {
+          "name": "String formatting (f-strings)",
+          "summary": "Formatted string literals (f-strings) embed expressions and variable values directly inside text using f'Text {variable}' syntax. F-strings offer fast, modern, and readable string interpolation."
+        },
+        {
+          "name": "Concatenation",
+          "summary": "Concatenation joins multiple strings together using the + operator or join() method. Combining text strings allows programs to dynamically generate user messages and structured output."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m5-q1",
+            "question": "Which syntax correctly creates a formatted f-string in Python?",
+            "options": ["f'Hello {name}'", "'Hello %name'", "format('Hello', name)", "'Hello ' + ${name}"],
+            "correctAnswer": 0
+          },
+          {
+            "id": "m5-q2",
+            "question": "Which string method removes leading and trailing whitespace?",
+            "options": ["clean()", "strip()", "trim()", "cut()"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m5-q3",
+            "question": "What is the result of 'Python'[0]?",
+            "options": ["'P'", "'p'", "'Py'", "1"],
+            "correctAnswer": 0
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m6",
+      "title": "Module 6: Lists & Tuples",
+      "topics": [
+        {
+          "name": "Creating lists, indexing, slicing",
+          "summary": "Lists are ordered, mutable collections of items defined with square brackets []. Indexing and slicing allow reading, updating, or replacing list elements by index position."
+        },
+        {
+          "name": "List methods: append(), remove(), sort(), pop()",
+          "summary": "Built-in list methods alter list contents in place by adding items (append), deleting values (remove), ordering elements (sort), or extracting items by index position (pop)."
+        },
+        {
+          "name": "Tuples and why they're immutable",
+          "summary": "Tuples are ordered collections defined with parentheses () that cannot be altered once created. Immutability ensures fixed data integrity and allows tuples to be used as dictionary keys."
+        },
+        {
+          "name": "List comprehension (basic intro)",
+          "summary": "List comprehensions provide compact syntax [expression for item in iterable] to construct new lists from existing sequences in a single clear line."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m6-q1",
+            "question": "Which Python sequence type is immutable after creation?",
+            "options": ["List", "Dictionary", "Tuple", "Set"],
+            "correctAnswer": 2
+          },
+          {
+            "id": "m6-q2",
+            "question": "Which method appends a new element to the end of an existing list?",
+            "options": ["push()", "add()", "append()", "insert()"],
+            "correctAnswer": 2
+          },
+          {
+            "id": "m6-q3",
+            "question": "What is the output of [x * 2 for x in [1, 2, 3]]?",
+            "options": ["[1, 2, 3]", "[2, 4, 6]", "[1, 4, 9]", "6"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m7",
+      "title": "Module 7: Dictionaries, Sets & Intro to Functions",
+      "topics": [
+        {
+          "name": "Dictionaries: key-value pairs, adding/updating/removing",
+          "summary": "Dictionaries store mapped key-value pairs inside curly braces {}. Keys enable rapid lookups, modifications, and deletion of associated data values."
+        },
+        {
+          "name": "Sets and basic set operations",
+          "summary": "Sets are unordered collections of unique elements that automatically eliminate duplicate values. They support mathematical set operations including union, intersection, and difference."
+        },
+        {
+          "name": "Defining functions with def",
+          "summary": "Functions are reusable blocks of code declared using the def keyword. Organizing logic into functions promotes code reusability, readability, and modular software design."
+        },
+        {
+          "name": "Parameters, return values",
+          "summary": "Parameters pass input data into functions during execution, while return statements pass calculated results back to the caller for subsequent use."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m7-q1",
+            "question": "Which keyword is used to define a custom function in Python?",
+            "options": ["function", "def", "func", "define"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m7-q2",
+            "question": "How are key-value pairs represented in a Python dictionary?",
+            "options": ["{'key': 'value'}", "['key' = 'value']", "('key', 'value')", "<key: value>"],
+            "correctAnswer": 0
+          },
+          {
+            "id": "m7-q3",
+            "question": "What unique property distinguishes a set from a list in Python?",
+            "options": ["Sets allow index slicing", "Sets contain no duplicate elements", "Sets are immutable", "Sets preserve order"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    }
+  ]
+}

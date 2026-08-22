@@ -1,0 +1,41 @@
+[
+  {
+    "name": "Swamy Guradasu",
+    "headline": "Wants to become a ml engineer",
+    "registerNumber": "24A21A6145",
+    "college": "Swarnandhra College of Engineering and Technology",
+    "branch": "AIML",
+    "bio": "I am a student of aiml a 3rd year",
+    "githubUrl": "https://github.com/swamyguradasu",
+    "linkedinUrl": "https://www.linkedin.com/in/swamy-guradasu",
+    "leetcodeId": "Swamy_Guradasu",
+    "leetcodeSolved": 52,
+    "email": "swamy@levelupdev.com"
+  },
+  {
+    "name": "BORUSU S P CH NAGA DHANISHA",
+    "headline": "To build a successful career in AI...",
+    "registerNumber": "25A21A6130",
+    "college": "Swarnandhra College of Engineering and Technology",
+    "branch": "AIML",
+    "bio": "I am Dhanisha, passionate about technology, innovation, and continuous learning.",
+    "githubUrl": "https://github.com/Dhanisha3892",
+    "linkedinUrl": "https://www.linkedin.com/in/s-p-ch-naga-dhanisha-borusu",
+    "leetcodeId": "",
+    "leetcodeSolved": 0,
+    "email": "dhanisha@levelupdev.com"
+  },
+  {
+    "name": "LevelUp Admin",
+    "headline": "System Administrator",
+    "registerNumber": "admin@2508",
+    "college": "Swarnandhra College of Engineering and Technology",
+    "branch": "CSE",
+    "bio": "Platform Administrator",
+    "githubUrl": "https://github.com",
+    "linkedinUrl": "https://linkedin.com",
+    "leetcodeId": "LeetCode",
+    "leetcodeSolved": 45,
+    "email": "levelupdev@admin.com"
+  }
+]
