@@ -27,6 +27,11 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: 'LevelUpDev | Engineering Learning Trail',
   description: 'Private group learning platform for developer skills, roadmaps, and DSA practice.',
+  icons: {
+    icon: '/levelupdev-icon.png',
+    shortcut: '/levelupdev-icon.png',
+    apple: '/levelupdev-icon.png',
+  },
 };
 
 export default function RootLayout({

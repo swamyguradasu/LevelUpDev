@@ -262,275 +262,286 @@ export default function HomePage() {
   const pythonCompletedCount = pythonModules.filter((m) => pythonProgressObj[m.moduleId] === true).length;
   const pythonPercentage = Math.round((pythonCompletedCount / pythonTotalCount) * 100);
   const isPythonStarted = pythonCompletedCount > 0;
+  const PALOMAR_VIDEO_URL =
+    'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260820_010308_b1636845-4c15-4ab6-b0c9-9a29bfb0c6e3.mp4';
 
   return (
-    <div className="text-[#1A1C1B] min-h-screen flex flex-col topo-bg font-sans antialiased relative overflow-hidden select-none">
-      {/* Welcome Overlay */}
-      {showWelcome && (
-        <WelcomeScreen userData={userData} onComplete={handleWelcomeComplete} />
-      )}
+    <div className="relative min-h-screen bg-black text-[#1A1C1B] flex flex-col font-sans antialiased overflow-x-hidden select-none">
+      {/* Palomar Video Background Layer */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <video
+          src={PALOMAR_VIDEO_URL}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="w-full h-full object-cover object-bottom"
+        />
+        <div className="absolute inset-0 bg-black/40" />
+      </div>
 
-      {/* Layer 1: Parallax Ambient Glow */}
-      <div
-        className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-[#C98A3E]/10 rounded-full blur-3xl pointer-events-none transition-transform duration-75 ease-out"
-        style={{
-          transform: `translate3d(${mousePos.x * 0.3}px, ${mousePos.y * 0.3}px, 0)`,
-        }}
-      />
+      <div className="relative z-10 min-h-screen flex flex-col flex-1">
+        {/* Welcome Overlay */}
+        {showWelcome && (
+          <WelcomeScreen userData={userData} onComplete={handleWelcomeComplete} />
+        )}
 
-      {/* Navigation Bar */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-[#5C7A6B]/15 w-full top-0 left-0 flex justify-between items-center px-6 md:px-12 py-4 z-50 sticky">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#0F2E28] flex items-center justify-center text-[#C98A3E] font-bold">
-            <Compass className="w-5 h-5" />
-          </div>
-          <span className="font-display font-bold text-lg text-[#0F2E28] tracking-tight">
-            LevelUpDev <span className="text-[#5C7A6B] font-mono text-xs font-normal">/ Trail Tracker</span>
-          </span>
-        </div>
-
-        <nav className="hidden md:flex gap-8 items-center text-sm font-medium">
-          <Link className="text-[#0F2E28] font-semibold hover:text-[#C98A3E] transition" href="/home">
-            Portfolio
-          </Link>
-          <Link className="text-[#414846] hover:text-[#0F2E28] transition" href="/skills/python">
-            Skill Trails
-          </Link>
-          <Link className="text-[#414846] hover:text-[#0F2E28] transition" href="/daily">
-            Daily Challenge
-          </Link>
-          <Link className="text-[#414846] hover:text-[#0F2E28] transition" href="/leaderboard">
-            Leaderboard
-          </Link>
-          {isAdminEmail(userData?.email || '') && (
-            <Link
-              className="text-[#C98A3E] font-bold hover:text-[#0F2E28] transition flex items-center gap-1 bg-[#C98A3E]/10 px-2.5 py-1 rounded-full border border-[#C98A3E]/20"
-              href="/admin"
-            >
-              Admin Console
-            </Link>
-          )}
-        </nav>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsEditingProfile(true)}
-            className="p-2 rounded-xl hover:bg-[#5C7A6B]/10 text-[#0F2E28] transition"
-            title="Edit Portfolio Profile"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleLogout}
-            className="p-2 rounded-xl hover:bg-red-50 text-red-600 transition"
-            title="Logout"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main className="flex-grow w-full max-w-[1280px] mx-auto px-4 md:px-12 py-8 space-y-10">
-        {/* 1. Currently Learning Highlight Strip (Top) */}
-        <section className="w-full bg-[#0F2E28] text-white rounded-2xl p-5 md:p-6 shadow-md border border-[#5C7A6B]/30 flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-[#C98A3E]/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex items-center gap-4 relative z-10">
-            <div className="w-12 h-12 rounded-xl bg-[#C98A3E]/20 border border-[#C98A3E]/40 flex items-center justify-center text-[#C98A3E] shrink-0">
-              <Play className="w-5 h-5 fill-current" />
+        {/* Navigation Bar */}
+        <header className="bg-stone-900/80 backdrop-blur-xl border-b border-white/10 w-full top-0 left-0 flex justify-between items-center px-6 md:px-12 py-4 z-50 sticky">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-stone-900 border border-white/15 p-1 flex items-center justify-center shadow-md">
+              <img src="/levelupdev-icon.png" alt="LevelUpDev Logo" className="w-full h-full object-contain rounded-lg" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-[#C98A3E] uppercase tracking-wider">
-                  Active Learning Focus
-                </span>
-                <span className="px-2 py-0.5 rounded bg-[#5C7A6B]/30 text-xs font-mono text-slate-200">
-                  {isPythonStarted ? 'IN PROGRESS' : 'NOT STARTED'}
-                </span>
-              </div>
-              <h2 className="font-display font-semibold text-lg md:text-xl text-white mt-0.5">
-                {userData.lastActiveModule
-                  ? `Python Skill Trail — ${userData.lastActiveModule.moduleTitle} (${pythonCompletedCount}/${pythonTotalCount} Completed)`
-                  : isPythonStarted
-                  ? `Python Skill Trail — In Progress (${pythonCompletedCount}/${pythonTotalCount} Completed)`
-                  : `Python Skill Trail — Get Started with Python Core Basics (0/${pythonTotalCount} Completed)`}
-              </h2>
-            </div>
-          </div>
-
-          <Link
-            href="/skills/python"
-            className="w-full md:w-auto px-6 py-3 bg-[#C98A3E] text-[#0F2E28] font-sans font-semibold rounded-full hover:bg-[#C98A3E]/90 transition shadow-sm flex items-center justify-center gap-2 shrink-0 relative z-10"
-          >
-            <span>{isPythonStarted ? 'Resume Trail' : 'Start Skill Trail'}</span>
-            <ExternalLink className="w-4 h-4" />
-          </Link>
-        </section>
-
-        {/* 2. Professional Resume Header Section */}
-        <section className="bg-white/90 backdrop-blur-md rounded-3xl p-8 md:p-10 border border-[#5C7A6B]/20 shadow-[0_4px_20px_rgba(15,46,40,0.06)] relative overflow-hidden flex flex-col md:flex-row items-start gap-8">
-          {/* Profile Photo Avatar */}
-          <div className="relative shrink-0 mx-auto md:mx-0">
-            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full p-1 bg-gradient-to-tr from-[#5C7A6B] via-[#C98A3E] to-[#5C7A6B] shadow-md overflow-hidden bg-white">
-              <img
-                className="w-full h-full rounded-full object-cover border-2 border-white"
-                src={userData.photoUrl && userData.photoUrl.trim() !== '' ? userData.photoUrl : defaultAvatar}
-                alt={displayName}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = defaultAvatar;
-                }}
-              />
-            </div>
-            {/* Streak Badge Pill */}
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#E2654B] text-white px-3.5 py-1 rounded-full flex items-center gap-1.5 shadow-md border-2 border-white text-xs font-mono font-bold whitespace-nowrap">
-              <Flame className="w-3.5 h-3.5 fill-white" />
-              <span>{userData.streak?.currentStreak || 0} Day Solve Streak</span>
-            </div>
-          </div>
-
-          {/* Resume Bio & Header Meta */}
-          <div className="flex-1 space-y-4 text-center md:text-left">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center justify-center md:justify-start gap-3">
-                  <h1 className="font-display text-3xl md:text-4xl font-bold text-[#0F2E28] tracking-tight">
-                    {displayName}
-                  </h1>
-                  <button
-                    onClick={() => setIsEditingProfile(true)}
-                    className="p-1.5 rounded-full hover:bg-[#5C7A6B]/10 text-[#5C7A6B] transition"
-                    title="Edit Profile"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="font-sans text-base font-semibold text-[#C98A3E] mt-0.5">
-                  {displayHeadline}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-center gap-2 font-mono text-xs text-[#5C7A6B] bg-[#EDF2ED] px-3.5 py-1.5 rounded-full border border-[#5C7A6B]/20">
-                <GraduationCap className="w-4 h-4 text-[#0F2E28]" />
-                <span>{displayCollege}</span>
-                <span>•</span>
-                <span className="font-bold text-[#0F2E28]">{displayBranch}</span>
-              </div>
-            </div>
-
-            <p className="font-sans text-sm text-[#414846] leading-relaxed max-w-3xl">
-              {displayBio}
-            </p>
-
-            {/* Social & Contact Badges */}
-            <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3 font-mono text-xs">
-              <a
-                href={userData.githubUrl || 'https://github.com'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1.5 rounded-lg bg-[#EDF2ED] hover:bg-[#5C7A6B]/15 text-[#0F2E28] border border-[#5C7A6B]/25 transition flex items-center gap-2"
-              >
-                <GithubIcon />
-                <span>GitHub Profile</span>
-              </a>
-              <a
-                href={userData.linkedinUrl || 'https://linkedin.com'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1.5 rounded-lg bg-[#EDF2ED] hover:bg-[#5C7A6B]/15 text-[#0F2E28] border border-[#5C7A6B]/25 transition flex items-center gap-2"
-              >
-                <LinkedinIcon />
-                <span>LinkedIn Connect</span>
-              </a>
-              <div className="px-3 py-1.5 rounded-lg bg-[#EDF2ED] text-[#414846] border border-[#5C7A6B]/20 flex items-center gap-2">
-                <Mail className="w-3.5 h-3.5 text-[#5C7A6B]" />
-                <span>{userData.email || 'kalyan.reddy@example.com'}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 3. Skills Section (Printable Resume Style) */}
-        <section className="bg-white/90 backdrop-blur-md rounded-3xl p-8 md:p-10 border border-[#5C7A6B]/20 shadow-[0_4px_20px_rgba(15,46,40,0.06)] space-y-6">
-          <div className="flex items-center justify-between border-b border-[#5C7A6B]/15 pb-4">
-            <div>
-              <h2 className="font-display text-2xl font-bold text-[#0F2E28] flex items-center gap-2">
-                <Code2 className="w-6 h-6 text-[#C98A3E]" />
-                <span>Technical Skills &amp; Proficiency</span>
-              </h2>
-              <p className="font-sans text-xs text-[#5C7A6B] mt-0.5">
-                Verified skill modules and learning milestones completed on Trail Tracker.
-              </p>
-            </div>
-            <span className="font-mono text-xs px-3 py-1 bg-[#EDF2ED] text-[#0F2E28] rounded-full border border-[#5C7A6B]/20">
-              RESUME PROFICIENCY
+            <span className="font-display font-bold text-lg text-white tracking-tight">
+              LevelUpDev <span className="text-stone-400 font-mono text-xs font-normal">/ Trail Tracker</span>
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Skill Card 1: Dynamic Python Card */}
-            <div className="p-6 rounded-2xl bg-[#EDF2ED]/60 border border-[#C98A3E]/40 space-y-4 relative">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="font-mono text-[11px] font-bold text-[#C98A3E] uppercase tracking-wider">
-                    {isPythonStarted ? `IN PROGRESS • ${pythonPercentage}% COMPLETE` : 'NOT STARTED • 0% COMPLETE'}
+          <nav className="hidden md:flex gap-8 items-center text-sm font-medium">
+            <Link className="text-white font-semibold hover:text-[#e8702a] transition" href="/home">
+              Portfolio
+            </Link>
+            <Link className="text-stone-300 hover:text-white transition" href="/skills/python">
+              Skill Trails
+            </Link>
+            <Link className="text-stone-300 hover:text-white transition" href="/daily">
+              Daily Challenge
+            </Link>
+            <Link className="text-stone-300 hover:text-white transition" href="/leaderboard">
+              Leaderboard
+            </Link>
+            {isAdminEmail(userData?.email || '') && (
+              <Link
+                className="text-amber-300 font-bold hover:text-white transition flex items-center gap-1 bg-[#e8702a]/20 px-2.5 py-1 rounded-full border border-[#e8702a]/40"
+                href="/admin"
+              >
+                Admin Console
+              </Link>
+            )}
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsEditingProfile(true)}
+              className="p-2 rounded-xl hover:bg-white/10 text-stone-200 transition"
+              title="Edit Portfolio Profile"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl hover:bg-rose-500/20 text-rose-400 transition"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Main Container */}
+        <main className="flex-grow w-full max-w-[1280px] mx-auto px-4 md:px-12 py-8 space-y-10">
+          {/* 1. Currently Learning Highlight Strip (Top) */}
+          <section className="w-full bg-stone-900/85 backdrop-blur-xl text-white rounded-3xl p-5 md:p-6 shadow-2xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#e8702a]/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="w-12 h-12 rounded-xl bg-[#e8702a]/20 border border-[#e8702a]/40 flex items-center justify-center text-[#e8702a] shrink-0 shadow-inner">
+                <Play className="w-5 h-5 fill-current" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-[#e8702a] uppercase tracking-wider">
+                    Active Learning Focus
                   </span>
-                  <h3 className="font-display text-xl font-bold text-[#0F2E28] mt-0.5">
-                    Python Programming &amp; Core Systems
-                  </h3>
+                  <span className="px-2 py-0.5 rounded bg-stone-800 text-xs font-mono text-stone-300 border border-white/10">
+                    {isPythonStarted ? 'IN PROGRESS' : 'NOT STARTED'}
+                  </span>
                 </div>
-                <span className="px-2.5 py-1 bg-[#C98A3E]/20 text-[#0F2E28] font-mono text-xs font-bold rounded-md border border-[#C98A3E]/30">
-                  {pythonCompletedCount} / {pythonTotalCount} Modules
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs font-mono text-[#5C7A6B]">
-                  <span>Progress: {pythonCompletedCount} of {pythonTotalCount} completed</span>
-                  <span>{pythonPercentage}%</span>
-                </div>
-                <div className="h-2 w-full bg-white rounded-full overflow-hidden border border-[#5C7A6B]/20">
-                  <div
-                    className="h-full bg-[#C98A3E] transition-all duration-300 rounded-full"
-                    style={{ width: `${pythonPercentage}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 pt-1 font-mono text-xs">
-                {pythonModules.length > 0 ? (
-                  pythonModules.map((m) => {
-                    const isDone = pythonProgressObj[m.moduleId] === true;
-                    return (
-                      <span
-                        key={m.moduleId}
-                        className={`px-2.5 py-1 rounded-md border transition-colors ${
-                          isDone
-                            ? 'bg-emerald-500/10 text-emerald-800 border-emerald-500/30 font-semibold'
-                            : 'bg-white text-[#5C7A6B] border-[#5C7A6B]/20'
-                        }`}
-                      >
-                        {m.title.split(':')[0]} {isDone ? '✓' : ''}
-                      </span>
-                    );
-                  })
-                ) : (
-                  <span className="text-xs font-mono text-[#5C7A6B]">7 Core Modules</span>
-                )}
+                <h2 className="font-display font-semibold text-lg md:text-xl text-white mt-0.5">
+                  {userData.lastActiveModule
+                    ? `Python Skill Trail — ${userData.lastActiveModule.moduleTitle} (${pythonCompletedCount}/${pythonTotalCount} Completed)`
+                    : isPythonStarted
+                    ? `Python Skill Trail — In Progress (${pythonCompletedCount}/${pythonTotalCount} Completed)`
+                    : `Python Skill Trail — Get Started with Python Core Basics (0/${pythonTotalCount} Completed)`}
+                </h2>
               </div>
             </div>
 
-          </div>
-        </section>
+            <Link
+              href="/skills/python"
+              className="w-full md:w-auto px-6 py-3 bg-[#e8702a] hover:bg-[#d2611f] text-white font-sans font-semibold rounded-full transition shadow-lg shadow-[#e8702a]/30 flex items-center justify-center gap-2 shrink-0 relative z-10"
+            >
+              <span>{isPythonStarted ? 'Resume Trail' : 'Start Skill Trail'}</span>
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+          </section>
+
+          {/* 2. Professional Resume Header Section */}
+          <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-start gap-8">
+            {/* Profile Photo Avatar */}
+            <div className="relative shrink-0 mx-auto md:mx-0">
+              <div className="w-32 h-32 md:w-36 md:h-36 rounded-full p-1 bg-gradient-to-tr from-[#e8702a] via-amber-400 to-[#e8702a] shadow-xl overflow-hidden bg-stone-900">
+                <img
+                  className="w-full h-full rounded-full object-cover border-2 border-stone-900"
+                  src={userData.photoUrl && userData.photoUrl.trim() !== '' ? userData.photoUrl : defaultAvatar}
+                  alt={displayName}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = defaultAvatar;
+                  }}
+                />
+              </div>
+              {/* Streak Badge Pill */}
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#e8702a] text-white px-3.5 py-1 rounded-full flex items-center gap-1.5 shadow-lg border-2 border-stone-900 text-xs font-mono font-bold whitespace-nowrap">
+                <Flame className="w-3.5 h-3.5 fill-white" />
+                <span>{userData.streak?.currentStreak || 0} Day Solve Streak</span>
+              </div>
+            </div>
+
+            {/* Resume Bio & Header Meta */}
+            <div className="flex-1 space-y-4 text-center md:text-left">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-center md:justify-start gap-3">
+                    <h1 className="font-display text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+                      {displayName}
+                    </h1>
+                    <button
+                      onClick={() => setIsEditingProfile(true)}
+                      className="p-1.5 rounded-full hover:bg-white/10 text-stone-400 hover:text-white transition"
+                      title="Edit Profile"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="font-sans text-base font-semibold text-[#e8702a] mt-0.5">
+                    {displayHeadline}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 font-mono text-xs text-stone-200 bg-stone-800/80 px-3.5 py-1.5 rounded-full border border-white/10">
+                  <GraduationCap className="w-4 h-4 text-[#e8702a]" />
+                  <span>{displayCollege}</span>
+                  <span>•</span>
+                  <span className="font-bold text-amber-300">{displayBranch}</span>
+                </div>
+              </div>
+
+              <p className="font-sans text-sm text-stone-300 leading-relaxed max-w-3xl">
+                {displayBio}
+              </p>
+
+              {/* Social & Contact Badges */}
+              <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3 font-mono text-xs">
+                <a
+                  href={userData.githubUrl || 'https://github.com'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-800 text-white border border-white/10 hover:border-[#e8702a] transition flex items-center gap-2"
+                >
+                  <GithubIcon />
+                  <span>GitHub Profile</span>
+                </a>
+                <a
+                  href={userData.linkedinUrl || 'https://linkedin.com'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-800 text-white border border-white/10 hover:border-[#e8702a] transition flex items-center gap-2"
+                >
+                  <LinkedinIcon />
+                  <span>LinkedIn Connect</span>
+                </a>
+                <div className="px-3 py-1.5 rounded-lg bg-stone-800/80 text-stone-300 border border-white/10 flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5 text-[#e8702a]" />
+                  <span>{userData.email || 'kalyan.reddy@example.com'}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 3. Skills Section (Printable Resume Style) */}
+          <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-2xl font-bold text-white flex items-center gap-2">
+                  <Code2 className="w-6 h-6 text-[#e8702a]" />
+                  <span>Technical Skills &amp; Proficiency</span>
+                </h2>
+                <p className="font-sans text-xs text-stone-400 mt-0.5">
+                  Verified skill modules and learning milestones completed on Trail Tracker.
+                </p>
+              </div>
+              <span className="font-mono text-xs px-3 py-1 bg-stone-800 text-stone-300 rounded-full border border-white/10">
+                RESUME PROFICIENCY
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Skill Card 1: Dynamic Python Card -> Clickable Link to /skills/python */}
+              <Link
+                href="/skills/python"
+                className="p-6 rounded-2xl bg-stone-900/90 backdrop-blur-2xl border border-[#e8702a]/60 shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_20px_rgba(232,112,42,0.2)] hover:border-[#e8702a] hover:shadow-[0_0_30px_rgba(232,112,42,0.3)] hover:scale-[1.01] transition-all duration-300 block group cursor-pointer relative"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="font-mono text-[11px] font-bold text-[#e8702a] uppercase tracking-wider">
+                      {isPythonStarted ? `IN PROGRESS • ${pythonPercentage}% COMPLETE` : 'NOT STARTED • 0% COMPLETE'}
+                    </span>
+                    <h3 className="font-display text-xl font-extrabold text-white mt-0.5 group-hover:text-amber-300 transition-colors flex items-center gap-2">
+                      <span>Python Programming &amp; Core Systems</span>
+                      <ExternalLink className="w-4 h-4 text-[#e8702a] opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                    </h3>
+                  </div>
+                  <span className="px-2.5 py-1 bg-[#e8702a]/20 text-amber-300 font-mono text-xs font-bold rounded-md border border-[#e8702a]/40">
+                    {pythonCompletedCount} / {pythonTotalCount} Modules
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 mt-4">
+                  <div className="flex justify-between text-xs font-mono text-stone-300">
+                    <span>Progress: {pythonCompletedCount} of {pythonTotalCount} completed</span>
+                    <span className="text-[#e8702a] font-bold">{pythonPercentage}%</span>
+                  </div>
+                  <div className="h-2 w-full bg-stone-800 rounded-full overflow-hidden border border-white/10">
+                    <div
+                      className="h-full bg-[#e8702a] transition-all duration-300 rounded-full shadow-sm"
+                      style={{ width: `${pythonPercentage}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-3 font-mono text-xs">
+                  {pythonModules.length > 0 ? (
+                    pythonModules.map((m) => {
+                      const isDone = pythonProgressObj[m.moduleId] === true;
+                      return (
+                        <span
+                          key={m.moduleId}
+                          className={`px-2.5 py-1 rounded-md border transition-colors ${
+                            isDone
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-semibold'
+                              : 'bg-stone-800/80 text-stone-300 border-white/10'
+                          }`}
+                        >
+                          {m.title.split(':')[0]} {isDone ? '✓' : ''}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    <span className="text-xs font-mono text-stone-400">7 Core Modules</span>
+                  )}
+                </div>
+              </Link>
+            </div>
+          </section>
 
         {/* 4. Featured Projects Section (Dynamic & Interactive) */}
-        <section className="bg-white/90 backdrop-blur-md rounded-3xl p-8 md:p-10 border border-[#5C7A6B]/20 shadow-[0_4px_20px_rgba(15,46,40,0.06)] space-y-6">
-          <div className="flex items-center justify-between border-b border-[#5C7A6B]/15 pb-4">
+        <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl space-y-6">
+          <div className="flex items-center justify-between border-b border-white/10 pb-4">
             <div>
-              <h2 className="font-display text-2xl font-bold text-[#0F2E28] flex items-center gap-2">
-                <FolderGit2 className="w-6 h-6 text-[#C98A3E]" />
+              <h2 className="font-display text-2xl font-bold text-white flex items-center gap-2">
+                <FolderGit2 className="w-6 h-6 text-[#e8702a]" />
                 <span>Featured Engineering Project</span>
               </h2>
-              <p className="font-sans text-xs text-[#5C7A6B] mt-0.5">
+              <p className="font-sans text-xs text-stone-400 mt-0.5">
                 Practical, production-style project selected for portfolio showcase.
               </p>
             </div>
@@ -538,16 +549,16 @@ export default function HomePage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsEditingLinks(true)}
-                  className="font-mono text-xs px-3 py-1.5 bg-[#EDF2ED] hover:bg-[#5C7A6B]/15 text-[#0F2E28] rounded-full border border-[#5C7A6B]/20 transition flex items-center gap-1.5"
+                  className="font-mono text-xs px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-white rounded-full border border-white/10 transition flex items-center gap-1.5"
                 >
-                  <Pencil className="w-3 h-3 text-[#5C7A6B]" />
+                  <Pencil className="w-3 h-3 text-[#e8702a]" />
                   <span>Edit Links</span>
                 </button>
                 <button
                   onClick={() => setIsConfirmingChange(true)}
-                  className="font-mono text-xs px-3 py-1.5 bg-[#EDF2ED] hover:bg-amber-50 text-[#0F2E28] hover:text-amber-800 rounded-full border border-[#5C7A6B]/20 transition flex items-center gap-1.5"
+                  className="font-mono text-xs px-3 py-1.5 bg-stone-800 hover:bg-[#e8702a]/20 text-white hover:text-amber-300 rounded-full border border-white/10 transition flex items-center gap-1.5"
                 >
-                  <RefreshCw className="w-3 h-3 text-[#C98A3E]" />
+                  <RefreshCw className="w-3 h-3 text-[#e8702a]" />
                   <span>Change Project</span>
                 </button>
               </div>
@@ -556,21 +567,21 @@ export default function HomePage() {
 
           {/* Case A: No Project Selected Yet */}
           {!userData.selectedProjectId && (
-            <div className="p-10 rounded-2xl bg-[#EDF2ED]/40 border border-dashed border-[#5C7A6B]/30 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#C98A3E]/10 border border-[#C98A3E]/30 flex items-center justify-center text-[#C98A3E]">
+            <div className="p-10 rounded-2xl bg-stone-950/60 border border-dashed border-white/15 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#e8702a]/15 border border-[#e8702a]/30 flex items-center justify-center text-[#e8702a]">
                 <FolderGit2 className="w-7 h-7" />
               </div>
               <div className="space-y-1 max-w-md">
-                <h3 className="font-display text-lg font-bold text-[#0F2E28]">
+                <h3 className="font-display text-lg font-bold text-white">
                   Choose a Project to Showcase
                 </h3>
-                <p className="font-sans text-xs text-[#414846] leading-relaxed">
+                <p className="font-sans text-xs text-stone-300 leading-relaxed">
                   Select a capstone project idea from our curated list to build and add to your digital resume.
                 </p>
               </div>
               <button
                 onClick={() => setIsSelectingProject(true)}
-                className="px-6 py-2.5 bg-[#C98A3E] text-[#0F2E28] font-sans font-semibold rounded-full hover:bg-[#C98A3E]/90 transition shadow-sm flex items-center gap-2"
+                className="px-6 py-2.5 bg-[#e8702a] hover:bg-[#d2611f] text-white font-sans font-semibold rounded-full transition shadow-lg shadow-[#e8702a]/30 flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>Choose a Project Idea</span>
@@ -580,13 +591,13 @@ export default function HomePage() {
 
           {/* Case B: Project Selected & GitHub Link Saved (Active Portfolio Card) */}
           {currentProject && (
-            <div className="p-6 md:p-8 rounded-2xl bg-[#EDF2ED]/40 border border-[#5C7A6B]/25 space-y-4 relative">
+            <div className="p-6 md:p-8 rounded-2xl bg-stone-950/70 border border-white/10 space-y-4 relative">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
-                  <span className="font-mono text-[11px] font-bold text-[#5C7A6B] uppercase tracking-wider">
+                  <span className="font-mono text-[11px] font-bold text-[#e8702a] uppercase tracking-wider">
                     FEATURED CAPSTONE • IN PORTFOLIO
                   </span>
-                  <h3 className="font-display text-xl font-bold text-[#0F2E28] mt-0.5">
+                  <h3 className="font-display text-xl font-bold text-white mt-0.5">
                     {currentProject.title}
                   </h3>
                 </div>
@@ -597,7 +608,7 @@ export default function HomePage() {
                       href={userData.projectGithubUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3.5 py-2 bg-white hover:bg-[#EDF2ED] text-[#0F2E28] border border-[#5C7A6B]/30 font-mono text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"
+                      className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-white border border-white/10 font-mono text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"
                     >
                       <GithubIcon />
                       <span>View Code</span>
@@ -605,7 +616,7 @@ export default function HomePage() {
                   ) : (
                     <button
                       onClick={() => setIsEditingLinks(true)}
-                      className="px-3 py-1.5 bg-amber-500/10 text-amber-800 border border-amber-500/30 font-mono text-xs font-semibold rounded-xl flex items-center gap-1.5"
+                      className="px-3 py-1.5 bg-[#e8702a]/20 text-amber-300 border border-[#e8702a]/40 font-mono text-xs font-semibold rounded-xl flex items-center gap-1.5"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       <span>Add GitHub Link</span>
@@ -617,7 +628,7 @@ export default function HomePage() {
                       href={userData.projectLiveUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3.5 py-2 bg-[#C98A3E] hover:bg-[#C98A3E]/90 text-[#0F2E28] font-mono text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shadow-sm"
+                      className="px-3.5 py-2 bg-[#e8702a] hover:bg-[#d2611f] text-white font-mono text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-[#e8702a]/30"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Live Demo</span>
@@ -626,7 +637,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <p className="font-sans text-sm text-[#414846] leading-relaxed">
+              <p className="font-sans text-sm text-stone-300 leading-relaxed">
                 {currentProject.description}
               </p>
 
@@ -634,7 +645,7 @@ export default function HomePage() {
                 {currentProject.suggestedTech.map((tech, idx) => (
                   <span
                     key={idx}
-                    className="px-2.5 py-1 bg-white text-[#0F2E28] border border-[#5C7A6B]/25 rounded-md"
+                    className="px-2.5 py-1 bg-stone-800 text-stone-200 border border-white/10 rounded-md"
                   >
                     {tech}
                   </span>
@@ -646,19 +657,19 @@ export default function HomePage() {
 
         {/* 5. LeetCode Live Problem Solving Tracker Section (Only shown if LeetCode ID is registered in CSV) */}
         {userData.leetcodeId && userData.leetcodeId.trim().length > 0 && (
-          <section className="bg-white/90 backdrop-blur-md rounded-3xl p-8 md:p-10 border border-[#5C7A6B]/20 shadow-[0_4px_20px_rgba(15,46,40,0.06)] space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#5C7A6B]/15 pb-4 gap-4">
+          <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-800 border border-amber-500/30 text-[11px] font-mono font-bold flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-600" /> AUTOMATIC LIVE TRACKING
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#e8702a]/20 text-amber-300 border border-[#e8702a]/40 text-[11px] font-mono font-bold flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-[#e8702a]" /> AUTOMATIC LIVE TRACKING
                   </span>
                 </div>
-                <h2 className="font-display text-2xl font-bold text-[#0F2E28] flex items-center gap-2 mt-1">
-                  <Code2 className="w-6 h-6 text-[#C98A3E]" />
+                <h2 className="font-display text-2xl font-bold text-white flex items-center gap-2 mt-1">
+                  <Code2 className="w-6 h-6 text-[#e8702a]" />
                   <span>LeetCode Solved Problems Tracker</span>
                 </h2>
-                <p className="font-sans text-xs text-[#5C7A6B] mt-0.5">
+                <p className="font-sans text-xs text-stone-400 mt-0.5">
                   Automatically syncs live LeetCode stats when you solve problems on LeetCode.
                 </p>
               </div>
@@ -667,7 +678,7 @@ export default function HomePage() {
                 <button
                   onClick={handleManualLeetCodeSync}
                   disabled={syncingLeetCode || !userData.leetcodeId}
-                  className="px-4 py-2 bg-[#0F2E28] text-[#C98A3E] hover:bg-[#0F2E28]/90 font-mono text-xs font-bold rounded-full transition flex items-center gap-2 border border-[#C98A3E]/30 disabled:opacity-50"
+                  className="px-4 py-2 bg-[#e8702a] text-white hover:bg-[#d2611f] font-mono text-xs font-bold rounded-full transition flex items-center gap-2 border border-[#e8702a]/30 shadow-lg shadow-[#e8702a]/30 disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncingLeetCode ? 'animate-spin' : ''}`} />
                   <span>{syncingLeetCode ? 'Syncing...' : 'Sync Live Stats'}</span>
@@ -677,18 +688,18 @@ export default function HomePage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Main Total Solved Highlight */}
-              <div className="lg:col-span-5 p-6 rounded-2xl bg-gradient-to-br from-[#0F2E28] via-[#143B34] to-[#0F2E28] text-white border border-[#5C7A6B]/30 space-y-4 relative overflow-hidden flex flex-col justify-between shadow-lg">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-[#C98A3E]/10 rounded-full blur-xl pointer-events-none" />
+              <div className="lg:col-span-5 p-6 rounded-2xl bg-stone-950/70 text-white border border-white/10 space-y-4 relative overflow-hidden flex flex-col justify-between shadow-xl">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-[#e8702a]/10 rounded-full blur-xl pointer-events-none" />
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs text-[#C98A3E] font-bold uppercase tracking-wider">
+                    <span className="font-mono text-xs text-[#e8702a] font-bold uppercase tracking-wider">
                       LeetCode Profile ID
                     </span>
                     <a
                       href={`https://leetcode.com/u/${userData.leetcodeId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-mono text-xs text-white/80 hover:text-[#C98A3E] flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-full border border-white/15 transition"
+                      className="font-mono text-xs text-white/80 hover:text-amber-300 flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-full border border-white/15 transition"
                     >
                       <span>@{userData.leetcodeId}</span>
                       <ExternalLink className="w-3 h-3" />
@@ -699,13 +710,13 @@ export default function HomePage() {
                     <span className="font-display text-5xl font-extrabold text-white tracking-tight">
                       {userData.leetcodeStats?.totalSolved ?? 0}
                     </span>
-                    <span className="font-sans text-base font-semibold text-[#C98A3E]">
+                    <span className="font-sans text-base font-semibold text-[#e8702a]">
                       Problems Solved
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-white/10 text-xs font-mono text-slate-300 flex items-center justify-between">
+                <div className="pt-3 border-t border-white/10 text-xs font-mono text-stone-300 flex items-center justify-between">
                   <span>Auto-sync Status:</span>
                   <span className="text-emerald-400 font-bold flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Active
@@ -716,44 +727,44 @@ export default function HomePage() {
               {/* Difficulty Breakdown Grid */}
               <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Easy Card */}
-                <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col justify-between space-y-2">
+                <div className="p-5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex flex-col justify-between space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-emerald-800 uppercase">Easy</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    <span className="font-mono text-xs font-bold text-emerald-300 uppercase">Easy</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                   </div>
                   <div>
-                    <div className="font-display text-3xl font-bold text-emerald-950">
+                    <div className="font-display text-3xl font-bold text-emerald-200">
                       {userData.leetcodeStats?.easySolved ?? 0}
                     </div>
-                    <div className="font-sans text-xs text-emerald-800 font-medium">Solved</div>
+                    <div className="font-sans text-xs text-emerald-400 font-medium">Solved</div>
                   </div>
                 </div>
 
                 {/* Medium Card */}
-                <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col justify-between space-y-2">
+                <div className="p-5 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex flex-col justify-between space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-amber-800 uppercase">Medium</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                    <span className="font-mono text-xs font-bold text-amber-300 uppercase">Medium</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
                   </div>
                   <div>
-                    <div className="font-display text-3xl font-bold text-amber-950">
+                    <div className="font-display text-3xl font-bold text-amber-200">
                       {userData.leetcodeStats?.mediumSolved ?? 0}
                     </div>
-                    <div className="font-sans text-xs text-amber-800 font-medium">Solved</div>
+                    <div className="font-sans text-xs text-amber-400 font-medium">Solved</div>
                   </div>
                 </div>
 
                 {/* Hard Card */}
-                <div className="p-5 rounded-2xl bg-red-500/10 border border-red-500/30 flex flex-col justify-between space-y-2">
+                <div className="p-5 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex flex-col justify-between space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-red-800 uppercase">Hard</span>
+                    <span className="font-mono text-xs font-bold text-rose-300 uppercase">Hard</span>
                     <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
                   </div>
                   <div>
-                    <div className="font-display text-3xl font-bold text-red-950">
+                    <div className="font-display text-3xl font-bold text-rose-200">
                       {userData.leetcodeStats?.hardSolved ?? 0}
                     </div>
-                    <div className="font-sans text-xs text-red-800 font-medium">Solved</div>
+                    <div className="font-sans text-xs text-rose-400 font-medium">Solved</div>
                   </div>
                 </div>
               </div>
@@ -762,23 +773,23 @@ export default function HomePage() {
         )}
 
         {/* 6. Daily Activity Log & Heatmap Section */}
-        <section className="bg-white/90 backdrop-blur-md rounded-3xl p-8 md:p-10 border border-[#5C7A6B]/20 shadow-[0_4px_20px_rgba(15,46,40,0.06)] space-y-6">
-          <div className="flex items-center justify-between border-b border-[#5C7A6B]/15 pb-4">
+        <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl space-y-6">
+          <div className="flex items-center justify-between border-b border-white/10 pb-4">
             <div>
-              <h2 className="font-display text-2xl font-bold text-[#0F2E28] flex items-center gap-2">
-                <Flame className="w-6 h-6 text-[#E2654B]" />
+              <h2 className="font-display text-2xl font-bold text-white flex items-center gap-2">
+                <Flame className="w-6 h-6 text-[#e8702a]" />
                 <span>Coding Activity &amp; Consistency Log</span>
               </h2>
-              <p className="font-sans text-xs text-[#5C7A6B] mt-0.5">
+              <p className="font-sans text-xs text-stone-400 mt-0.5">
                 Daily DSA problem solves and module completions tracked over time.
               </p>
             </div>
-            <span className="font-mono text-xs px-3 py-1 bg-[#EDF2ED] text-[#0F2E28] rounded-full border border-[#5C7A6B]/20">
+            <span className="font-mono text-xs px-3 py-1 bg-stone-800 text-stone-300 rounded-full border border-white/10">
               6-MONTH HEATMAP
             </span>
           </div>
 
-          <div className="p-6 rounded-2xl bg-[#EDF2ED]/40 border border-[#5C7A6B]/20">
+          <div className="p-6 rounded-2xl bg-stone-950/70 border border-white/10 text-white">
             <HeatmapCalendar solvedDates={userData.streak?.solvedDates || []} compact={false} />
           </div>
         </section>
@@ -1196,6 +1207,7 @@ export default function HomePage() {
           </a>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,83 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getSkillById, Skill, Module } from '@/lib/content';
 import { ArrowLeft, Check, Lock, HelpCircle } from 'lucide-react';
+
+const BG_IMAGE_1 =
+  'https://images.higgs.ai/?default=1&output=webp&url=https%3A%2F%2Fd8j0ntlcm91z4.cloudfront.net%2Fuser_38xzZboKViGWJOttwIXH07lWA1P%2Fhf_20260609_195923_b0ba8ace-1d1d-4f2c-9a28-1ab84b330680.png&w=1280&q=85';
+const BG_IMAGE_2 =
+  'https://images.higgs.ai/?default=1&output=webp&url=https%3A%2F%2Fd8j0ntlcm91z4.cloudfront.net%2Fuser_38xzZboKViGWJOttwIXH07lWA1P%2Fhf_20260609_201152_bba90a12-bf12-459f-91f0-51f237dbaf3b.png&w=1280&q=85';
+const SPOTLIGHT_R = 260;
+
+function RevealLayer({ image, cursorX, cursorY }: { image: string; cursorX: number; cursorY: number }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const revealRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const revealDiv = revealRef.current;
+    if (!canvas || !revealDiv) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (cursorX !== -999 && cursorY !== -999) {
+      const gradient = ctx.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, SPOTLIGHT_R);
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      gradient.addColorStop(0.4, 'rgba(255, 255, 255, 1)');
+      gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.75)');
+      gradient.addColorStop(0.75, 'rgba(255, 255, 255, 0.4)');
+      gradient.addColorStop(0.88, 'rgba(255, 255, 255, 0.12)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      ctx.beginPath();
+      ctx.arc(cursorX, cursorY, SPOTLIGHT_R, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+    }
+
+    const dataUrl = canvas.toDataURL();
+    revealDiv.style.maskImage = `url(${dataUrl})`;
+    revealDiv.style.webkitMaskImage = `url(${dataUrl})`;
+  }, [cursorX, cursorY]);
+
+  return (
+    <>
+      <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none" style={{ display: 'none' }} />
+      <div
+        ref={revealRef}
+        className="fixed inset-0 bg-center bg-cover bg-no-repeat z-1 pointer-events-none"
+        style={{
+          backgroundImage: `url(${image})`,
+          maskSize: '100% 100%',
+          WebkitMaskSize: '100% 100%',
+          maskRepeat: 'no-repeat',
+          WebkitMaskRepeat: 'no-repeat',
+        }}
+      />
+    </>
+  );
+}
 
 export default function SkillPathMapPage() {
   const params = useParams();
@@ -14,6 +86,41 @@ export default function SkillPathMapPage() {
 
   const { userData, loading } = useAuth();
   const [skill, setSkill] = useState<Skill | null>(null);
+
+  const mouseRef = useRef({ x: -999, y: -999 });
+  const smoothRef = useRef({ x: -999, y: -999 });
+  const rafRef = useRef<number | null>(null);
+  const [cursorPos, setCursorPos] = useState({ x: -999, y: -999 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+
+    const updateSmoothPosition = () => {
+      if (mouseRef.current.x !== -999 && mouseRef.current.y !== -999) {
+        if (smoothRef.current.x === -999 && smoothRef.current.y === -999) {
+          smoothRef.current = { ...mouseRef.current };
+        } else {
+          smoothRef.current.x += (mouseRef.current.x - smoothRef.current.x) * 0.1;
+          smoothRef.current.y += (mouseRef.current.y - smoothRef.current.y) * 0.1;
+        }
+        setCursorPos({ x: smoothRef.current.x, y: smoothRef.current.y });
+      }
+      rafRef.current = requestAnimationFrame(updateSmoothPosition);
+    };
+
+    rafRef.current = requestAnimationFrame(updateSmoothPosition);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!loading && !userData) {
@@ -30,10 +137,10 @@ export default function SkillPathMapPage() {
 
   if (loading || !userData) {
     return (
-      <div className="min-h-screen topo-bg flex items-center justify-center text-primary-container font-label-mono text-sm">
-        <div className="flex items-center gap-3 bg-surface-container-lowest px-6 py-4 rounded-2xl shadow-sm border border-outline-variant/30">
-          <div className="w-5 h-5 border-2 border-primary-container border-t-transparent rounded-full animate-spin" />
-          <span>Loading Skill Trail...</span>
+      <div className="min-h-screen bg-black flex items-center justify-center text-white font-label-mono text-sm">
+        <div className="flex items-center gap-3 bg-stone-900/80 backdrop-blur-md px-6 py-4 rounded-2xl shadow-xl border border-white/10">
+          <div className="w-5 h-5 border-2 border-[#e8702a] border-t-transparent rounded-full animate-spin" />
+          <span className="text-stone-200">Loading Skill Trail...</span>
         </div>
       </div>
     );
@@ -41,18 +148,18 @@ export default function SkillPathMapPage() {
 
   if (!skill) {
     return (
-      <div className="min-h-screen topo-bg text-on-surface flex flex-col items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-md bg-surface-container-lowest p-8 rounded-2xl shadow-sm border border-outline-variant/30">
-          <div className="w-14 h-14 bg-surface-container-low rounded-full flex items-center justify-center mx-auto text-primary-container">
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
+        <div className="text-center space-y-4 max-w-md bg-stone-900/80 backdrop-blur-xl p-8 rounded-2xl shadow-2xl border border-white/10">
+          <div className="w-14 h-14 bg-stone-800 rounded-full flex items-center justify-center mx-auto text-[#e8702a]">
             <HelpCircle className="w-7 h-7" />
           </div>
-          <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Trail Not Found</h2>
-          <p className="font-body-sm text-body-sm text-on-surface-variant">
-            No roadmap configuration found for <code className="font-label-mono bg-surface-container-high px-1.5 py-0.5 rounded text-on-surface">&quot;{skillId}&quot;</code>.
+          <h2 className="font-headline-md text-headline-md font-bold text-white">Trail Not Found</h2>
+          <p className="font-body-sm text-body-sm text-stone-300">
+            No roadmap configuration found for <code className="font-label-mono bg-stone-800 px-1.5 py-0.5 rounded text-amber-300">&quot;{skillId}&quot;</code>.
           </p>
           <Link
             href="/home"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-container text-white font-medium rounded-lg text-body-sm hover:opacity-90 transition shadow-sm"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e8702a] hover:bg-[#d2611f] text-white font-medium rounded-xl text-body-sm transition shadow-lg shadow-[#e8702a]/30"
           >
             <ArrowLeft className="w-4 h-4" /> Return to Profile
           </Link>
@@ -98,148 +205,163 @@ export default function SkillPathMapPage() {
   });
 
   return (
-    <div className="min-h-screen topo-bg text-on-surface font-body-md antialiased overflow-x-hidden">
-      {/* Top Navigation */}
-      <header className="flex justify-between items-center w-full px-container-padding-mobile md:px-container-padding-desktop py-4 bg-transparent flat no shadows border-none z-50 relative">
-        <Link
-          aria-label="Back to Profile"
-          className="flex items-center gap-2 text-on-surface-variant hover:opacity-80 transition-opacity scale-95 duration-200"
-          href="/home"
-        >
-          <ArrowLeft className="w-5 h-5 text-on-surface-variant" />
-          <span className="hidden md:inline font-body-sm text-body-sm">Profile</span>
-        </Link>
-        <h1 className="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed tracking-tight">
-          {skill.title} Skill Trail
-        </h1>
-        <div className="w-8"></div> {/* Spacer for flex centering */}
-      </header>
+    <div className="relative min-h-screen bg-black text-on-surface font-body-md antialiased overflow-x-hidden">
+      {/* Base Image Layer */}
+      <div
+        className="fixed inset-0 bg-center bg-cover bg-no-repeat z-0 pointer-events-none hero-zoom"
+        style={{ backgroundImage: `url(${BG_IMAGE_1})` }}
+      />
+
+      {/* Reveal Layer */}
+      <RevealLayer image={BG_IMAGE_2} cursorX={cursorPos.x} cursorY={cursorPos.y} />
+
+      {/* Dark overlay for contrast */}
+      <div className="fixed inset-0 bg-black/40 z-[2] pointer-events-none" />
+
+      {/* Roadmap Content */}
+      <div className="relative z-10 min-h-screen">
+        {/* Top Navigation */}
+        <header className="flex justify-between items-center w-full px-container-padding-mobile md:px-container-padding-desktop py-4 bg-transparent flat no shadows border-none z-50 relative">
+          <Link
+            aria-label="Back to Profile"
+            className="flex items-center gap-2 text-white/90 hover:text-white hover:opacity-80 transition-opacity scale-95 duration-200"
+            href="/home"
+          >
+            <ArrowLeft className="w-5 h-5 text-white/90" />
+            <span className="hidden md:inline font-body-sm text-body-sm">Profile</span>
+          </Link>
+          <h1 className="font-headline-md text-headline-md font-bold text-white tracking-tight drop-shadow-md">
+            {skill.title} Skill Trail
+          </h1>
+          <div className="w-8"></div> {/* Spacer for flex centering */}
+        </header>
 
       {/* Main Content Canvas */}
       <main className="relative max-w-[1280px] mx-auto w-full min-h-[800px] py-12 px-container-padding-mobile md:px-container-padding-desktop">
         {/* SVG Trail Line Background */}
         <div className="absolute inset-0 pointer-events-none z-0 hidden md:block">
           <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1000 800">
-            <path className="trail-path" d="M 500,50 Q 800,200 500,350 T 500,650" />
+            <path
+              className="trail-path"
+              d="M 500,50 Q 750,200 500,350 T 500,650"
+              stroke="#e8702a"
+              strokeOpacity="0.6"
+              strokeWidth="3"
+              strokeDasharray="8 8"
+              fill="none"
+            />
           </svg>
         </div>
         <div className="absolute inset-0 pointer-events-none z-0 block md:hidden">
           <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 400 800">
-            <path className="trail-path" d="M 200,50 Q 300,200 200,350 T 200,650" />
+            <path
+              className="trail-path"
+              d="M 200,50 Q 300,200 200,350 T 200,650"
+              stroke="#e8702a"
+              strokeOpacity="0.6"
+              strokeWidth="3"
+              strokeDasharray="8 8"
+              fill="none"
+            />
           </svg>
         </div>
 
-        {/* Trail Nodes Container */}
-        <div className="relative z-10 flex flex-col items-center gap-24 md:gap-32 w-full max-w-3xl mx-auto mt-8">
+        {/* Trail Nodes Container with Fixed Left/Right Axis */}
+        <div className="relative z-10 flex flex-col items-center gap-28 md:gap-36 w-full max-w-4xl mx-auto mt-8">
           {modulesWithStatus.map((mod, index) => {
             const isEven = index % 2 === 0;
             const modCode = `M${String(index + 1).padStart(2, '0')}`;
             const topicSummary =
               mod.topics.map((t) => t.name).join(', ') || 'Core concepts and practical exercises.';
 
-            // Node 1 & Node 2 style: Completed Node
-            if (mod.isCompleted) {
-              return (
-                <div
-                  key={mod.moduleId}
-                  className={`flex items-center group w-full ${
-                    isEven ? 'md:-ml-32' : 'flex-row-reverse md:-mr-32'
-                  }`}
-                >
-                  <div className="flex-shrink-0 relative">
-                    <div className="w-12 h-12 rounded-full bg-[#C98A3E] flex items-center justify-center shadow-sm">
+            return (
+              <div key={mod.moduleId} className="relative flex items-center justify-center w-full min-h-[140px]">
+                {/* Center Axis Node Badge */}
+                <div className="absolute left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
+                  {mod.isCompleted ? (
+                    <div className="w-12 h-12 rounded-full bg-[#e8702a] flex items-center justify-center shadow-lg shadow-[#e8702a]/40 border-2 border-white/30">
                       <Check className="w-6 h-6 text-white stroke-[3]" />
                     </div>
-                  </div>
-                  <Link
-                    href={`/skills/${skill.skillId}/${mod.moduleId}`}
-                    className={`${
-                      isEven ? 'ml-6' : 'mr-6 text-right'
-                    } bg-surface-container-lowest p-6 rounded-lg border border-outline-variant/30 shadow-sm w-72 hover:border-[#5C7A6B]/40 transition-colors block`}
-                  >
-                    <div className={`flex ${isEven ? 'justify-between' : 'justify-end'} items-start mb-2`}>
-                      <span className="font-label-mono text-label-mono text-[#5C7A6B]">{modCode}</span>
+                  ) : mod.isCurrent || (mod.isUnlocked && !mod.isCompleted && firstUncompletedIndex === index) ? (
+                    <div className="w-14 h-14 rounded-full bg-stone-950 border-4 border-[#e8702a] flex items-center justify-center shadow-[0_0_25px_rgba(232,112,42,0.7)] animate-pulse">
+                      <div className="w-5 h-5 rounded-full bg-[#e8702a] shadow-inner"></div>
                     </div>
-                    <h3 className="font-headline-sm text-headline-sm text-on-surface mb-2">{mod.title}</h3>
-                    <p className="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
-                      {topicSummary}
-                    </p>
-                  </Link>
+                  ) : (
+                    <div className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center bg-stone-900/90 shadow-inner">
+                      <Lock className="w-4 h-4 text-stone-400" />
+                    </div>
+                  )}
                 </div>
-              );
-            }
 
-            // Node 3 style: Current Active Node
-            if (mod.isCurrent || (mod.isUnlocked && !mod.isCompleted && firstUncompletedIndex === index)) {
-              return (
-                <div key={mod.moduleId} className="flex items-center group w-full relative z-20">
-                  <div className="flex-shrink-0 relative ml-0 md:ml-0 mx-auto md:mx-0 absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0">
-                    <div className="w-12 h-12 rounded-full bg-surface-container-lowest border-4 border-primary-container flex items-center justify-center glow-ring">
-                      <div className="w-4 h-4 rounded-full bg-[#C98A3E]"></div>
-                    </div>
-                  </div>
-                  <div className="ml-auto md:ml-6 mt-20 md:mt-0 bg-surface-container-lowest p-6 rounded-lg border border-primary-container/20 shadow-md w-full md:w-80 relative bg-white">
-                    <div className="absolute -top-3 right-4">
-                      <span className="bg-[#E2654B] text-white px-2 py-1 rounded font-label-caps text-[10px]">
-                        CURRENT
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="font-label-mono text-label-mono text-primary-container">{modCode}</span>
-                      <span className="font-label-mono text-label-mono text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded">
-                        3.0 ECTS
-                      </span>
-                    </div>
-                    <h3 className="font-headline-sm text-headline-sm text-primary-container mb-2 font-bold">
-                      {mod.title}
-                    </h3>
-                    <p className="font-body-sm text-body-sm text-on-surface-variant mb-4 line-clamp-2">
-                      {topicSummary}
-                    </p>
+                {/* Fixed Card Position (Left for Even, Right for Odd) */}
+                <div
+                  className={`absolute z-10 w-[calc(50%-2.5rem)] sm:w-80 ${
+                    isEven
+                      ? 'right-1/2 mr-8 md:mr-12 text-right'
+                      : 'left-1/2 ml-8 md:ml-12 text-left'
+                  }`}
+                >
+                  {mod.isCompleted ? (
                     <Link
                       href={`/skills/${skill.skillId}/${mod.moduleId}`}
-                      className="w-full bg-primary-container text-white font-body-sm text-body-sm py-2 px-4 rounded-lg font-medium hover:opacity-90 transition-opacity block text-center"
+                      className="bg-stone-900/75 backdrop-blur-md p-5 sm:p-6 rounded-2xl border border-white/10 shadow-xl hover:border-[#e8702a]/60 hover:shadow-2xl hover:shadow-[#e8702a]/15 hover:scale-[1.02] transition-all duration-300 block group"
                     >
-                      Resume Trail
+                      <div className={`flex items-center justify-between mb-2 ${isEven ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <span className="font-label-mono text-label-mono text-[#e8702a] font-semibold">{modCode}</span>
+                        <span className="text-xs text-emerald-400 font-mono font-medium bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                          Completed ✓
+                        </span>
+                      </div>
+                      <h3 className="font-headline-sm text-headline-sm text-white group-hover:text-amber-300 transition-colors mb-2 font-bold">{mod.title}</h3>
+                      <p className="font-body-sm text-body-sm text-stone-300/90 line-clamp-2">
+                        {topicSummary}
+                      </p>
                     </Link>
-                  </div>
-                </div>
-              );
-            }
-
-            // Node 4 & Node 5 style: Locked Nodes
-            return (
-              <div
-                key={mod.moduleId}
-                className={`flex items-center group w-full ${
-                  isEven
-                    ? 'md:-ml-32 opacity-40 backdrop-blur-sm grayscale-[50%]'
-                    : 'flex-row-reverse md:-mr-32 opacity-60 backdrop-blur-sm grayscale-[30%]'
-                }`}
-              >
-                <div className="flex-shrink-0 relative">
-                  <div className="w-10 h-10 rounded-full border-2 border-outline-variant flex items-center justify-center bg-surface">
-                    <Lock className="w-4 h-4 text-outline-variant" />
-                  </div>
-                </div>
-                <div
-                  className={`${
-                    isEven ? 'ml-6' : 'mr-6 text-right'
-                  } bg-surface-container-low p-6 rounded-lg border border-outline-variant/20 shadow-none w-72 relative`}
-                >
-                  <div className={`flex ${isEven ? 'justify-start' : 'justify-end'} items-start mb-2`}>
-                    <span className="font-label-mono text-label-mono text-outline">{modCode}</span>
-                  </div>
-                  <h3 className="font-headline-sm text-headline-sm text-on-surface-variant mb-2">
-                    {mod.title}
-                  </h3>
-                  <p className="font-body-sm text-body-sm text-outline line-clamp-2">{topicSummary}</p>
+                  ) : mod.isCurrent || (mod.isUnlocked && !mod.isCompleted && firstUncompletedIndex === index) ? (
+                    <div className="bg-stone-900/90 backdrop-blur-xl p-5 sm:p-6 rounded-2xl border border-[#e8702a]/70 shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_25px_rgba(232,112,42,0.25)] relative group hover:scale-[1.02] transition-all duration-300">
+                      <div className={`flex items-center justify-between mb-3 ${isEven ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-mono text-label-mono text-[#e8702a] font-bold">{modCode}</span>
+                          <span className="bg-[#e8702a] text-white px-2.5 py-0.5 rounded-full font-label-caps text-[10px] font-extrabold shadow-sm shadow-[#e8702a]/40 uppercase tracking-wider">
+                            CURRENT
+                          </span>
+                        </div>
+                        <span className="font-label-mono text-xs text-stone-300 bg-stone-800/80 px-2 py-0.5 rounded border border-white/10">
+                          3.0 ECTS
+                        </span>
+                      </div>
+                      <h3 className="font-headline-sm text-headline-sm text-white mb-2 font-extrabold text-lg sm:text-xl tracking-tight">
+                        {mod.title}
+                      </h3>
+                      <p className="font-body-sm text-body-sm text-stone-300/90 mb-4 line-clamp-2 leading-relaxed">
+                        {topicSummary}
+                      </p>
+                      <Link
+                        href={`/skills/${skill.skillId}/${mod.moduleId}`}
+                        className="w-full bg-[#e8702a] hover:bg-[#d2611f] text-white font-semibold text-sm py-2.5 px-4 rounded-xl shadow-lg shadow-[#e8702a]/30 hover:shadow-[#e8702a]/50 active:scale-95 transition-all block text-center mt-4"
+                      >
+                        Resume Trail →
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="bg-stone-950/50 backdrop-blur-md p-5 sm:p-6 rounded-2xl border border-white/10 shadow-none opacity-60">
+                      <div className={`flex items-center justify-between mb-2 ${isEven ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <span className="font-label-mono text-label-mono text-stone-400 font-medium">{modCode}</span>
+                        <span className="text-xs text-stone-500 font-mono">Locked</span>
+                      </div>
+                      <h3 className="font-headline-sm text-headline-sm text-stone-300/80 mb-2 font-semibold">
+                        {mod.title}
+                      </h3>
+                      <p className="font-body-sm text-body-sm text-stone-400/80 line-clamp-2">{topicSummary}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
       </main>
+      </div>
     </div>
   );
 }
