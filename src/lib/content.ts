@@ -43,11 +43,24 @@ export interface DailyChallenge {
   notes: string;
 }
 
+import {
+  MINI_PROJECTS_LIST,
+  MiniProject,
+  getAllMiniProjects,
+  getMiniProjectById,
+  getMiniProjectsByCategory,
+} from '@/data/miniProjectsData';
+
+export type { MiniProject, DayPlan } from '@/data/miniProjectsData';
+
 export interface ProjectIdea {
   projectId: string;
   title: string;
   description: string;
   suggestedTech: string[];
+  category?: string;
+  difficulty?: string;
+  duration?: string;
 }
 
 const SKILL_MAP: Record<string, Skill> = {
@@ -79,13 +92,15 @@ export function getAllDailyChallenges(): DailyChallenge[] {
   return dailyChallengesData as DailyChallenge[];
 }
 
-export function getAllProjects(): ProjectIdea[] {
-  return projectsData as ProjectIdea[];
+export function getAllProjects(): MiniProject[] {
+  return getAllMiniProjects();
 }
 
-export function getProjectById(projectId: string): ProjectIdea | null {
-  return (projectsData as ProjectIdea[]).find((p) => p.projectId === projectId) || null;
+export function getProjectById(projectId: string): MiniProject | null {
+  return getMiniProjectById(projectId);
 }
+
+export { getAllMiniProjects, getMiniProjectById, getMiniProjectsByCategory };
 
 export function isEmailAllowed(email: string): boolean {
   if (!email) return false;

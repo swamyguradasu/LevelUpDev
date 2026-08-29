@@ -4,7 +4,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { getAllSkills, Skill, getAllProjects, getProjectById, ProjectIdea, isAdminEmail } from '@/lib/content';
+import {
+  getAllSkills,
+  Skill,
+  getAllProjects,
+  getProjectById,
+  getAllMiniProjects,
+  getMiniProjectById,
+  MiniProject,
+  ProjectIdea,
+  isAdminEmail,
+} from '@/lib/content';
+import { UserPortfolioProject } from '@/context/AuthContext';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { WelcomeScreen } from '@/components/WelcomeScreen';
 import {
@@ -56,6 +67,16 @@ import {
   Layers3,
   Calendar,
   Filter,
+  Trash2,
+  Globe,
+  DollarSign,
+  PieChart,
+  CheckSquare,
+  CloudRain,
+  Book,
+  Target,
+  Clock,
+  Zap,
 } from 'lucide-react';
 
 function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -101,7 +122,18 @@ const DEFAULT_AVATAR =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCeImeuYYYUrCiVonGEBFUpCkEZiehGncFXeYHxaVkJl8fxQflctQxvXzd_sgXHjlOO9sjk_p2uTzRRTOu0chpmEn32zM5aJbOALiZEjm1pFnCqktUT5w9_2VHjtJdEU-7Dgw2Uj52To4J80eBe-Eb6rnLSnvX2d13dzXYgNM7OxwV7dqWBA_x2LA6fjraZrCAqmlgF5zXHVgFv4RcTA2Mw00lEFupmVx_9RBhYQt5U6OC5juqv46SkRg';
 
 export default function HomePage() {
-  const { userData, loading, isDemoMode, updateProfile, updateUserProject, logout, syncLeetCodeStats } = useAuth();
+  const {
+    userData,
+    loading,
+    isDemoMode,
+    updateProfile,
+    updateUserProject,
+    addProjectToPortfolio,
+    updatePortfolioProject,
+    removePortfolioProject,
+    logout,
+    syncLeetCodeStats,
+  } = useAuth();
   const router = useRouter();
 
   // Welcome Screen State
@@ -115,7 +147,6 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isSharingProfile, setIsSharingProfile] = useState(false);
   const [selectedSkillModal, setSelectedSkillModal] = useState<{
     skill: Skill;
@@ -123,36 +154,30 @@ export default function HomePage() {
     totalCount: number;
     isEarned: boolean;
   } | null>(null);
-  const [selectedProjectModal, setSelectedProjectModal] = useState<ProjectIdea | null>(null);
+  const [selectedProjectModal, setSelectedProjectModal] = useState<any | null>(null);
   const [selectedCertModal, setSelectedCertModal] = useState<PortfolioCertificate | null>(null);
 
-  // Edit Profile Form State
-  const [nameInput, setNameInput] = useState('');
-  const [headlineInput, setHeadlineInput] = useState('');
-  const [bioInput, setBioInput] = useState('');
-  const [locationInput, setLocationInput] = useState('India');
-  const [collegeInput, setCollegeInput] = useState('');
-  const [branchInput, setBranchInput] = useState('');
-  const [githubInput, setGithubInput] = useState('');
-  const [linkedinInput, setLinkedinInput] = useState('');
-  const [leetcodeInput, setLeetcodeInput] = useState('');
-  const [photoInput, setPhotoInput] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [syncingLeetCode, setSyncingLeetCode] = useState(false);
-
-  // Project Selection & Management States
+  // 7-Day Mini Projects States
   const [isSelectingProject, setIsSelectingProject] = useState(false);
-  const [isConfirmingChange, setIsConfirmingChange] = useState(false);
-  const [isEditingLinks, setIsEditingLinks] = useState(false);
-  const [projGithubInput, setProjGithubInput] = useState('');
-  const [projLiveInput, setProjLiveInput] = useState('');
-  const [hasDeployed, setHasDeployed] = useState(false);
-  const [savingProjectLinks, setSavingProjectLinks] = useState(false);
+  const [searchMiniProject, setSearchMiniProject] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('All');
+  const [viewingProjectDetails, setViewingProjectDetails] = useState<MiniProject | null>(null);
+  const [editingProject, setEditingProject] = useState<UserPortfolioProject | null>(null);
+  const [editForm, setEditForm] = useState({
+    description: '',
+    githubUrl: '',
+    liveUrl: '',
+    status: 'In Progress' as 'Selected' | 'In Progress' | 'Completed',
+    tech: '',
+  });
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Content Data
   const [allSkills, setAllSkills] = useState<Skill[]>([]);
-  const [allProjects, setAllProjects] = useState<ProjectIdea[]>([]);
+  const [allProjects, setAllProjects] = useState<MiniProject[]>([]);
 
   useEffect(() => {
     if (!loading && !userData) {
@@ -169,27 +194,6 @@ export default function HomePage() {
     sessionStorage.removeItem('levelupdev_welcome_pending');
     setShowWelcome(false);
   };
-
-  useEffect(() => {
-    if (userData) {
-      setNameInput(userData.name || 'Swamy Guradasu');
-      setHeadlineInput(userData.headline || 'AIML Developer • ML Enthusiast • Full-Stack Builder');
-      setBioInput(
-        userData.bio ||
-          'Building intelligent products while continuously learning and shipping projects. Passionate about machine learning pipelines, backend systems, and clean developer tooling.'
-      );
-      setCollegeInput(userData.college || 'Swarnandhra College of Engineering & Technology');
-      setBranchInput(userData.branch || 'B.Tech — Artificial Intelligence & Machine Learning');
-      setGithubInput(userData.githubUrl || 'https://github.com/swamyguradasu');
-      setLinkedinInput(userData.linkedinUrl || 'https://linkedin.com/in/swamyguradasu');
-      setLeetcodeInput(userData.leetcodeId || 'Swamy_Guradasu');
-      setPhotoInput(userData.photoUrl || '');
-
-      setProjGithubInput(userData.projectGithubUrl || '');
-      setProjLiveInput(userData.projectLiveUrl || '');
-      setHasDeployed(!!userData.projectLiveUrl);
-    }
-  }, [userData]);
 
   useEffect(() => {
     setAllSkills(getAllSkills());
@@ -243,19 +247,48 @@ export default function HomePage() {
   }, [userData, allSkills]);
 
   // Compute Completed / Linked Projects
-  const userProjects = useMemo(() => {
-    if (!userData || !userData.selectedProjectId) return [];
-    const proj = getProjectById(userData.selectedProjectId);
-    if (!proj) return [];
-    return [
-      {
-        ...proj,
-        githubUrl: userData.projectGithubUrl || null,
-        liveUrl: userData.projectLiveUrl || null,
-        completedDate: 'August 2026',
-        status: userData.projectLiveUrl ? 'Deployed' : userData.projectGithubUrl ? 'Completed' : 'In Development',
-      },
-    ];
+  const userProjects = useMemo<UserPortfolioProject[]>(() => {
+    if (!userData) return [];
+
+    if (userData.portfolioProjects && userData.portfolioProjects.length > 0) {
+      return userData.portfolioProjects.map((p) => {
+        const fullProj = getMiniProjectById(p.projectId);
+        return {
+          ...p,
+          title: p.title || fullProj?.title || p.projectId,
+          description: p.description || fullProj?.description || '',
+          category: p.category || fullProj?.category || 'General',
+          difficulty: p.difficulty || fullProj?.difficulty || 'Beginner',
+          duration: p.duration || fullProj?.duration || '7 Days',
+          suggestedTech: p.suggestedTech?.length ? p.suggestedTech : fullProj?.suggestedTech || [],
+          githubUrl: p.githubUrl || null,
+          liveUrl: p.liveUrl || null,
+          status: p.status || (p.liveUrl ? 'Completed' : 'In Progress'),
+          selectedDate: p.selectedDate || 'Aug 2026',
+        };
+      });
+    }
+
+    if (userData.selectedProjectId) {
+      const proj = getMiniProjectById(userData.selectedProjectId);
+      return [
+        {
+          projectId: userData.selectedProjectId,
+          title: proj?.title || 'Selected Mini Project',
+          description: proj?.description || '',
+          category: proj?.category || 'Python',
+          difficulty: proj?.difficulty || 'Beginner',
+          duration: '7 Days',
+          suggestedTech: proj?.suggestedTech || ['Python'],
+          githubUrl: userData.projectGithubUrl || null,
+          liveUrl: userData.projectLiveUrl || null,
+          status: userData.projectLiveUrl ? 'Completed' : userData.projectGithubUrl ? 'In Progress' : 'Selected',
+          selectedDate: 'Aug 2026',
+        },
+      ];
+    }
+
+    return [];
   }, [userData]);
 
   // Compute Dynamic Achievements
@@ -393,74 +426,75 @@ export default function HomePage() {
     );
   }
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isDemoMode) {
-      alert('You are exploring in Demo Viewing Mode. Changes are disabled and not saved to the database.');
-      setIsEditingProfile(false);
-      return;
-    }
-    setSaving(true);
-    await updateProfile({
-      name: nameInput,
-      headline: headlineInput,
-      bio: bioInput,
-      college: collegeInput,
-      branch: branchInput,
-      githubUrl: githubInput,
-      linkedinUrl: linkedinInput,
-      leetcodeId: leetcodeInput,
-      photoUrl: photoInput,
-    });
-    setIsEditingProfile(false);
-    setSaving(false);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
   };
 
-  const handleSelectProjectIdea = async (projectId: string) => {
+  const handleSelectProjectFromDetails = async (project: MiniProject) => {
     if (isDemoMode) {
       alert('You are exploring in Demo Viewing Mode. Project changes are disabled in this preview.');
-      setIsSelectingProject(false);
       return;
     }
+    await addProjectToPortfolio(project);
+    showToast(`"${project.title}" added to your portfolio! 🚀`);
+    setViewingProjectDetails(null);
     setIsSelectingProject(false);
-    await updateUserProject(projectId, null, null);
-    setProjGithubInput('');
-    setProjLiveInput('');
-    setHasDeployed(false);
-    setIsEditingLinks(true);
   };
 
-  const handleSaveProjectLinks = async (e: React.FormEvent) => {
+  const handleOpenEditProject = (project: UserPortfolioProject) => {
+    setEditingProject(project);
+    setUrlError(null);
+    setEditForm({
+      description: project.description || '',
+      githubUrl: project.githubUrl || '',
+      liveUrl: project.liveUrl || '',
+      status: project.status || 'In Progress',
+      tech: (project.suggestedTech || []).join(', '),
+    });
+  };
+
+  const handleSaveEditProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isDemoMode) {
-      alert('You are exploring in Demo Viewing Mode. Changes will not be saved to the database.');
-      setIsEditingLinks(false);
+    if (!editingProject) return;
+
+    // Validate URLs
+    const cleanGh = editForm.githubUrl.trim();
+    const cleanLive = editForm.liveUrl.trim();
+
+    if (cleanGh && !cleanGh.startsWith('http://') && !cleanGh.startsWith('https://')) {
+      setUrlError('Please enter a valid GitHub URL starting with https:// or http://');
       return;
     }
-    if (!projGithubInput) return;
-    setSavingProjectLinks(true);
-    const activeProjId = userData.selectedProjectId || 'task-queue';
-    await updateUserProject(
-      activeProjId,
-      projGithubInput,
-      hasDeployed && projLiveInput ? projLiveInput : null
-    );
-    setIsEditingLinks(false);
-    setSavingProjectLinks(false);
+    if (cleanLive && !cleanLive.startsWith('http://') && !cleanLive.startsWith('https://')) {
+      setUrlError('Please enter a valid Live Demo URL starting with https:// or http://');
+      return;
+    }
+
+    setUrlError(null);
+    const techArray = editForm.tech
+      ? editForm.tech.split(',').map((t) => t.trim()).filter(Boolean)
+      : editingProject.suggestedTech;
+
+    await updatePortfolioProject(editingProject.projectId, {
+      description: editForm.description,
+      githubUrl: cleanGh || null,
+      liveUrl: cleanLive || null,
+      status: editForm.status,
+      suggestedTech: techArray,
+    });
+
+    showToast('Project updated successfully! ✓');
+    setEditingProject(null);
   };
 
-  const handleConfirmChangeProject = async () => {
-    if (isDemoMode) {
-      alert('Project modification is disabled in Demo Viewing Mode.');
-      setIsConfirmingChange(false);
-      return;
+  const handleRemoveProject = async (projectId: string) => {
+    if (confirm('Are you sure you want to remove this project from your portfolio?')) {
+      await removePortfolioProject(projectId);
+      showToast('Project removed from portfolio.');
     }
-    setIsConfirmingChange(false);
-    await updateUserProject(null, null, null);
-    setProjGithubInput('');
-    setProjLiveInput('');
-    setHasDeployed(false);
-    setIsSelectingProject(true);
   };
 
   const handleLogout = async () => {
@@ -477,13 +511,21 @@ export default function HomePage() {
     }
   };
 
-  const displayName = userData.name || 'Swamy Guradasu';
+  const displayName = userData.name || userData.username || 'Developer';
   const displayHeadline = userData.headline || 'AIML Developer • ML Enthusiast • Full-Stack Builder';
   const displayCollege = userData.college || 'Swarnandhra College of Engineering & Technology';
-  const displayBranch = userData.branch || 'B.Tech — Artificial Intelligence & Machine Learning';
+  const displayBranch = userData.branch || 'Artificial Intelligence & Machine Learning';
+  const displayDegree = userData.degree || 'BTech';
+  const displayRegNo = userData.registerNumber || '';
+  const displayYear = userData.currentYear || '';
+  const displayGradYear = userData.graduationYear || '';
   const displayBio =
     userData.bio ||
+    userData.shortBio ||
     'Building intelligent products while continuously learning and shipping projects. Passionate about machine learning pipelines, backend systems, and clean developer tooling.';
+  const displayAboutMe = userData.aboutMe || '';
+  const displayLocation = [userData.city, userData.state, userData.country].filter(Boolean).join(', ') || 'India';
+  const displayCareerInterest = userData.careerInterest || '';
 
   const unlockedCount = earnedSkills.length;
   const projectCount = userProjects.length;
@@ -538,8 +580,8 @@ export default function HomePage() {
             <Link className="text-slate-300 hover:text-white transition" href="/internships">
               Internships
             </Link>
-            <Link className="text-slate-300 hover:text-white transition" href="/skills/python">
-              Skill Trails
+            <Link className="text-slate-300 hover:text-white transition" href="/skills">
+              Skills Trail
             </Link>
             <Link className="text-slate-300 hover:text-white transition" href="/daily">
               Daily Challenge
@@ -581,15 +623,6 @@ export default function HomePage() {
             >
               <Share2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Share</span>
-            </button>
-
-            {/* Edit Profile */}
-            <button
-              onClick={() => setIsEditingProfile(true)}
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition"
-              title="Edit Profile"
-            >
-              <Settings className="w-4 h-4" />
             </button>
 
             {/* Logout */}
@@ -737,45 +770,79 @@ export default function HomePage() {
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1 font-mono text-xs text-slate-400">
                   <span className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
                     <MapPin className="w-3.5 h-3.5 text-[#006cd2]" />
-                    <span>{locationInput}</span>
+                    <span>{displayLocation}</span>
                   </span>
                   <span className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
                     <GraduationCap className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>{displayBranch}</span>
+                    <span>
+                      {displayDegree} • {displayBranch}
+                    </span>
                   </span>
-                  <span className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Currently Learning: Python &amp; ML</span>
-                  </span>
+                  {displayRegNo && (
+                    <span className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-slate-300">
+                      <span className="text-[#006cd2] font-bold">ID:</span>
+                      <span>{displayRegNo}</span>
+                    </span>
+                  )}
+                  {displayYear && (
+                    <span className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                      <span>{displayYear}</span>
+                      {displayGradYear && <span className="text-slate-500">• Grad &apos;{displayGradYear.slice(-2)}</span>}
+                    </span>
+                  )}
+                  {displayCareerInterest && (
+                    <span className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-amber-300">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{displayCareerInterest}</span>
+                    </span>
+                  )}
                 </div>
 
-                {/* Social Badges */}
+                {/* Social Badges & Links */}
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-2">
-                  <a
-                    href={userData.githubUrl || 'https://github.com/swamyguradasu'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-[#006cd2] text-xs font-mono flex items-center gap-2 transition"
-                  >
-                    <GithubIcon />
-                    <span>GitHub</span>
-                  </a>
-                  <a
-                    href={userData.linkedinUrl || 'https://linkedin.com/in/swamyguradasu'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-[#006cd2] text-xs font-mono flex items-center gap-2 transition"
-                  >
-                    <LinkedinIcon />
-                    <span>LinkedIn</span>
-                  </a>
-                  <button
-                    onClick={() => setIsEditingProfile(true)}
-                    className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-mono flex items-center gap-1.5 border border-slate-800 transition"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    <span>Edit Profile</span>
-                  </button>
+                  {userData.githubUrl && (
+                    <a
+                      href={userData.githubUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-[#006cd2] text-xs font-mono flex items-center gap-2 transition"
+                    >
+                      <GithubIcon />
+                      <span>GitHub</span>
+                    </a>
+                  )}
+                  {userData.linkedinUrl && (
+                    <a
+                      href={userData.linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-[#006cd2] text-xs font-mono flex items-center gap-2 transition"
+                    >
+                      <LinkedinIcon />
+                      <span>LinkedIn</span>
+                    </a>
+                  )}
+                  {userData.websiteUrl && (
+                    <a
+                      href={userData.websiteUrl.startsWith('http') ? userData.websiteUrl : `https://${userData.websiteUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-[#006cd2] text-xs font-mono flex items-center gap-2 transition"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Portfolio Web</span>
+                    </a>
+                  )}
+                  {userData.showEmailPublicly && (userData.contactEmail || userData.personalEmail) && (
+                    <a
+                      href={`mailto:${userData.contactEmail || userData.personalEmail}`}
+                      className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-mono flex items-center gap-1.5 transition"
+                      title="Contact Email"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-[#006cd2]" />
+                      <span>{userData.contactEmail || userData.personalEmail}</span>
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -840,13 +907,6 @@ export default function HomePage() {
                       : 'Complete skills and link projects to boost your recruiter-readiness score.'}
                   </p>
                 </div>
-
-                <button
-                  onClick={() => setIsEditingProfile(true)}
-                  className="text-xs font-mono text-[#006cd2] hover:underline self-start sm:self-center"
-                >
-                  Improve Profile →
-                </button>
               </div>
 
               {/* Progress Bar */}
@@ -1040,27 +1100,32 @@ export default function HomePage() {
           )}
 
           {/* ========================================================================= */}
-          {/* 4. PROJECTS SECTION */}
+          {/* 4. PROJECTS SECTION (7-DAY MINI PROJECTS) */}
           {/* ========================================================================= */}
           {(activeFilter === 'all' || activeFilter === 'projects') && (
             <section id="projects" className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
                 <div>
-                  <h2 className="font-display text-2xl font-extrabold text-white flex items-center gap-2">
-                    <FolderGit2 className="w-5 h-5 text-[#006cd2]" />
-                    <span>Projects</span>
-                  </h2>
-                  <p className="font-sans text-xs sm:text-sm text-slate-400 mt-0.5">
-                    Production systems and applications built, submitted, and verified through LevelUpDev.
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="font-display text-2xl font-extrabold text-white flex items-center gap-2">
+                      <FolderGit2 className="w-5 h-5 text-[#006cd2]" />
+                      <span>Projects</span>
+                    </h2>
+                    <span className="font-mono text-[11px] font-bold text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/30">
+                      7-DAY MINI PROJECTS
+                    </span>
+                  </div>
+                  <p className="font-sans text-xs sm:text-sm text-slate-400 mt-1">
+                    Practical, production-focused applications built, deployed, and verified through LevelUpDev.
                   </p>
                 </div>
 
                 <button
                   onClick={() => setIsSelectingProject(true)}
-                  className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-mono text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition self-start sm:self-center"
+                  className="px-4 py-2 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-mono text-xs font-semibold flex items-center gap-2 transition self-start sm:self-center shadow-md shadow-[#006cd2]/20 shrink-0"
                 >
-                  <Plus className="w-3.5 h-3.5 text-[#006cd2]" />
-                  <span>Link / Change Project</span>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Explore 7-Day Mini Projects</span>
                 </button>
               </div>
 
@@ -1072,12 +1137,26 @@ export default function HomePage() {
                       key={proj.projectId}
                       className="p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-[#006cd2]/60 transition-all shadow-xl space-y-5 flex flex-col justify-between group"
                     >
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-xs font-bold text-[#006cd2] bg-[#006cd2]/10 px-2.5 py-0.5 rounded-full border border-[#006cd2]/30">
-                            LEVELUPDEV VERIFIED PROJECT
-                          </span>
-                          <span className="font-mono text-xs font-medium text-emerald-400 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-800/40">
+                      <div className="space-y-3.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[11px] font-bold text-[#006cd2] bg-[#006cd2]/10 px-2.5 py-0.5 rounded-full border border-[#006cd2]/30">
+                              {proj.category || '7-Day Project'}
+                            </span>
+                            <span className="font-mono text-[10px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded-full border border-slate-800">
+                              {proj.duration || '7 Days'}
+                            </span>
+                          </div>
+
+                          <span
+                            className={`font-mono text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
+                              proj.status === 'Completed'
+                                ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
+                                : proj.status === 'In Progress'
+                                ? 'text-amber-400 bg-amber-950/60 border-amber-800/40'
+                                : 'text-blue-300 bg-blue-950/60 border-blue-800/40'
+                            }`}
+                          >
                             {proj.status}
                           </span>
                         </div>
@@ -1092,8 +1171,8 @@ export default function HomePage() {
 
                         {/* Tech Stack Chips */}
                         <div className="space-y-1.5 pt-1">
-                          <span className="font-mono text-[11px] text-slate-400 font-bold uppercase">
-                            Technology Stack
+                          <span className="font-mono text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                            Technologies
                           </span>
                           <div className="flex flex-wrap gap-1.5">
                             {proj.suggestedTech.map((tech, tIdx) => (
@@ -1109,38 +1188,76 @@ export default function HomePage() {
                       </div>
 
                       {/* Action Links */}
-                      <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          {proj.githubUrl && (
+                      <div className="pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {proj.githubUrl ? (
                             <a
                               href={proj.githubUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-mono text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition"
+                              className="px-3.5 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-mono text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition shadow-sm"
                             >
                               <GithubIcon />
-                              <span>Repository</span>
+                              <span>View GitHub →</span>
                             </a>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenEditProject(proj)}
+                              className="px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-white font-mono text-xs border border-dashed border-slate-700 flex items-center gap-1.5 transition"
+                            >
+                              <GithubIcon />
+                              <span>+ Add GitHub URL</span>
+                            </button>
                           )}
-                          {proj.liveUrl && (
+
+                          {proj.liveUrl ? (
                             <a
                               href={proj.liveUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-3 py-1.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-mono text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                              className="px-3.5 py-1.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-mono text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
-                              <span>Live Demo</span>
+                              <span>View Live Project →</span>
                             </a>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenEditProject(proj)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-950/60 hover:bg-slate-800 text-slate-500 hover:text-slate-300 font-mono text-[11px] border border-slate-800/80 transition"
+                            >
+                              <span>Live Demo — Not added yet</span>
+                            </button>
                           )}
                         </div>
 
-                        <button
-                          onClick={() => setSelectedProjectModal(proj)}
-                          className="text-xs font-mono text-slate-400 hover:text-white transition"
-                        >
-                          View Breakdown →
-                        </button>
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <button
+                            onClick={() => {
+                              const found = getMiniProjectById(proj.projectId);
+                              if (found) setViewingProjectDetails(found);
+                              else setViewingProjectDetails(proj as any);
+                            }}
+                            className="text-xs font-mono text-blue-400 hover:text-blue-300 transition underline underline-offset-4"
+                          >
+                            View 7-Day Plan →
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenEditProject(proj)}
+                            className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition"
+                            title="Edit Project"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleRemoveProject(proj.projectId)}
+                            className="p-1.5 rounded-lg bg-slate-950 hover:bg-red-950/40 text-slate-500 hover:text-rose-400 border border-slate-800 transition"
+                            title="Remove from Portfolio"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1149,18 +1266,17 @@ export default function HomePage() {
                 /* Empty Project State */
                 <div className="p-8 sm:p-12 rounded-3xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-4">
                   <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 mx-auto flex items-center justify-center text-slate-500 shadow-inner">
-                    <Plus className="w-6 h-6 text-slate-400" />
+                    <FolderGit2 className="w-6 h-6 text-blue-400" />
                   </div>
-                  <div className="space-y-1 max-w-md mx-auto">
-                    <h3 className="font-display text-lg font-bold text-white">Your Projects Will Appear Here</h3>
-                    <p className="font-sans text-xs sm:text-sm text-slate-400">
-                      Select a project challenge, build the application, and submit your GitHub repository to display it
-                      on your verified portfolio.
+                  <div className="space-y-1.5 max-w-md mx-auto">
+                    <h3 className="font-display text-lg font-bold text-white">Your 7-Day Projects Will Appear Here</h3>
+                    <p className="font-sans text-xs sm:text-sm text-slate-400 leading-relaxed">
+                      Choose from our curated 7-Day Mini Projects library, follow the day-by-day roadmap, and link your verified GitHub repository and live demo to your portfolio.
                     </p>
                   </div>
                   <button
                     onClick={() => setIsSelectingProject(true)}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold shadow-md shadow-[#006cd2]/30 transition"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold shadow-md shadow-[#006cd2]/30 transition"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Select Project to Build</span>
@@ -1453,8 +1569,8 @@ export default function HomePage() {
                 Career Roadmaps
               </Link>
               <span>•</span>
-              <Link href="/skills/python" className="hover:text-slate-300 transition-colors">
-                Skill Trails
+              <Link href="/skills" className="hover:text-slate-300 transition-colors">
+                Skills Trail
               </Link>
               <span>•</span>
               <Link href="/daily" className="hover:text-slate-300 transition-colors">
@@ -1468,133 +1584,6 @@ export default function HomePage() {
           </div>
         </footer>
       </div>
-
-      {/* ========================================================================= */}
-      {/* MODAL 1: EDIT PROFILE MODAL */}
-      {/* ========================================================================= */}
-      {isEditingProfile && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2 font-display text-lg font-bold text-white">
-                <Settings className="w-5 h-5 text-[#006cd2]" />
-                <span>Edit Developer Profile</span>
-              </div>
-              <button
-                onClick={() => setIsEditingProfile(false)}
-                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveProfile} className="space-y-4 font-sans text-xs">
-              <div className="space-y-1">
-                <label className="font-mono text-slate-300 font-bold uppercase">Full Name</label>
-                <input
-                  type="text"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-mono text-slate-300 font-bold uppercase">Headline</label>
-                <input
-                  type="text"
-                  value={headlineInput}
-                  onChange={(e) => setHeadlineInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-mono text-slate-300 font-bold uppercase">Bio</label>
-                <textarea
-                  rows={3}
-                  value={bioInput}
-                  onChange={(e) => setBioInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-mono text-slate-300 font-bold uppercase">College / University</label>
-                  <input
-                    type="text"
-                    value={collegeInput}
-                    onChange={(e) => setCollegeInput(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-mono text-slate-300 font-bold uppercase">Major / Degree</label>
-                  <input
-                    type="text"
-                    value={branchInput}
-                    onChange={(e) => setBranchInput(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-mono text-slate-300 font-bold uppercase">GitHub Profile URL</label>
-                  <input
-                    type="url"
-                    value={githubInput}
-                    onChange={(e) => setGithubInput(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-mono text-slate-300 font-bold uppercase">LinkedIn Profile URL</label>
-                  <input
-                    type="url"
-                    value={linkedinInput}
-                    onChange={(e) => setLinkedinInput(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-mono text-slate-300 font-bold uppercase">Avatar Photo URL</label>
-                <input
-                  type="url"
-                  value={photoInput}
-                  onChange={(e) => setPhotoInput(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
-                />
-              </div>
-
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsEditingProfile(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 font-mono transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-6 py-2 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-semibold shadow-md shadow-[#006cd2]/30 transition disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : 'Save Profile'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL 2: SHARE PORTFOLIO MODAL */}
@@ -1795,128 +1784,491 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-[#006cd2]/80 text-white font-mono text-xs px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-bounce">
+          <Sparkles className="w-4 h-4 text-blue-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* ========================================================================= */}
-      {/* MODAL 5: SELECT / CHANGE PROJECT MODAL */}
+      {/* MODAL 5: 7-DAY MINI PROJECTS DISCOVERY MODAL */}
       {/* ========================================================================= */}
       {isSelectingProject && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <h3 className="font-display text-xl font-bold text-white">Select a Portfolio Project</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Choose a project to build and link its verified GitHub repository to your profile.
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in my-8 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display text-2xl font-extrabold text-white">7-Day Mini Projects</h3>
+                  <span className="font-mono text-xs font-bold text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/30">
+                    CURATED LIBRARY
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-400">
+                  Build something real. Learn by doing. Complete it in 7 days.
                 </p>
               </div>
               <button
                 onClick={() => setIsSelectingProject(false)}
-                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
+                className="p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-              {allProjects.map((p) => (
-                <div
-                  key={p.projectId}
-                  className="p-5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-[#006cd2] transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1 flex-1">
-                    <h4 className="font-display text-base font-bold text-white">{p.title}</h4>
-                    <p className="text-xs text-slate-300 leading-relaxed">{p.description}</p>
-                    <div className="flex flex-wrap gap-1 pt-1">
-                      {p.suggestedTech.map((t, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 font-mono text-[10px] border border-slate-800"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+            {/* Information Banner */}
+            <div className="p-3.5 rounded-2xl bg-blue-950/40 border border-blue-800/40 flex items-center gap-3 text-xs text-blue-200 font-sans">
+              <Sparkles className="w-5 h-5 text-blue-400 shrink-0" />
+              <span>
+                <strong>Every project is designed to be completed within 7 days</strong> by a beginner/intermediate developer. Select a project to view the day-by-day plan or add it directly to your portfolio.
+              </span>
+            </div>
 
-                  <button
-                    onClick={() => handleSelectProjectIdea(p.projectId)}
-                    className="px-4 py-2 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold rounded-xl shrink-0 transition"
-                  >
-                    Select Project
-                  </button>
+            {/* Search and Filters Bar */}
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search mini projects by name, technology, or skills..."
+                  value={searchMiniProject}
+                  onChange={(e) => setSearchMiniProject(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#006cd2]"
+                />
+              </div>
+
+              {/* Category & Difficulty Filters */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Category Pills */}
+                <div className="flex flex-wrap gap-1.5">
+                  {['All', 'Python', 'Web Development', 'SQL / Database', 'DSA', 'AI / ML'].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3 py-1 rounded-lg font-mono text-xs transition ${
+                        selectedCategory === cat
+                          ? 'bg-[#006cd2] text-white font-bold shadow-sm'
+                          : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
                 </div>
-              ))}
+
+                {/* Difficulty Pills */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-[11px] text-slate-500 uppercase">Difficulty:</span>
+                  {['All', 'Beginner', 'Intermediate'].map((diff) => (
+                    <button
+                      key={diff}
+                      onClick={() => setSelectedDifficulty(diff)}
+                      className={`px-2.5 py-0.5 rounded font-mono text-[11px] transition ${
+                        selectedDifficulty === diff
+                          ? 'bg-slate-800 text-white font-bold border border-slate-600'
+                          : 'bg-slate-950 text-slate-500 hover:text-slate-300 border border-slate-800/80'
+                      }`}
+                    >
+                      {diff}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Projects Grid */}
+            <div className="overflow-y-auto pr-1 flex-1 space-y-4">
+              {(() => {
+                const filtered = getAllMiniProjects().filter((p) => {
+                  const matchCat = selectedCategory === 'All' || p.category === selectedCategory;
+                  const matchDiff = selectedDifficulty === 'All' || p.difficulty === selectedDifficulty;
+                  const q = searchMiniProject.toLowerCase().trim();
+                  const matchSearch =
+                    !q ||
+                    p.title.toLowerCase().includes(q) ||
+                    p.description.toLowerCase().includes(q) ||
+                    p.suggestedTech.some((t) => t.toLowerCase().includes(q)) ||
+                    p.learnSkills.some((s) => s.toLowerCase().includes(q));
+                  return matchCat && matchDiff && matchSearch;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-slate-500 space-y-2">
+                      <Search className="w-8 h-8 mx-auto text-slate-600" />
+                      <p className="font-mono text-xs">No mini projects found matching your filters.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filtered.map((p) => {
+                      const isAlreadyInPortfolio = userProjects.some((up) => up.projectId === p.projectId);
+
+                      return (
+                        <div
+                          key={p.projectId}
+                          className="p-5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-[#006cd2]/70 transition flex flex-col justify-between space-y-4 group"
+                        >
+                          <div className="space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/30">
+                                {p.category}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[10px] text-amber-400 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-500/30 font-medium">
+                                  {p.difficulty}
+                                </span>
+                                <span className="font-mono text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                  7 Days
+                                </span>
+                              </div>
+                            </div>
+
+                            <h4 className="font-display text-base font-bold text-white group-hover:text-blue-300 transition-colors">
+                              {p.title}
+                            </h4>
+
+                            <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
+                              {p.description}
+                            </p>
+
+                            {/* Tech Stack */}
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {p.suggestedTech.slice(0, 4).map((tech, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 font-mono text-[10px] border border-slate-800"
+                                >
+                                  {tech}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                            <button
+                              onClick={() => setViewingProjectDetails(p)}
+                              className="text-xs font-mono text-slate-300 hover:text-white transition flex items-center gap-1"
+                            >
+                              <span>Explore 7-Day Plan</span>
+                              <ArrowRight className="w-3 h-3 text-[#006cd2]" />
+                            </button>
+
+                            {isAlreadyInPortfolio ? (
+                              <span className="font-mono text-[11px] text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-xl border border-emerald-800/50 font-bold flex items-center gap-1">
+                                <Check className="w-3 h-3" />
+                                <span>In Portfolio</span>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleSelectProjectFromDetails(p)}
+                                className="px-3.5 py-1.5 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold rounded-xl transition shadow-sm flex items-center gap-1"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Add to Portfolio</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 6: EDIT PROJECT LINKS MODAL */}
+      {/* MODAL 6: DEDICATED 7-DAY PROJECT DETAILS MODAL */}
       {/* ========================================================================= */}
-      {isEditingLinks && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-display text-lg font-bold text-white">Link Project Repositories</h3>
+      {viewingProjectDetails && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in my-8 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/30">
+                    {viewingProjectDetails.category}
+                  </span>
+                  <span className="font-mono text-xs text-amber-400 bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                    {viewingProjectDetails.difficulty}
+                  </span>
+                  <span className="font-mono text-xs text-slate-300 bg-slate-950 px-2.5 py-0.5 rounded-full border border-slate-800 font-bold">
+                    ⏱ 7 Days
+                  </span>
+                </div>
+                <h3 className="font-display text-2xl font-extrabold text-white">{viewingProjectDetails.title}</h3>
+                <p className="text-xs sm:text-sm text-slate-400">{viewingProjectDetails.description}</p>
+              </div>
+
               <button
-                onClick={() => setIsEditingLinks(false)}
+                onClick={() => setViewingProjectDetails(null)}
+                className="p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="overflow-y-auto pr-2 space-y-6 flex-1 text-xs font-sans">
+              {/* 1. Project Overview & Problem Statement */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                  <h4 className="font-mono text-[11px] font-bold text-blue-400 uppercase tracking-wider">
+                    1. Project Overview
+                  </h4>
+                  <p className="text-slate-300 leading-relaxed">{viewingProjectDetails.overview}</p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                  <h4 className="font-mono text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+                    2. Problem Statement
+                  </h4>
+                  <p className="text-slate-300 leading-relaxed">{viewingProjectDetails.problemStatement}</p>
+                </div>
+              </div>
+
+              {/* 3. What You'll Learn */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <h4 className="font-mono text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+                  3. What You Will Learn
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {viewingProjectDetails.learnSkills.map((skill, sIdx) => (
+                    <div key={sIdx} className="flex items-center gap-2 text-slate-300 font-mono text-[11px]">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>{skill}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4 & 5. Core Features & Optional Features */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                  <h4 className="font-mono text-[11px] font-bold text-slate-200 uppercase tracking-wider">
+                    4. Core Features
+                  </h4>
+                  <ul className="space-y-1.5 text-slate-300">
+                    {viewingProjectDetails.coreFeatures.map((feat, fIdx) => (
+                      <li key={fIdx} className="flex items-start gap-1.5">
+                        <span className="text-blue-400 font-bold">•</span>
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                  <h4 className="font-mono text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    5. Optional / Extension Features
+                  </h4>
+                  <ul className="space-y-1.5 text-slate-400">
+                    {viewingProjectDetails.optionalFeatures.map((feat, fIdx) => (
+                      <li key={fIdx} className="flex items-start gap-1.5">
+                        <span className="text-amber-400 font-bold">•</span>
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* 6. Recommended Tech Stack */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <h4 className="font-mono text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  6. Recommended Technology Stack
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {viewingProjectDetails.suggestedTech.map((tech, idx) => (
+                    <span
+                      key={idx}
+                      className="px-3 py-1 rounded-xl bg-slate-900 text-blue-300 font-mono text-xs border border-slate-800 font-medium"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* 7. 7-Day Development Plan Timeline */}
+              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-mono text-[11px] font-bold text-blue-400 uppercase tracking-wider">
+                    7. 7-Day Step-by-Step Development Plan
+                  </h4>
+                  <span className="font-mono text-[10px] text-slate-500">Day 1 → Day 7</span>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  {viewingProjectDetails.sevenDayPlan.map((step) => (
+                    <div key={step.day} className="flex items-start gap-3 p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                      <div className="w-12 shrink-0 text-center font-mono font-bold text-xs text-blue-400 bg-blue-500/10 py-1 rounded-lg border border-blue-500/30">
+                        Day {step.day}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="font-display text-xs font-bold text-white">{step.title}</div>
+                        <ul className="space-y-0.5 text-slate-400 text-[11px]">
+                          {step.tasks.map((task, tIdx) => (
+                            <li key={tIdx} className="flex items-center gap-1.5">
+                              <span className="text-slate-600">→</span>
+                              <span>{task}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 8 & 9. Expected Result & Portfolio Value */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                  <h4 className="font-mono text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                    8. Expected Final Result
+                  </h4>
+                  <p className="text-slate-400 leading-relaxed">{viewingProjectDetails.expectedResult}</p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                  <h4 className="font-mono text-[11px] font-bold text-purple-400 uppercase tracking-wider">
+                    9. Recruiter & Portfolio Value
+                  </h4>
+                  <p className="text-slate-400 leading-relaxed">{viewingProjectDetails.portfolioValue}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setViewingProjectDetails(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-950 text-slate-400 hover:text-white font-mono text-xs border border-slate-800 transition"
+              >
+                Close Breakdown
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectProjectFromDetails(viewingProjectDetails)}
+                className="px-6 py-2.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold shadow-lg shadow-[#006cd2]/30 transition flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Add to My Portfolio</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 7: IN-PLACE EDIT PROJECT MODAL */}
+      {/* ========================================================================= */}
+      {editingProject && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="font-display text-lg font-bold text-white">Edit Portfolio Project</h3>
+                <p className="text-xs text-slate-400">{editingProject.title}</p>
+              </div>
+              <button
+                onClick={() => setEditingProject(null)}
                 className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveProjectLinks} className="space-y-4 text-xs font-sans">
+            {urlError && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-800/60 text-xs text-red-300 font-mono flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>{urlError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEditProject} className="space-y-4 text-xs font-sans">
               <div className="space-y-1">
-                <label className="font-mono text-slate-300 font-bold uppercase">GitHub Repository URL</label>
-                <input
-                  type="url"
-                  placeholder="https://github.com/your-username/repo-name"
-                  value={projGithubInput}
-                  onChange={(e) => setProjGithubInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
+                <label className="font-mono text-slate-300 font-bold uppercase">Project Description</label>
+                <textarea
+                  rows={3}
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  placeholder="Summarize the core features and architecture..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2] resize-none"
                   required
                 />
               </div>
 
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="font-mono text-slate-300 font-bold uppercase">Live Deployed URL (Optional)</label>
-                  <label className="flex items-center gap-1 text-[11px] font-mono text-slate-400 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={hasDeployed}
-                      onChange={(e) => setHasDeployed(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-950 text-[#006cd2]"
-                    />
-                    <span>Has Live Demo</span>
-                  </label>
-                </div>
-                {hasDeployed && (
-                  <input
-                    type="url"
-                    placeholder="https://your-live-demo.com"
-                    value={projLiveInput}
-                    onChange={(e) => setProjLiveInput(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2] mt-1"
-                  />
-                )}
+                <label className="font-mono text-slate-300 font-bold uppercase">Project Status</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value as any })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
+                >
+                  <option value="Selected">Selected</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-mono text-slate-300 font-bold uppercase">GitHub Repository URL</label>
+                <input
+                  type="url"
+                  placeholder="https://github.com/your-username/repo-name"
+                  value={editForm.githubUrl}
+                  onChange={(e) => setEditForm({ ...editForm, githubUrl: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-mono text-slate-300 font-bold uppercase">Live Deployed URL (Optional)</label>
+                <input
+                  type="url"
+                  placeholder="https://your-live-deployment.app"
+                  value={editForm.liveUrl}
+                  onChange={(e) => setEditForm({ ...editForm, liveUrl: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-mono text-slate-300 font-bold uppercase">Technologies (comma separated)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Python, Streamlit, Pandas, Scikit-learn"
+                  value={editForm.tech}
+                  onChange={(e) => setEditForm({ ...editForm, tech: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
+                />
               </div>
 
               <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setIsEditingLinks(false)}
+                  onClick={() => setEditingProject(null)}
                   className="px-4 py-2 rounded-xl bg-slate-950 text-slate-400 hover:text-white font-mono transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={savingProjectLinks || !projGithubInput}
-                  className="px-5 py-2 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-semibold transition disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-semibold transition"
                 >
-                  {savingProjectLinks ? 'Saving...' : 'Save Links'}
+                  Save Changes
                 </button>
               </div>
             </form>

@@ -164,8 +164,8 @@ export default function DailyChallengePage() {
             <Link className="text-stone-300 hover:text-white transition" href="/roadmaps">
               Career Roadmaps
             </Link>
-            <Link className="text-stone-300 hover:text-white transition" href="/skills/python">
-              Skill Trails
+            <Link className="text-stone-300 hover:text-white transition" href="/skills">
+              Skills Trail
             </Link>
             <Link className="text-white font-semibold hover:text-[#006cd2] transition" href="/daily">
               Daily Challenge

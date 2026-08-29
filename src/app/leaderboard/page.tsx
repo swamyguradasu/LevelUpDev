@@ -15,6 +15,8 @@ import {
   Compass,
   LogOut,
   Code2,
+  Lock,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function LeaderboardPage() {
@@ -119,8 +121,8 @@ export default function LeaderboardPage() {
             <Link className="text-stone-300 hover:text-white transition" href="/roadmaps">
               Career Roadmaps
             </Link>
-            <Link className="text-stone-300 hover:text-white transition" href="/skills/python">
-              Skill Trails
+            <Link className="text-stone-300 hover:text-white transition" href="/skills">
+              Skills Trail
             </Link>
             <Link className="text-stone-300 hover:text-white transition" href="/daily">
               Daily Challenge
@@ -268,37 +270,65 @@ export default function LeaderboardPage() {
 
                           {/* User Details */}
                           <td className="py-4 px-6">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full p-0.5 bg-gradient-to-tr from-[#006cd2] via-cyan-400 to-[#006cd2] shrink-0 shadow-sm">
-                                {member.photoUrl ? (
-                                  <img
-                                    src={member.photoUrl}
-                                    alt={member.name}
-                                    className="w-full h-full object-cover rounded-full"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white uppercase">
-                                    {member.name ? member.name.substring(0, 2) : 'DEV'}
-                                  </div>
-                                )}
-                              </div>
-
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-display text-sm font-bold text-white">
-                                    {member.name}
-                                  </span>
-                                  {isCurrentUser && (
-                                    <span className="px-2.5 py-0.5 bg-[#006cd2] text-white text-[10px] font-mono font-bold rounded-full shadow-sm">
-                                      You
-                                    </span>
+                            {member.isPortfolioPublic !== false ? (
+                              <Link
+                                href={`/portfolio/${member.username || member.email.split('@')[0]}`}
+                                className="flex items-center gap-3 group/member cursor-pointer"
+                                title="Click to view Recruiter Portfolio"
+                              >
+                                <div className="w-10 h-10 rounded-full p-0.5 bg-gradient-to-tr from-[#006cd2] via-cyan-400 to-[#006cd2] shrink-0 shadow-sm group-hover/member:scale-105 transition">
+                                  {member.photoUrl ? (
+                                    <img
+                                      src={member.photoUrl}
+                                      alt={member.name}
+                                      className="w-full h-full object-cover rounded-full"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white uppercase">
+                                      {member.name ? member.name.substring(0, 2) : 'DEV'}
+                                    </div>
                                   )}
                                 </div>
-                                <p className="text-xs text-stone-400 line-clamp-1 max-w-xs">
-                                  {member.headline || member.bio || member.email}
-                                </p>
+
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-display text-sm font-bold text-white group-hover/member:text-[#006cd2] transition flex items-center gap-1">
+                                      <span>{member.name}</span>
+                                      <ExternalLink className="w-3 h-3 opacity-0 group-hover/member:opacity-100 transition text-[#006cd2]" />
+                                    </span>
+                                    {isCurrentUser && (
+                                      <span className="px-2.5 py-0.5 bg-[#006cd2] text-white text-[10px] font-mono font-bold rounded-full shadow-sm">
+                                        You
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-stone-400 line-clamp-1 max-w-xs">
+                                    {member.headline || member.bio || member.email}
+                                  </p>
+                                </div>
+                              </Link>
+                            ) : (
+                              <div className="flex items-center gap-3 opacity-75">
+                                <div className="w-10 h-10 rounded-full p-0.5 bg-stone-800 shrink-0">
+                                  <div className="w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-stone-400 uppercase">
+                                    {member.name ? member.name.substring(0, 2) : 'DEV'}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-display text-sm font-bold text-stone-300">
+                                      {member.name}
+                                    </span>
+                                    <span title="Private Portfolio">
+                                      <Lock className="w-3 h-3 text-stone-500" />
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-stone-500 line-clamp-1 max-w-xs">
+                                    Private Profile
+                                  </p>
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </td>
 
                           {/* Streak */}

@@ -768,8 +768,8 @@ export default function SoftwareEngineerRoadmapPage() {
                 Portfolio
               </Link>
               <span>•</span>
-              <Link href="/skills/python" className="hover:text-slate-300 transition-colors">
-                Skill Trails
+              <Link href="/skills" className="hover:text-slate-300 transition-colors">
+                Skills Trail
               </Link>
               <span>•</span>
               <Link href="/daily" className="hover:text-slate-300 transition-colors">

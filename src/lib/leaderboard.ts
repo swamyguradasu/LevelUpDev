@@ -1,36 +1,60 @@
-import { getAllRosterUsers } from '@/lib/roster';
 import { UserProfileData } from '@/context/AuthContext';
+import type { StaticUserProfile } from '@/lib/csvRoster';
 
 export async function fetchLeaderboardUsers(
   currentUser: UserProfileData | null
 ): Promise<UserProfileData[]> {
-  const roster = getAllRosterUsers();
-  
-  const allUsers: UserProfileData[] = roster.map((dev) => {
-    if (currentUser && currentUser.email.trim().toLowerCase() === dev.email.trim().toLowerCase()) {
+  let staticProfiles: StaticUserProfile[] = [];
+
+  try {
+    if (typeof window !== 'undefined') {
+      const res = await fetch('/api/auth/profile');
+      if (res.ok) {
+        const data = await res.json();
+        staticProfiles = data.profiles || [];
+      }
+    }
+  } catch (err) {
+    console.warn('Leaderboard profile fetch notice:', err);
+  }
+
+  const allUsers: UserProfileData[] = staticProfiles.map((p) => {
+    if (currentUser && currentUser.email.trim().toLowerCase() === p.levelupdevEmail.trim().toLowerCase()) {
       return currentUser;
     }
     return {
-      uid: `user-${dev.registerNumber}`,
-      name: dev.name,
-      email: dev.email,
-      photoUrl: '',
-      headline: dev.headline || 'Learning Developer',
-      college: 'Engineering Institute',
-      branch: dev.branch || 'AIML',
-      bio: dev.bio || '',
-      githubUrl: dev.githubUrl || '',
-      linkedinUrl: dev.linkedinUrl || '',
-      leetcodeId: dev.leetcodeId || '',
-      leetcodeStats: dev.leetcodeSolved !== undefined
-        ? {
-            totalSolved: dev.leetcodeSolved,
-            easySolved: Math.round(dev.leetcodeSolved * 0.6),
-            mediumSolved: Math.round(dev.leetcodeSolved * 0.3),
-            hardSolved: Math.round(dev.leetcodeSolved * 0.1),
-            lastSyncedAt: new Date().toISOString(),
-          }
-        : { totalSolved: 0, easySolved: 0, mediumSolved: 0, hardSolved: 0 },
+      uid: `user_${p.levelupdevEmail.replace(/[^a-z0-9]/g, '_')}`,
+      email: p.levelupdevEmail,
+      levelupdevEmail: p.levelupdevEmail,
+      role: p.role,
+      name: p.fullName || p.username || 'Developer',
+      username: p.username || '',
+      personalEmail: p.personalEmail || '',
+      photoUrl: p.photoUrl || '',
+      headline: p.headline || 'Aspiring Software Developer',
+      college: p.college || 'Swarnandhra College of Engineering and Technology',
+      degree: p.degree || 'BTech',
+      registerNumber: p.registerNumber || '',
+      branch: p.branch || 'AIML',
+      currentYear: p.currentYear || '',
+      graduationYear: p.graduationYear || '',
+      city: p.city || '',
+      state: p.state || '',
+      country: p.country || 'India',
+      currentRole: p.currentRole || 'Student',
+      careerInterest: p.careerInterest || '',
+      bio: p.shortBio || p.aboutMe || '',
+      shortBio: p.shortBio || '',
+      aboutMe: p.aboutMe || '',
+      githubUrl: p.githubUrl || '',
+      linkedinUrl: p.linkedinUrl || '',
+      websiteUrl: p.websiteUrl || '',
+      otherUrl: p.otherUrl || '',
+      contactEmail: p.contactEmail || '',
+      phone: p.phone || '',
+      isPortfolioPublic: p.isPortfolioPublic,
+      showEmailPublicly: p.showEmailPublicly,
+      showPhonePublicly: p.showPhonePublicly,
       joinedDate: new Date().toISOString(),
       skillsCompleted: [],
       progress: {},
@@ -45,6 +69,11 @@ export async function fetchLeaderboardUsers(
       projectLiveUrl: null,
     };
   });
+
+  // If currentUser is not in list (e.g. demo mode), prepend it
+  if (currentUser && !allUsers.some((u) => u.email.toLowerCase() === currentUser.email.toLowerCase())) {
+    allUsers.unshift(currentUser);
+  }
 
   // Sort descending by currentStreak, then by leetcode total solved count
   allUsers.sort((a, b) => {

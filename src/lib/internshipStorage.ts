@@ -13,51 +13,8 @@ import {
 
 const STORAGE_KEY = 'levelupdev_internship_applications_v1';
 
-// Initial seed applications so the admin console demonstrates real data immediately
-const SEED_APPLICATIONS: InternshipApplication[] = [
-  {
-    id: 'app-seed-001',
-    user_id: 'usr-swamy-01',
-    internship_id: 'python-developer-intern',
-    internship_title: 'Python Developer Intern',
-    full_name: 'Swamy Guradasu',
-    email: 'swamyguradasu@gmail.com',
-    phone: '+91 98765 43210',
-    education: 'B.Tech AI & ML, Swarnandhra College of Engineering & Tech (2024-2028)',
-    skills: 'Python 3.12, FastAPI, PostgreSQL, Git, Problem Solving, Docker',
-    status: 'Interested',
-    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-    admin_notes: 'Strong Python background and active daily challenge solve streak.',
-  },
-  {
-    id: 'app-seed-002',
-    user_id: 'usr-demo-02',
-    internship_id: 'data-analyst-intern',
-    internship_title: 'Data Analyst Intern',
-    full_name: 'Priya Sharma',
-    email: 'priya.sharma@example.edu',
-    phone: '+91 91234 56780',
-    education: 'B.Tech Computer Science, Swarnandhra College (2023-2027)',
-    skills: 'SQL, Python (Pandas), Excel, Power BI, Statistics, EDA',
-    status: 'Under Review',
-    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
-    admin_notes: 'Reviewed initial SQL test queries, preparing for mentor check-in.',
-  },
-  {
-    id: 'app-seed-003',
-    user_id: 'usr-demo-03',
-    internship_id: 'machine-learning-intern',
-    internship_title: 'Machine Learning Intern',
-    full_name: 'Rahul Varma',
-    email: 'rahul.varma@example.edu',
-    phone: '+91 98450 12345',
-    education: 'B.Tech Data Science & AI, Swarnandhra College (2022-2026)',
-    skills: 'Python, Scikit-learn, PyTorch, Linear Algebra, Pandas, NumPy',
-    status: 'Selected',
-    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-    admin_notes: 'Completed supervised learning task module with top score.',
-  },
-];
+// Seed applications list (empty for clean dynamic database architecture)
+const SEED_APPLICATIONS: InternshipApplication[] = [];
 
 // Helper to get from local storage
 function getLocalApplications(): InternshipApplication[] {
