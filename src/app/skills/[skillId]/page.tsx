@@ -139,7 +139,7 @@ export default function SkillPathMapPage() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center text-white font-label-mono text-sm">
         <div className="flex items-center gap-3 bg-stone-900/80 backdrop-blur-md px-6 py-4 rounded-2xl shadow-xl border border-white/10">
-          <div className="w-5 h-5 border-2 border-[#e8702a] border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-[#006cd2] border-t-transparent rounded-full animate-spin" />
           <span className="text-stone-200">Loading Skill Trail...</span>
         </div>
       </div>
@@ -150,16 +150,16 @@ export default function SkillPathMapPage() {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
         <div className="text-center space-y-4 max-w-md bg-stone-900/80 backdrop-blur-xl p-8 rounded-2xl shadow-2xl border border-white/10">
-          <div className="w-14 h-14 bg-stone-800 rounded-full flex items-center justify-center mx-auto text-[#e8702a]">
+          <div className="w-14 h-14 bg-stone-800 rounded-full flex items-center justify-center mx-auto text-[#006cd2]">
             <HelpCircle className="w-7 h-7" />
           </div>
           <h2 className="font-headline-md text-headline-md font-bold text-white">Trail Not Found</h2>
           <p className="font-body-sm text-body-sm text-stone-300">
-            No roadmap configuration found for <code className="font-label-mono bg-stone-800 px-1.5 py-0.5 rounded text-amber-300">&quot;{skillId}&quot;</code>.
+            No roadmap configuration found for <code className="font-label-mono bg-stone-800 px-1.5 py-0.5 rounded text-blue-300">&quot;{skillId}&quot;</code>.
           </p>
           <Link
             href="/home"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e8702a] hover:bg-[#d2611f] text-white font-medium rounded-xl text-body-sm transition shadow-lg shadow-[#e8702a]/30"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#006cd2] hover:bg-[#005bb5] text-white font-medium rounded-xl text-body-sm transition shadow-lg shadow-[#006cd2]/30"
           >
             <ArrowLeft className="w-4 h-4" /> Return to Profile
           </Link>
@@ -244,7 +244,7 @@ export default function SkillPathMapPage() {
             <path
               className="trail-path"
               d="M 500,50 Q 750,200 500,350 T 500,650"
-              stroke="#e8702a"
+              stroke="#006cd2"
               strokeOpacity="0.6"
               strokeWidth="3"
               strokeDasharray="8 8"
@@ -257,7 +257,7 @@ export default function SkillPathMapPage() {
             <path
               className="trail-path"
               d="M 200,50 Q 300,200 200,350 T 200,650"
-              stroke="#e8702a"
+              stroke="#006cd2"
               strokeOpacity="0.6"
               strokeWidth="3"
               strokeDasharray="8 8"
@@ -279,12 +279,12 @@ export default function SkillPathMapPage() {
                 {/* Center Axis Node Badge */}
                 <div className="absolute left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
                   {mod.isCompleted ? (
-                    <div className="w-12 h-12 rounded-full bg-[#e8702a] flex items-center justify-center shadow-lg shadow-[#e8702a]/40 border-2 border-white/30">
+                    <div className="w-12 h-12 rounded-full bg-[#006cd2] flex items-center justify-center shadow-lg shadow-[#006cd2]/40 border-2 border-white/30">
                       <Check className="w-6 h-6 text-white stroke-[3]" />
                     </div>
                   ) : mod.isCurrent || (mod.isUnlocked && !mod.isCompleted && firstUncompletedIndex === index) ? (
-                    <div className="w-14 h-14 rounded-full bg-stone-950 border-4 border-[#e8702a] flex items-center justify-center shadow-[0_0_25px_rgba(232,112,42,0.7)] animate-pulse">
-                      <div className="w-5 h-5 rounded-full bg-[#e8702a] shadow-inner"></div>
+                    <div className="w-14 h-14 rounded-full bg-stone-950 border-4 border-[#006cd2] flex items-center justify-center shadow-[0_0_25px_rgba(0,108,210,0.7)] animate-pulse">
+                      <div className="w-5 h-5 rounded-full bg-[#006cd2] shadow-inner"></div>
                     </div>
                   ) : (
                     <div className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center bg-stone-900/90 shadow-inner">
@@ -304,25 +304,25 @@ export default function SkillPathMapPage() {
                   {mod.isCompleted ? (
                     <Link
                       href={`/skills/${skill.skillId}/${mod.moduleId}`}
-                      className="bg-stone-900/75 backdrop-blur-md p-5 sm:p-6 rounded-2xl border border-white/10 shadow-xl hover:border-[#e8702a]/60 hover:shadow-2xl hover:shadow-[#e8702a]/15 hover:scale-[1.02] transition-all duration-300 block group"
+                      className="bg-stone-900/75 backdrop-blur-md p-5 sm:p-6 rounded-2xl border border-white/10 shadow-xl hover:border-[#006cd2]/60 hover:shadow-2xl hover:shadow-[#006cd2]/20 hover:scale-[1.02] transition-all duration-300 block group"
                     >
                       <div className={`flex items-center justify-between mb-2 ${isEven ? 'flex-row-reverse' : 'flex-row'}`}>
-                        <span className="font-label-mono text-label-mono text-[#e8702a] font-semibold">{modCode}</span>
+                        <span className="font-label-mono text-label-mono text-[#006cd2] font-semibold">{modCode}</span>
                         <span className="text-xs text-emerald-400 font-mono font-medium bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                           Completed ✓
                         </span>
                       </div>
-                      <h3 className="font-headline-sm text-headline-sm text-white group-hover:text-amber-300 transition-colors mb-2 font-bold">{mod.title}</h3>
+                      <h3 className="font-headline-sm text-headline-sm text-white group-hover:text-blue-300 transition-colors mb-2 font-bold">{mod.title}</h3>
                       <p className="font-body-sm text-body-sm text-stone-300/90 line-clamp-2">
                         {topicSummary}
                       </p>
                     </Link>
                   ) : mod.isCurrent || (mod.isUnlocked && !mod.isCompleted && firstUncompletedIndex === index) ? (
-                    <div className="bg-stone-900/90 backdrop-blur-xl p-5 sm:p-6 rounded-2xl border border-[#e8702a]/70 shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_25px_rgba(232,112,42,0.25)] relative group hover:scale-[1.02] transition-all duration-300">
+                    <div className="bg-stone-900/90 backdrop-blur-xl p-5 sm:p-6 rounded-2xl border border-[#006cd2]/70 shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_25px_rgba(0,108,210,0.25)] relative group hover:scale-[1.02] transition-all duration-300">
                       <div className={`flex items-center justify-between mb-3 ${isEven ? 'flex-row-reverse' : 'flex-row'}`}>
                         <div className="flex items-center gap-2">
-                          <span className="font-label-mono text-label-mono text-[#e8702a] font-bold">{modCode}</span>
-                          <span className="bg-[#e8702a] text-white px-2.5 py-0.5 rounded-full font-label-caps text-[10px] font-extrabold shadow-sm shadow-[#e8702a]/40 uppercase tracking-wider">
+                          <span className="font-label-mono text-label-mono text-[#006cd2] font-bold">{modCode}</span>
+                          <span className="bg-[#006cd2] text-white px-2.5 py-0.5 rounded-full font-label-caps text-[10px] font-extrabold shadow-sm shadow-[#006cd2]/40 uppercase tracking-wider">
                             CURRENT
                           </span>
                         </div>
@@ -338,7 +338,7 @@ export default function SkillPathMapPage() {
                       </p>
                       <Link
                         href={`/skills/${skill.skillId}/${mod.moduleId}`}
-                        className="w-full bg-[#e8702a] hover:bg-[#d2611f] text-white font-semibold text-sm py-2.5 px-4 rounded-xl shadow-lg shadow-[#e8702a]/30 hover:shadow-[#e8702a]/50 active:scale-95 transition-all block text-center mt-4"
+                        className="w-full bg-[#006cd2] hover:bg-[#005bb5] text-white font-semibold text-sm py-2.5 px-4 rounded-xl shadow-lg shadow-[#006cd2]/30 hover:shadow-[#006cd2]/50 active:scale-95 transition-all block text-center mt-4"
                       >
                         Resume Trail →
                       </Link>

@@ -168,7 +168,7 @@ export default function ModuleDetailPage() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center font-mono text-sm text-stone-300">
         <div className="flex items-center gap-3 bg-stone-900/80 backdrop-blur-md px-6 py-4 rounded-2xl shadow-xl border border-white/10">
-          <div className="w-5 h-5 border-2 border-[#e8702a] border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-[#006cd2] border-t-transparent rounded-full animate-spin" />
           <span>Loading Module Content...</span>
         </div>
       </div>
@@ -179,16 +179,16 @@ export default function ModuleDetailPage() {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
         <div className="text-center space-y-4 max-w-md bg-stone-900/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/10">
-          <div className="w-16 h-16 bg-stone-800 rounded-2xl flex items-center justify-center mx-auto text-[#e8702a]">
+          <div className="w-16 h-16 bg-stone-800 rounded-2xl flex items-center justify-center mx-auto text-[#006cd2]">
             <HelpCircle className="w-8 h-8" />
           </div>
           <h2 className="font-display text-2xl font-bold text-white">Module Not Found</h2>
           <p className="font-sans text-sm text-stone-300">
-            Could not find module <code className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-amber-300">&quot;{moduleId}&quot;</code> under skill <code className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-amber-300">&quot;{skillId}&quot;</code>.
+            Could not find module <code className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-blue-300">&quot;{moduleId}&quot;</code> under skill <code className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-blue-300">&quot;{skillId}&quot;</code>.
           </p>
           <Link
             href={`/skills/${skillId}`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e8702a] hover:bg-[#d2611f] text-white font-sans text-sm font-semibold rounded-full transition shadow-lg shadow-[#e8702a]/30"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-sm font-semibold rounded-full transition shadow-lg shadow-[#006cd2]/30"
           >
             <ArrowLeft className="w-4 h-4" /> Back to Skill Map
           </Link>
@@ -263,7 +263,7 @@ export default function ModuleDetailPage() {
               href={`/skills/${skill.skillId}`}
               className="flex items-center gap-2 font-mono text-xs font-semibold text-white/80 hover:text-white transition-colors"
             >
-              <ArrowLeft className="w-4 h-4 text-[#e8702a]" />
+              <ArrowLeft className="w-4 h-4 text-[#006cd2]" />
               <span>Back to Level Map</span>
             </Link>
 
@@ -278,8 +278,8 @@ export default function ModuleDetailPage() {
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Completed
                 </span>
               ) : (
-                <span className="px-3.5 py-1 bg-[#e8702a]/15 border border-[#e8702a]/40 text-amber-300 text-xs font-mono font-bold rounded-full flex items-center gap-1.5 shadow-sm">
-                  <Sparkles className="w-4 h-4 text-[#e8702a]" /> Active Level
+                <span className="px-3.5 py-1 bg-[#006cd2]/15 border border-[#006cd2]/40 text-blue-300 text-xs font-mono font-bold rounded-full flex items-center gap-1.5 shadow-sm">
+                  <Sparkles className="w-4 h-4 text-[#006cd2]" /> Active Level
                 </span>
               )}
             </div>
@@ -290,10 +290,10 @@ export default function ModuleDetailPage() {
         <main className="max-w-4xl mx-auto w-full px-4 sm:px-6 py-10 space-y-8 flex-1">
           {/* Module Title Banner */}
           <div className="bg-stone-900/85 backdrop-blur-xl text-white rounded-3xl p-8 border border-white/10 shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-[#e8702a] via-amber-400 to-[#e8702a]" />
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-[#006cd2] via-cyan-400 to-[#006cd2]" />
             <div className="relative z-10 space-y-3">
               <div className="flex items-center gap-3">
-                <span className="font-mono text-xs font-bold text-[#e8702a] bg-[#e8702a]/15 px-3 py-1 rounded-full uppercase tracking-wider border border-[#e8702a]/30">
+                <span className="font-mono text-xs font-bold text-[#006cd2] bg-[#006cd2]/15 px-3 py-1 rounded-full uppercase tracking-wider border border-[#006cd2]/30">
                   {module.moduleId.toUpperCase()} • {skill.title}
                 </span>
               </div>
@@ -310,7 +310,7 @@ export default function ModuleDetailPage() {
           <section className="space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h2 className="font-display text-xl font-bold text-white flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-[#e8702a]" />
+                <BookOpen className="w-5 h-5 text-[#006cd2]" />
                 Module Syllabus Topics
               </h2>
               <span className="font-mono text-xs text-stone-400">
@@ -322,13 +322,13 @@ export default function ModuleDetailPage() {
               {module.topics.map((t, idx) => (
                 <div
                   key={idx}
-                  className="bg-stone-900/75 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-xl hover:border-[#e8702a]/50 transition-all space-y-2 group"
+                  className="bg-stone-900/75 backdrop-blur-md rounded-2xl border border-white/10 p-6 shadow-xl hover:border-[#006cd2]/50 transition-all space-y-2 group"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-7 h-7 rounded-xl bg-[#e8702a]/20 border border-[#e8702a]/40 text-amber-300 font-mono text-xs font-bold flex items-center justify-center shrink-0">
+                    <span className="w-7 h-7 rounded-xl bg-[#006cd2]/20 border border-[#006cd2]/40 text-blue-300 font-mono text-xs font-bold flex items-center justify-center shrink-0">
                       {idx + 1}
                     </span>
-                    <h3 className="font-display text-base font-bold text-white group-hover:text-amber-300 transition-colors">
+                    <h3 className="font-display text-base font-bold text-white group-hover:text-blue-300 transition-colors">
                       {t.name}
                     </h3>
                   </div>
@@ -345,7 +345,7 @@ export default function ModuleDetailPage() {
             <>
               {!showAssessment && !submitted ? (
                 <div className="bg-stone-900/85 backdrop-blur-xl border border-white/10 rounded-3xl p-8 sm:p-10 text-center space-y-5 shadow-2xl mt-8">
-                  <div className="w-16 h-16 bg-[#e8702a]/15 border border-[#e8702a]/30 rounded-2xl flex items-center justify-center mx-auto text-[#e8702a] shadow-inner">
+                  <div className="w-16 h-16 bg-[#006cd2]/15 border border-[#006cd2]/30 rounded-2xl flex items-center justify-center mx-auto text-[#006cd2] shadow-inner">
                     <Sparkles className="w-8 h-8" />
                   </div>
                   <div className="space-y-2 max-w-md mx-auto">
@@ -359,7 +359,7 @@ export default function ModuleDetailPage() {
                   <button
                     type="button"
                     onClick={() => setShowAssessment(true)}
-                    className="inline-flex items-center gap-2 px-8 py-4 bg-[#e8702a] hover:bg-[#d2611f] text-white font-sans text-sm font-semibold rounded-full shadow-lg shadow-[#e8702a]/30 hover:scale-[1.03] active:scale-95 transition-all duration-200"
+                    className="inline-flex items-center gap-2 px-8 py-4 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-sm font-semibold rounded-full shadow-lg shadow-[#006cd2]/30 hover:scale-[1.03] active:scale-95 transition-all duration-200"
                   >
                     <span>Start Knowledge Assessment</span>
                     <ChevronRight className="w-4 h-4" />
@@ -370,7 +370,7 @@ export default function ModuleDetailPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="font-display text-xl font-bold text-white flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-[#e8702a]" />
+                        <Sparkles className="w-5 h-5 text-[#006cd2]" />
                         Knowledge Assessment
                       </h2>
                       <p className="font-sans text-xs text-stone-400 mt-0.5">
@@ -398,7 +398,7 @@ export default function ModuleDetailPage() {
                       className="bg-stone-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-7 space-y-4 shadow-xl"
                     >
                       <div className="flex items-start gap-3">
-                        <span className="font-mono text-xs font-bold text-[#e8702a] bg-[#e8702a]/15 px-2.5 py-1 rounded-lg border border-[#e8702a]/30 shrink-0 mt-0.5">
+                        <span className="font-mono text-xs font-bold text-[#006cd2] bg-[#006cd2]/15 px-2.5 py-1 rounded-lg border border-[#006cd2]/30 shrink-0 mt-0.5">
                           Q{qIndex + 1}
                         </span>
                         <p className="font-display text-base font-semibold text-white leading-snug">
@@ -411,7 +411,7 @@ export default function ModuleDetailPage() {
                           const isSelected = selectedOpt === oIdx;
 
                           let optionStyle =
-                            'bg-stone-800/60 border-white/10 text-stone-200 hover:border-[#e8702a] hover:bg-stone-800/80';
+                            'bg-stone-800/60 border-white/10 text-stone-200 hover:border-[#006cd2] hover:bg-stone-800/80';
 
                           if (submitted) {
                             const isCorrectOpt = oIdx === q.correctAnswer;
@@ -423,7 +423,7 @@ export default function ModuleDetailPage() {
                             }
                           } else if (isSelected) {
                             optionStyle =
-                              'bg-[#e8702a]/20 border-[#e8702a] text-white font-bold shadow-md ring-1 ring-[#e8702a]';
+                              'bg-[#006cd2]/20 border-[#006cd2] text-white font-bold shadow-md ring-1 ring-[#006cd2]';
                           }
 
                           return (
@@ -434,7 +434,7 @@ export default function ModuleDetailPage() {
                             >
                               <span className="leading-snug">{optionText}</span>
                               {isSelected && (
-                                <span className="w-5 h-5 rounded-full bg-[#e8702a] text-white flex items-center justify-center shrink-0 ml-2 shadow-sm">
+                                <span className="w-5 h-5 rounded-full bg-[#006cd2] text-white flex items-center justify-center shrink-0 ml-2 shadow-sm">
                                   <Check className="w-3.5 h-3.5 stroke-[3]" />
                                 </span>
                               )}
@@ -460,7 +460,7 @@ export default function ModuleDetailPage() {
                         <div
                           className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${
                             passed
-                              ? 'bg-[#e8702a] text-white shadow-lg shadow-[#e8702a]/30'
+                              ? 'bg-[#006cd2] text-white shadow-lg shadow-[#006cd2]/30'
                               : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                           }`}
                         >
@@ -478,8 +478,8 @@ export default function ModuleDetailPage() {
                               : 'Review the topic summaries above and try again to unlock the next module.'}
                           </p>
                           {isSkillFinished && passed && (
-                            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-[#e8702a]/20 border border-[#e8702a]/40 text-amber-300 text-xs font-mono font-bold rounded-lg">
-                              <Trophy className="w-4 h-4 text-[#e8702a]" /> Entire Skill Mastered! Saved to Resume Portfolio.
+                            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-[#006cd2]/20 border border-[#006cd2]/40 text-blue-300 text-xs font-mono font-bold rounded-lg">
+                              <Trophy className="w-4 h-4 text-[#006cd2]" /> Entire Skill Mastered! Saved to Resume Portfolio.
                             </div>
                           )}
                         </div>
@@ -488,7 +488,7 @@ export default function ModuleDetailPage() {
                       {passed ? (
                         <Link
                           href={`/skills/${skill.skillId}`}
-                          className="w-full sm:w-auto px-6 py-3.5 bg-[#e8702a] hover:bg-[#d2611f] text-white font-sans text-sm font-semibold rounded-full transition shadow-lg shadow-[#e8702a]/30 flex items-center justify-center gap-2 shrink-0"
+                          className="w-full sm:w-auto px-6 py-3.5 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-sm font-semibold rounded-full transition shadow-lg shadow-[#006cd2]/30 flex items-center justify-center gap-2 shrink-0"
                         >
                           <span>Return to Level Map</span>
                           <ChevronRight className="w-4 h-4" />
@@ -509,7 +509,7 @@ export default function ModuleDetailPage() {
                     <button
                       type="submit"
                       disabled={Object.keys(userAnswers).length < module.assessment.questions.length}
-                      className="w-full sm:w-auto px-8 py-4 bg-[#e8702a] hover:bg-[#d2611f] text-white font-sans text-sm font-semibold rounded-full shadow-lg shadow-[#e8702a]/30 hover:scale-[1.02] active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full sm:w-auto px-8 py-4 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-sm font-semibold rounded-full shadow-lg shadow-[#006cd2]/30 hover:scale-[1.02] active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Award className="w-4 h-4" />
                       <span>Submit Assessment</span>

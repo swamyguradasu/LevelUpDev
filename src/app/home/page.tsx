@@ -1,12 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getAllSkills, Skill, getAllProjects, getProjectById, ProjectIdea, isAdminEmail } from '@/lib/content';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { WelcomeScreen } from '@/components/WelcomeScreen';
+import {
+  PLATFORM_ACHIEVEMENTS_LIST,
+  PortfolioAchievement,
+  PortfolioCertificate,
+  PortfolioExperience,
+  PortfolioEducation,
+} from '@/data/portfolioData';
 import {
   Flame,
   Pencil,
@@ -30,6 +37,25 @@ import {
   AlertTriangle,
   Upload,
   User,
+  ShieldCheck,
+  Award,
+  BookOpen,
+  Briefcase,
+  Search,
+  CheckCircle2,
+  ArrowRight,
+  Eye,
+  Copy,
+  Download,
+  Terminal,
+  Cpu,
+  Database,
+  Layers,
+  Star,
+  Activity,
+  Layers3,
+  Calendar,
+  Filter,
 } from 'lucide-react';
 
 function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -71,18 +97,40 @@ function LinkedinIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+const DEFAULT_AVATAR =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuCeImeuYYYUrCiVonGEBFUpCkEZiehGncFXeYHxaVkJl8fxQflctQxvXzd_sgXHjlOO9sjk_p2uTzRRTOu0chpmEn32zM5aJbOALiZEjm1pFnCqktUT5w9_2VHjtJdEU-7Dgw2Uj52To4J80eBe-Eb6rnLSnvX2d13dzXYgNM7OxwV7dqWBA_x2LA6fjraZrCAqmlgF5zXHVgFv4RcTA2Mw00lEFupmVx_9RBhYQt5U6OC5juqv46SkRg';
+
 export default function HomePage() {
-  const { userData, loading, updateProfile, updateUserProject, logout, syncLeetCodeStats } = useAuth();
+  const { userData, loading, isDemoMode, updateProfile, updateUserProject, logout, syncLeetCodeStats } = useAuth();
   const router = useRouter();
 
   // Welcome Screen State
   const [showWelcome, setShowWelcome] = useState(false);
 
-  // Edit Profile Modal / Form State
+  // Recruiter Mode Toggle
+  const [isRecruiterView, setIsRecruiterView] = useState(false);
+
+  // Active Section Filter
+  const [activeFilter, setActiveFilter] = useState<'all' | 'skills' | 'projects' | 'achievements' | 'certifications' | 'education'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Modals
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSharingProfile, setIsSharingProfile] = useState(false);
+  const [selectedSkillModal, setSelectedSkillModal] = useState<{
+    skill: Skill;
+    completedCount: number;
+    totalCount: number;
+    isEarned: boolean;
+  } | null>(null);
+  const [selectedProjectModal, setSelectedProjectModal] = useState<ProjectIdea | null>(null);
+  const [selectedCertModal, setSelectedCertModal] = useState<PortfolioCertificate | null>(null);
+
+  // Edit Profile Form State
   const [nameInput, setNameInput] = useState('');
   const [headlineInput, setHeadlineInput] = useState('');
   const [bioInput, setBioInput] = useState('');
+  const [locationInput, setLocationInput] = useState('India');
   const [collegeInput, setCollegeInput] = useState('');
   const [branchInput, setBranchInput] = useState('');
   const [githubInput, setGithubInput] = useState('');
@@ -100,25 +148,11 @@ export default function HomePage() {
   const [projLiveInput, setProjLiveInput] = useState('');
   const [hasDeployed, setHasDeployed] = useState(false);
   const [savingProjectLinks, setSavingProjectLinks] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
-  // Parallax backdrop
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  // Static Content
+  // Content Data
   const [allSkills, setAllSkills] = useState<Skill[]>([]);
   const [allProjects, setAllProjects] = useState<ProjectIdea[]>([]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const { innerWidth, innerHeight } = window;
-      const x = (e.clientX / innerWidth - 0.5) * 15;
-      const y = (e.clientY / innerHeight - 0.5) * 15;
-      setMousePos({ x, y });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
 
   useEffect(() => {
     if (!loading && !userData) {
@@ -138,22 +172,21 @@ export default function HomePage() {
 
   useEffect(() => {
     if (userData) {
-      setNameInput(userData.name || 'Kalyan Reddy');
-      setHeadlineInput(userData.headline || 'Aspiring Backend Developer');
+      setNameInput(userData.name || 'Swamy Guradasu');
+      setHeadlineInput(userData.headline || 'AIML Developer • ML Enthusiast • Full-Stack Builder');
       setBioInput(
         userData.bio ||
-          'Passionate about building scalable backend microservices, algorithmic optimization, and cloud-native architectures. Currently exploring Python internals and distributed systems.'
+          'Building intelligent products while continuously learning and shipping projects. Passionate about machine learning pipelines, backend systems, and clean developer tooling.'
       );
-      setCollegeInput(userData.college || 'XYZ Institute of Technology');
-      setBranchInput(userData.branch || 'B.Tech, CSE');
-      setGithubInput(userData.githubUrl || 'https://github.com');
-      setLinkedinInput(userData.linkedinUrl || 'https://linkedin.com');
+      setCollegeInput(userData.college || 'Swarnandhra College of Engineering & Technology');
+      setBranchInput(userData.branch || 'B.Tech — Artificial Intelligence & Machine Learning');
+      setGithubInput(userData.githubUrl || 'https://github.com/swamyguradasu');
+      setLinkedinInput(userData.linkedinUrl || 'https://linkedin.com/in/swamyguradasu');
       setLeetcodeInput(userData.leetcodeId || 'Swamy_Guradasu');
       setPhotoInput(userData.photoUrl || '');
 
-      // Project links
-      setProjGithubInput(userData.projectGithubUrl || 'https://github.com/example/task-queue');
-      setProjLiveInput(userData.projectLiveUrl || 'https://task-queue-demo.example.com');
+      setProjGithubInput(userData.projectGithubUrl || '');
+      setProjLiveInput(userData.projectLiveUrl || '');
       setHasDeployed(!!userData.projectLiveUrl);
     }
   }, [userData]);
@@ -163,20 +196,210 @@ export default function HomePage() {
     setAllProjects(getAllProjects());
   }, []);
 
+  // Compute Dynamic Skills (Earned vs In-Progress)
+  const { earnedSkills, inProgressSkills } = useMemo(() => {
+    if (!userData || allSkills.length === 0) return { earnedSkills: [], inProgressSkills: [] };
+
+    const earned: {
+      skill: Skill;
+      completedCount: number;
+      totalCount: number;
+      earnedDate: string;
+      percentage: number;
+    }[] = [];
+
+    const inProgress: {
+      skill: Skill;
+      completedCount: number;
+      totalCount: number;
+      percentage: number;
+    }[] = [];
+
+    allSkills.forEach((sk) => {
+      const skillProgressObj = userData.progress?.[sk.skillId.toLowerCase()] || {};
+      const totalCount = sk.modules.length;
+      const completedCount = sk.modules.filter((m) => skillProgressObj[m.moduleId] === true).length;
+      const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+      if (completedCount === totalCount && totalCount > 0) {
+        earned.push({
+          skill: sk,
+          completedCount,
+          totalCount,
+          earnedDate: 'August 2026',
+          percentage: 100,
+        });
+      } else if (completedCount > 0) {
+        inProgress.push({
+          skill: sk,
+          completedCount,
+          totalCount,
+          percentage,
+        });
+      }
+    });
+
+    return { earnedSkills: earned, inProgressSkills: inProgress };
+  }, [userData, allSkills]);
+
+  // Compute Completed / Linked Projects
+  const userProjects = useMemo(() => {
+    if (!userData || !userData.selectedProjectId) return [];
+    const proj = getProjectById(userData.selectedProjectId);
+    if (!proj) return [];
+    return [
+      {
+        ...proj,
+        githubUrl: userData.projectGithubUrl || null,
+        liveUrl: userData.projectLiveUrl || null,
+        completedDate: 'August 2026',
+        status: userData.projectLiveUrl ? 'Deployed' : userData.projectGithubUrl ? 'Completed' : 'In Development',
+      },
+    ];
+  }, [userData]);
+
+  // Compute Dynamic Achievements
+  const achievements = useMemo(() => {
+    if (!userData) return [];
+
+    const solvedCount = userData.streak?.solvedDates?.length || 0;
+    const streakDays = userData.streak?.currentStreak || 0;
+    const hasLinkedProject = !!userData.projectGithubUrl;
+    const pythonDone = earnedSkills.some((s) => s.skill.skillId.toLowerCase() === 'python');
+
+    return PLATFORM_ACHIEVEMENTS_LIST.map((ach) => {
+      let isUnlocked = false;
+      let earnedDate: string | undefined;
+
+      if (ach.id === 'python-mastery' && pythonDone) {
+        isUnlocked = true;
+        earnedDate = 'Aug 2026';
+      } else if (ach.id === 'first-project' && hasLinkedProject) {
+        isUnlocked = true;
+        earnedDate = 'Aug 2026';
+      } else if (ach.id === 'streak-7' && streakDays >= 7) {
+        isUnlocked = true;
+        earnedDate = 'Aug 2026';
+      } else if (ach.id === 'streak-30' && streakDays >= 30) {
+        isUnlocked = true;
+        earnedDate = 'Aug 2026';
+      } else if (ach.id === 'first-solve' && solvedCount >= 1) {
+        isUnlocked = true;
+        earnedDate = 'Aug 2026';
+      } else if (ach.id === 'dsa-grinder' && solvedCount >= 10) {
+        isUnlocked = true;
+        earnedDate = 'Aug 2026';
+      } else if (ach.id === 'perfect-module' && pythonDone) {
+        isUnlocked = true;
+        earnedDate = 'Aug 2026';
+      } else if (ach.id === 'recruiter-ready' && (earnedSkills.length > 0 || hasLinkedProject)) {
+        isUnlocked = true;
+        earnedDate = 'Aug 2026';
+      }
+
+      return {
+        ...ach,
+        isUnlocked,
+        earnedDate,
+      };
+    });
+  }, [userData, earnedSkills]);
+
+  // Compute Verified Certifications
+  const certifications = useMemo<PortfolioCertificate[]>(() => {
+    if (!userData) return [];
+    const list: PortfolioCertificate[] = [];
+
+    earnedSkills.forEach((s) => {
+      const code = s.skill.skillId.toUpperCase();
+      const userHash = userData.uid ? userData.uid.slice(0, 6).toUpperCase() : 'DEV01';
+      list.push({
+        id: `cert-${s.skill.skillId}`,
+        title: `Certified ${s.skill.title} Specialist`,
+        skillId: s.skill.skillId,
+        issuedBy: 'LevelUpDev Platform & LMS Authority',
+        issueDate: 'August 2026',
+        credentialId: `LUD-${code}-2026-${userHash}`,
+        verificationUrl: `https://levelupdev.com/verify/LUD-${code}-2026-${userHash}`,
+        skillsCovered: s.skill.modules.map((m) => m.title),
+        gradeScore: '96% (Verified Assessment)',
+        isUnlocked: true,
+      });
+    });
+
+    return list;
+  }, [userData, earnedSkills]);
+
+  // Compute Portfolio Strength Score
+  const portfolioStrength = useMemo(() => {
+    if (!userData) return { score: 40, checks: [] };
+
+    const checks = [
+      { label: 'Profile headline & bio configured', done: !!(userData.name && userData.headline && userData.bio) },
+      { label: 'Avatar & college education linked', done: !!(userData.college && userData.branch) },
+      { label: 'GitHub or LinkedIn profile connected', done: !!(userData.githubUrl || userData.linkedinUrl) },
+      { label: 'At least 1 verified skill unlocked', done: earnedSkills.length > 0 },
+      { label: 'At least 1 project built & deployed', done: userProjects.length > 0 },
+      { label: 'Milestone achievements earned', done: achievements.filter((a) => a.isUnlocked).length >= 2 },
+    ];
+
+    const completed = checks.filter((c) => c.done).length;
+    const score = Math.min(100, Math.round((completed / checks.length) * 100));
+
+    return { score, checks };
+  }, [userData, earnedSkills, userProjects, achievements]);
+
+  // Static Experience & Education Lists
+  const experiences: PortfolioExperience[] = [
+    {
+      id: 'exp-1',
+      role: 'Artificial Intelligence & Machine Learning Scholar',
+      organization: 'LevelUpDev Engineering Group',
+      location: 'India',
+      period: '2024 — Present',
+      type: 'Open Source',
+      description: [
+        'Mastering end-to-end Python internals, algorithm optimization, and machine learning pipelines.',
+        'Building scalable asynchronous microservices, REST APIs with FastAPI, and predictive systems.',
+        'Solving daily algorithmic problems and contributing to developer peer code reviews.',
+      ],
+      technologies: ['Python 3.12', 'FastAPI', 'Machine Learning', 'Docker', 'Git'],
+    },
+  ];
+
+  const educations: PortfolioEducation[] = [
+    {
+      id: 'edu-1',
+      degree: 'Bachelor of Technology (B.Tech)',
+      major: userData?.branch || 'Artificial Intelligence & Machine Learning',
+      institution: userData?.college || 'Swarnandhra College of Engineering & Technology',
+      period: '2024 — 2028',
+      gpaOrScore: '8.8 / 10.0 CGPA',
+      highlights: [
+        'Core coursework: Data Structures, Algorithms, Linear Algebra, Probability, Database Systems, Computer Networks.',
+        'Active member of the developer engineering club and AI research cohort.',
+      ],
+    },
+  ];
+
   if (loading || !userData) {
     return (
-      <div className="min-h-screen topo-bg flex items-center justify-center text-[#0F2E28] font-mono text-sm">
-        <div className="flex items-center gap-3 bg-white/90 px-6 py-4 rounded-2xl shadow-sm border border-[#5C7A6B]/20">
-          <div className="w-5 h-5 border-2 border-[#0F2E28] border-t-transparent rounded-full animate-spin" />
-          <span>Syncing Digital Resume Portfolio...</span>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-sm">
+        <div className="flex items-center gap-3 bg-slate-900/90 px-6 py-4 rounded-2xl border border-slate-800 shadow-2xl">
+          <div className="w-5 h-5 border-2 border-[#006cd2] border-t-transparent rounded-full animate-spin" />
+          <span>Syncing Dynamic Portfolio Dashboard...</span>
         </div>
       </div>
     );
   }
 
-  // Handle Save Profile Updates
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isDemoMode) {
+      alert('You are exploring in Demo Viewing Mode. Changes are disabled and not saved to the database.');
+      setIsEditingProfile(false);
+      return;
+    }
     setSaving(true);
     await updateProfile({
       name: nameInput,
@@ -193,14 +416,12 @@ export default function HomePage() {
     setSaving(false);
   };
 
-  const handleManualLeetCodeSync = async () => {
-    setSyncingLeetCode(true);
-    await syncLeetCodeStats();
-    setSyncingLeetCode(false);
-  };
-
-  // Select a project idea from list
   const handleSelectProjectIdea = async (projectId: string) => {
+    if (isDemoMode) {
+      alert('You are exploring in Demo Viewing Mode. Project changes are disabled in this preview.');
+      setIsSelectingProject(false);
+      return;
+    }
     setIsSelectingProject(false);
     await updateUserProject(projectId, null, null);
     setProjGithubInput('');
@@ -209,9 +430,13 @@ export default function HomePage() {
     setIsEditingLinks(true);
   };
 
-  // Save Project Links
   const handleSaveProjectLinks = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isDemoMode) {
+      alert('You are exploring in Demo Viewing Mode. Changes will not be saved to the database.');
+      setIsEditingLinks(false);
+      return;
+    }
     if (!projGithubInput) return;
     setSavingProjectLinks(true);
     const activeProjId = userData.selectedProjectId || 'task-queue';
@@ -224,8 +449,12 @@ export default function HomePage() {
     setSavingProjectLinks(false);
   };
 
-  // Confirm Change Project (Clears saved links & resets selection)
   const handleConfirmChangeProject = async () => {
+    if (isDemoMode) {
+      alert('Project modification is disabled in Demo Viewing Mode.');
+      setIsConfirmingChange(false);
+      return;
+    }
     setIsConfirmingChange(false);
     await updateUserProject(null, null, null);
     setProjGithubInput('');
@@ -239,952 +468,1125 @@ export default function HomePage() {
     router.push('/login');
   };
 
-  const defaultAvatar =
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuCeImeuYYYUrCiVonGEBFUpCkEZiehGncFXeYHxaVkJl8fxQflctQxvXzd_sgXHjlOO9sjk_p2uTzRRTOu0chpmEn32zM5aJbOALiZEjm1pFnCqktUT5w9_2VHjtJdEU-7Dgw2Uj52To4J80eBe-Eb6rnLSnvX2d13dzXYgNM7OxwV7dqWBA_x2LA6fjraZrCAqmlgF5zXHVgFv4RcTA2Mw00lEFupmVx_9RBhYQt5U6OC5juqv46SkRg';
+  const handleCopyShareLink = () => {
+    if (typeof window !== 'undefined') {
+      const shareUrl = `${window.location.origin}/home?user=${userData.uid || 'public'}`;
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
 
-  // Selected Project Object
-  const selectedProjId = userData.selectedProjectId ?? 'task-queue';
-  const currentProject = selectedProjId ? getProjectById(selectedProjId) : null;
-
-  const displayName = userData.name || 'Member';
-  const displayHeadline = userData.headline || 'Learning Developer';
-  const displayCollege = userData.college || 'Swarnandhra College of Engineering and Technology';
-  const displayBranch = userData.branch || 'AIML';
+  const displayName = userData.name || 'Swamy Guradasu';
+  const displayHeadline = userData.headline || 'AIML Developer • ML Enthusiast • Full-Stack Builder';
+  const displayCollege = userData.college || 'Swarnandhra College of Engineering & Technology';
+  const displayBranch = userData.branch || 'B.Tech — Artificial Intelligence & Machine Learning';
   const displayBio =
     userData.bio ||
-    'Passionate developer learning with LevelUpDev group.';
+    'Building intelligent products while continuously learning and shipping projects. Passionate about machine learning pipelines, backend systems, and clean developer tooling.';
 
-  // Dynamic Python progress calculation
-  const pythonProgressObj = userData.progress?.python || {};
-  const pythonSkillDef = allSkills.find((s) => s.skillId.toLowerCase() === 'python');
-  const pythonModules = pythonSkillDef?.modules || [];
-  const pythonTotalCount = pythonModules.length || 7;
-  const pythonCompletedCount = pythonModules.filter((m) => pythonProgressObj[m.moduleId] === true).length;
-  const pythonPercentage = Math.round((pythonCompletedCount / pythonTotalCount) * 100);
-  const isPythonStarted = pythonCompletedCount > 0;
-  const PALOMAR_VIDEO_URL =
-    'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260820_010308_b1636845-4c15-4ab6-b0c9-9a29bfb0c6e3.mp4';
+  const unlockedCount = earnedSkills.length;
+  const projectCount = userProjects.length;
+  const unlockedAchCount = achievements.filter((a) => a.isUnlocked).length;
+  const certCount = certifications.length;
+  const streakCount = userData.streak?.currentStreak || 0;
 
   return (
-    <div className="relative min-h-screen bg-black text-[#1A1C1B] flex flex-col font-sans antialiased overflow-x-hidden select-none">
-      {/* Palomar Video Background Layer */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <video
-          src={PALOMAR_VIDEO_URL}
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="w-full h-full object-cover object-bottom"
+    <div className="relative min-h-screen bg-slate-950 text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-[#006cd2] selection:text-white">
+      {/* Background Decor Layer */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[850px] h-[500px] bg-[#006cd2]/15 rounded-full blur-[140px]" />
+        <div className="absolute top-[40%] -left-40 w-[600px] h-[600px] bg-cyan-600/10 rounded-full blur-[160px]" />
+        <div className="absolute bottom-[10%] -right-40 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[160px]" />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `radial-gradient(rgba(255,255,255,0.8) 1px, transparent 1px)`,
+            backgroundSize: '24px 24px',
+          }}
         />
-        <div className="absolute inset-0 bg-black/40" />
       </div>
 
-      <div className="relative z-10 min-h-screen flex flex-col flex-1">
-        {/* Welcome Overlay */}
-        {showWelcome && (
-          <WelcomeScreen userData={userData} onComplete={handleWelcomeComplete} />
-        )}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* Welcome Screen Overlay */}
+        {showWelcome && <WelcomeScreen userData={userData} onComplete={handleWelcomeComplete} />}
 
-        {/* Navigation Bar */}
-        <header className="bg-stone-900/80 backdrop-blur-xl border-b border-white/10 w-full top-0 left-0 flex justify-between items-center px-6 md:px-12 py-4 z-50 sticky">
+        {/* ========================================================================= */}
+        {/* TOP MAIN NAVIGATION */}
+        {/* ========================================================================= */}
+        <header className="bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 w-full top-0 left-0 flex justify-between items-center px-4 sm:px-8 md:px-12 py-3.5 z-50 sticky">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-stone-900 border border-white/15 p-1 flex items-center justify-center shadow-md">
+            <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 p-1 flex items-center justify-center shadow-md">
               <img src="/levelupdev-icon.png" alt="LevelUpDev Logo" className="w-full h-full object-contain rounded-lg" />
             </div>
-            <span className="font-display font-bold text-lg text-white tracking-tight">
-              LevelUpDev <span className="text-stone-400 font-mono text-xs font-normal">/ Trail Tracker</span>
-            </span>
+            <div>
+              <span className="font-display font-bold text-base sm:text-lg text-white tracking-tight flex items-center gap-1.5">
+                LevelUpDev <span className="text-slate-500 font-mono text-xs font-normal">/ Portfolio</span>
+              </span>
+            </div>
           </div>
 
-          <nav className="hidden md:flex gap-8 items-center text-sm font-medium">
-            <Link className="text-white font-semibold hover:text-[#e8702a] transition" href="/home">
-              Portfolio
+          {/* Nav Links */}
+          <nav className="hidden md:flex gap-6 items-center text-sm font-medium">
+            <Link className="text-[#006cd2] font-semibold flex items-center gap-1" href="/home">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Portfolio</span>
             </Link>
-            <Link className="text-stone-300 hover:text-white transition" href="/skills/python">
+            <Link className="text-slate-300 hover:text-white transition" href="/roadmaps">
+              Career Roadmaps
+            </Link>
+            <Link className="text-slate-300 hover:text-white transition" href="/internships">
+              Internships
+            </Link>
+            <Link className="text-slate-300 hover:text-white transition" href="/skills/python">
               Skill Trails
             </Link>
-            <Link className="text-stone-300 hover:text-white transition" href="/daily">
+            <Link className="text-slate-300 hover:text-white transition" href="/daily">
               Daily Challenge
             </Link>
-            <Link className="text-stone-300 hover:text-white transition" href="/leaderboard">
+            <Link className="text-slate-300 hover:text-white transition" href="/leaderboard">
               Leaderboard
             </Link>
             {isAdminEmail(userData?.email || '') && (
               <Link
-                className="text-amber-300 font-bold hover:text-white transition flex items-center gap-1 bg-[#e8702a]/20 px-2.5 py-1 rounded-full border border-[#e8702a]/40"
+                className="text-blue-300 font-bold hover:text-white transition flex items-center gap-1 bg-[#006cd2]/20 px-2.5 py-0.5 rounded-full border border-[#006cd2]/40 text-xs"
                 href="/admin"
               >
-                Admin Console
+                Admin
               </Link>
             )}
           </nav>
 
-          <div className="flex items-center gap-3">
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Recruiter View Toggle */}
+            <button
+              onClick={() => setIsRecruiterView(!isRecruiterView)}
+              className={`px-3 py-1.5 rounded-xl font-mono text-xs font-semibold flex items-center gap-1.5 transition border ${
+                isRecruiterView
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 ring-1 ring-emerald-500/30'
+                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+              }`}
+              title="Toggle Recruiter Clean Presentation Mode"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isRecruiterView ? 'Recruiter Mode: ON' : 'Recruiter View'}</span>
+            </button>
+
+            {/* Share Profile Button */}
+            <button
+              onClick={() => setIsSharingProfile(true)}
+              className="px-3 py-1.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-[#006cd2]/30 transition"
+              title="Share Public Portfolio"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+
+            {/* Edit Profile */}
             <button
               onClick={() => setIsEditingProfile(true)}
-              className="p-2 rounded-xl hover:bg-white/10 text-stone-200 transition"
-              title="Edit Portfolio Profile"
+              className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition"
+              title="Edit Profile"
             >
-              <Settings className="w-5 h-5" />
+              <Settings className="w-4 h-4" />
             </button>
+
+            {/* Logout */}
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl hover:bg-rose-500/20 text-rose-400 transition"
+              className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-rose-500/20 text-rose-400 transition"
               title="Logout"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </header>
 
-        {/* Main Container */}
-        <main className="flex-grow w-full max-w-[1280px] mx-auto px-4 md:px-12 py-8 space-y-10">
-          {/* 1. Currently Learning Highlight Strip (Top) */}
-          <section className="w-full bg-stone-900/85 backdrop-blur-xl text-white rounded-3xl p-5 md:p-6 shadow-2xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-[#e8702a]/10 rounded-full blur-2xl pointer-events-none" />
-            <div className="flex items-center gap-4 relative z-10">
-              <div className="w-12 h-12 rounded-xl bg-[#e8702a]/20 border border-[#e8702a]/40 flex items-center justify-center text-[#e8702a] shrink-0 shadow-inner">
-                <Play className="w-5 h-5 fill-current" />
+        {/* ========================================================================= */}
+        {/* DEMO VIEWING MODE BANNER (When in demo mode) */}
+        {/* ========================================================================= */}
+        {isDemoMode && (
+          <div className="bg-amber-950/70 border-b border-amber-500/40 py-2.5 px-4 text-xs font-mono text-amber-200 flex flex-col sm:flex-row items-center justify-between gap-2 shadow-lg shadow-black/40">
+            <div className="flex items-center gap-2">
+              <Eye className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>👁️ Demo Viewing Mode:</strong> You are exploring LevelUpDev with a dummy member profile. This is a read-only preview for exploration and does not affect the database.
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-3.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition shrink-0 shadow-sm text-[11px]"
+            >
+              Exit Demo &amp; Sign In
+            </button>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* RECRUITER BANNER CALLOUT (When active) */}
+        {/* ========================================================================= */}
+        {isRecruiterView && (
+          <div className="bg-emerald-950/40 border-b border-emerald-500/30 py-2 px-4 text-center text-xs font-mono text-emerald-300 flex items-center justify-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>
+              <strong>Recruiter View Active: </strong> Showing verified skills, production projects, certifications, and
+              education. Gamified badges and locked trails are hidden.
+            </span>
+            <button
+              onClick={() => setIsRecruiterView(false)}
+              className="underline font-bold text-white ml-2 hover:text-emerald-200"
+            >
+              Exit
+            </button>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* SECTION NAVIGATION PILLS */}
+        {/* ========================================================================= */}
+        <div className="bg-slate-950/90 border-b border-slate-800/80 sticky top-[61px] z-40 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-4 sm:px-8 py-2 flex items-center justify-between gap-4 overflow-x-auto scrollbar-none">
+            <div className="flex items-center gap-1.5 shrink-0">
+              {(['all', 'skills', 'projects', 'achievements', 'certifications', 'education'] as const).map((filter) => {
+                const isActive = activeFilter === filter;
+                return (
+                  <button
+                    key={filter}
+                    onClick={() => setActiveFilter(filter)}
+                    className={`px-3 py-1 rounded-lg text-xs font-mono font-medium capitalize transition shrink-0 ${
+                      isActive
+                        ? 'bg-[#006cd2] text-white shadow-sm shadow-[#006cd2]/30 font-bold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick Search */}
+            <div className="relative w-48 sm:w-64 shrink-0 hidden sm:block">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search portfolio..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#006cd2] font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* MAIN PORTFOLIO BODY */}
+        {/* ========================================================================= */}
+        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+          {/* ========================================================================= */}
+          {/* 1. PORTFOLIO HERO / PROFILE CARD */}
+          {/* ========================================================================= */}
+          <section className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-6 sm:p-8 md:p-10 backdrop-blur-xl shadow-2xl relative overflow-hidden flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-[#006cd2]/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Left: Avatar & Profile Info */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 relative z-10 flex-1">
+              {/* Avatar with Online Glow */}
+              <div className="relative shrink-0 mx-auto sm:mx-0">
+                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl p-1 bg-gradient-to-tr from-[#006cd2] via-cyan-400 to-[#006cd2] shadow-xl overflow-hidden bg-slate-900">
+                  <img
+                    className="w-full h-full rounded-2xl object-cover border-2 border-slate-900"
+                    src={userData.photoUrl && userData.photoUrl.trim() !== '' ? userData.photoUrl : DEFAULT_AVATAR}
+                    alt={displayName}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                    }}
+                  />
+                </div>
+                {/* Active Indicator */}
+                <div
+                  className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-emerald-500 border-4 border-slate-900 flex items-center justify-center shadow-lg"
+                  title="Active on LevelUpDev LMS"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                </div>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-[#e8702a] uppercase tracking-wider">
-                    Active Learning Focus
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-stone-800 text-xs font-mono text-stone-300 border border-white/10">
-                    {isPythonStarted ? 'IN PROGRESS' : 'NOT STARTED'}
+
+              {/* Bio & Details */}
+              <div className="space-y-2.5 text-center sm:text-left flex-1">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                    {displayName}
+                  </h1>
+                  <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-800/40 w-fit mx-auto sm:mx-0">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>LMS Verified Developer</span>
                   </span>
                 </div>
-                <h2 className="font-display font-semibold text-lg md:text-xl text-white mt-0.5">
-                  {userData.lastActiveModule
-                    ? `Python Skill Trail — ${userData.lastActiveModule.moduleTitle} (${pythonCompletedCount}/${pythonTotalCount} Completed)`
-                    : isPythonStarted
-                    ? `Python Skill Trail — In Progress (${pythonCompletedCount}/${pythonTotalCount} Completed)`
-                    : `Python Skill Trail — Get Started with Python Core Basics (0/${pythonTotalCount} Completed)`}
-                </h2>
+
+                <p className="font-sans text-sm font-semibold text-[#006cd2]">
+                  {displayHeadline}
+                </p>
+
+                <p className="font-sans text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
+                  {displayBio}
+                </p>
+
+                {/* Metadata Row */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1 font-mono text-xs text-slate-400">
+                  <span className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                    <MapPin className="w-3.5 h-3.5 text-[#006cd2]" />
+                    <span>{locationInput}</span>
+                  </span>
+                  <span className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                    <GraduationCap className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{displayBranch}</span>
+                  </span>
+                  <span className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Currently Learning: Python &amp; ML</span>
+                  </span>
+                </div>
+
+                {/* Social Badges */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-2">
+                  <a
+                    href={userData.githubUrl || 'https://github.com/swamyguradasu'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-[#006cd2] text-xs font-mono flex items-center gap-2 transition"
+                  >
+                    <GithubIcon />
+                    <span>GitHub</span>
+                  </a>
+                  <a
+                    href={userData.linkedinUrl || 'https://linkedin.com/in/swamyguradasu'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-[#006cd2] text-xs font-mono flex items-center gap-2 transition"
+                  >
+                    <LinkedinIcon />
+                    <span>LinkedIn</span>
+                  </a>
+                  <button
+                    onClick={() => setIsEditingProfile(true)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-mono flex items-center gap-1.5 border border-slate-800 transition"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Edit Profile</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <Link
-              href="/skills/python"
-              className="w-full md:w-auto px-6 py-3 bg-[#e8702a] hover:bg-[#d2611f] text-white font-sans font-semibold rounded-full transition shadow-lg shadow-[#e8702a]/30 flex items-center justify-center gap-2 shrink-0 relative z-10"
-            >
-              <span>{isPythonStarted ? 'Resume Trail' : 'Start Skill Trail'}</span>
-              <ExternalLink className="w-4 h-4" />
-            </Link>
+            {/* Right: Portfolio Dynamic Stats Card */}
+            <div className="w-full lg:w-72 bg-slate-950/90 border border-slate-800 rounded-2xl p-5 space-y-4 shrink-0 shadow-inner relative z-10">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <span className="font-mono text-xs font-bold text-slate-400 uppercase">LMS Verified Stats</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80">
+                  <div className="font-display text-2xl font-extrabold text-white">{unlockedCount}</div>
+                  <div className="font-mono text-[11px] text-slate-400">Skills Unlocked</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80">
+                  <div className="font-display text-2xl font-extrabold text-blue-400">{projectCount}</div>
+                  <div className="font-mono text-[11px] text-slate-400">Projects Built</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80">
+                  <div className="font-display text-2xl font-extrabold text-amber-400">{unlockedAchCount}</div>
+                  <div className="font-mono text-[11px] text-slate-400">Achievements</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80">
+                  <div className="font-display text-2xl font-extrabold text-purple-400">{certCount}</div>
+                  <div className="font-mono text-[11px] text-slate-400">Certifications</div>
+                </div>
+              </div>
+
+              {!isRecruiterView && (
+                <div className="p-2.5 rounded-xl bg-blue-950/30 border border-[#006cd2]/30 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Flame className="w-4 h-4 text-orange-400 fill-orange-400" />
+                    <span className="font-mono text-xs font-bold text-slate-200">Learning Streak</span>
+                  </div>
+                  <span className="font-mono text-xs font-extrabold text-orange-300">{streakCount} Days</span>
+                </div>
+              )}
+            </div>
           </section>
 
-          {/* 2. Professional Resume Header Section */}
-          <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-start gap-8">
-            {/* Profile Photo Avatar */}
-            <div className="relative shrink-0 mx-auto md:mx-0">
-              <div className="w-32 h-32 md:w-36 md:h-36 rounded-full p-1 bg-gradient-to-tr from-[#e8702a] via-amber-400 to-[#e8702a] shadow-xl overflow-hidden bg-stone-900">
-                <img
-                  className="w-full h-full rounded-full object-cover border-2 border-stone-900"
-                  src={userData.photoUrl && userData.photoUrl.trim() !== '' ? userData.photoUrl : defaultAvatar}
-                  alt={displayName}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = defaultAvatar;
-                  }}
-                />
-              </div>
-              {/* Streak Badge Pill */}
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#e8702a] text-white px-3.5 py-1 rounded-full flex items-center gap-1.5 shadow-lg border-2 border-stone-900 text-xs font-mono font-bold whitespace-nowrap">
-                <Flame className="w-3.5 h-3.5 fill-white" />
-                <span>{userData.streak?.currentStreak || 0} Day Solve Streak</span>
-              </div>
-            </div>
-
-            {/* Resume Bio & Header Meta */}
-            <div className="flex-1 space-y-4 text-center md:text-left">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center justify-center md:justify-start gap-3">
-                    <h1 className="font-display text-3xl md:text-4xl font-extrabold text-white tracking-tight">
-                      {displayName}
-                    </h1>
-                    <button
-                      onClick={() => setIsEditingProfile(true)}
-                      className="p-1.5 rounded-full hover:bg-white/10 text-stone-400 hover:text-white transition"
-                      title="Edit Profile"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
+          {/* ========================================================================= */}
+          {/* 2. PORTFOLIO STRENGTH / COMPLETION COMPONENT */}
+          {/* ========================================================================= */}
+          {!isRecruiterView && (
+            <section className="bg-slate-900/70 border border-slate-800 rounded-3xl p-6 sm:p-7 backdrop-blur-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-[#006cd2] uppercase">PORTFOLIO STRENGTH</span>
+                    <span className="font-mono text-xs font-bold text-white px-2 py-0.5 rounded bg-slate-800">
+                      {portfolioStrength.score}%
+                    </span>
                   </div>
-                  <p className="font-sans text-base font-semibold text-[#e8702a] mt-0.5">
-                    {displayHeadline}
+                  <p className="font-sans text-xs text-slate-400">
+                    {portfolioStrength.score >= 80
+                      ? 'Your portfolio is recruiter-ready with verified skills and live project builds.'
+                      : 'Complete skills and link projects to boost your recruiter-readiness score.'}
                   </p>
                 </div>
 
-                <div className="flex items-center justify-center gap-2 font-mono text-xs text-stone-200 bg-stone-800/80 px-3.5 py-1.5 rounded-full border border-white/10">
-                  <GraduationCap className="w-4 h-4 text-[#e8702a]" />
-                  <span>{displayCollege}</span>
-                  <span>•</span>
-                  <span className="font-bold text-amber-300">{displayBranch}</span>
-                </div>
-              </div>
-
-              <p className="font-sans text-sm text-stone-300 leading-relaxed max-w-3xl">
-                {displayBio}
-              </p>
-
-              {/* Social & Contact Badges */}
-              <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3 font-mono text-xs">
-                <a
-                  href={userData.githubUrl || 'https://github.com'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-800 text-white border border-white/10 hover:border-[#e8702a] transition flex items-center gap-2"
-                >
-                  <GithubIcon />
-                  <span>GitHub Profile</span>
-                </a>
-                <a
-                  href={userData.linkedinUrl || 'https://linkedin.com'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-800 text-white border border-white/10 hover:border-[#e8702a] transition flex items-center gap-2"
-                >
-                  <LinkedinIcon />
-                  <span>LinkedIn Connect</span>
-                </a>
-                <div className="px-3 py-1.5 rounded-lg bg-stone-800/80 text-stone-300 border border-white/10 flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5 text-[#e8702a]" />
-                  <span>{userData.email || 'kalyan.reddy@example.com'}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* 3. Skills Section (Printable Resume Style) */}
-          <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <h2 className="font-display text-2xl font-bold text-white flex items-center gap-2">
-                  <Code2 className="w-6 h-6 text-[#e8702a]" />
-                  <span>Technical Skills &amp; Proficiency</span>
-                </h2>
-                <p className="font-sans text-xs text-stone-400 mt-0.5">
-                  Verified skill modules and learning milestones completed on Trail Tracker.
-                </p>
-              </div>
-              <span className="font-mono text-xs px-3 py-1 bg-stone-800 text-stone-300 rounded-full border border-white/10">
-                RESUME PROFICIENCY
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Skill Card 1: Dynamic Python Card -> Clickable Link to /skills/python */}
-              <Link
-                href="/skills/python"
-                className="p-6 rounded-2xl bg-stone-900/90 backdrop-blur-2xl border border-[#e8702a]/60 shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_20px_rgba(232,112,42,0.2)] hover:border-[#e8702a] hover:shadow-[0_0_30px_rgba(232,112,42,0.3)] hover:scale-[1.01] transition-all duration-300 block group cursor-pointer relative"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="font-mono text-[11px] font-bold text-[#e8702a] uppercase tracking-wider">
-                      {isPythonStarted ? `IN PROGRESS • ${pythonPercentage}% COMPLETE` : 'NOT STARTED • 0% COMPLETE'}
-                    </span>
-                    <h3 className="font-display text-xl font-extrabold text-white mt-0.5 group-hover:text-amber-300 transition-colors flex items-center gap-2">
-                      <span>Python Programming &amp; Core Systems</span>
-                      <ExternalLink className="w-4 h-4 text-[#e8702a] opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-                    </h3>
-                  </div>
-                  <span className="px-2.5 py-1 bg-[#e8702a]/20 text-amber-300 font-mono text-xs font-bold rounded-md border border-[#e8702a]/40">
-                    {pythonCompletedCount} / {pythonTotalCount} Modules
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 mt-4">
-                  <div className="flex justify-between text-xs font-mono text-stone-300">
-                    <span>Progress: {pythonCompletedCount} of {pythonTotalCount} completed</span>
-                    <span className="text-[#e8702a] font-bold">{pythonPercentage}%</span>
-                  </div>
-                  <div className="h-2 w-full bg-stone-800 rounded-full overflow-hidden border border-white/10">
-                    <div
-                      className="h-full bg-[#e8702a] transition-all duration-300 rounded-full shadow-sm"
-                      style={{ width: `${pythonPercentage}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2 pt-3 font-mono text-xs">
-                  {pythonModules.length > 0 ? (
-                    pythonModules.map((m) => {
-                      const isDone = pythonProgressObj[m.moduleId] === true;
-                      return (
-                        <span
-                          key={m.moduleId}
-                          className={`px-2.5 py-1 rounded-md border transition-colors ${
-                            isDone
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-semibold'
-                              : 'bg-stone-800/80 text-stone-300 border-white/10'
-                          }`}
-                        >
-                          {m.title.split(':')[0]} {isDone ? '✓' : ''}
-                        </span>
-                      );
-                    })
-                  ) : (
-                    <span className="text-xs font-mono text-stone-400">7 Core Modules</span>
-                  )}
-                </div>
-              </Link>
-            </div>
-          </section>
-
-        {/* 4. Featured Projects Section (Dynamic & Interactive) */}
-        <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl space-y-6">
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
-            <div>
-              <h2 className="font-display text-2xl font-bold text-white flex items-center gap-2">
-                <FolderGit2 className="w-6 h-6 text-[#e8702a]" />
-                <span>Featured Engineering Project</span>
-              </h2>
-              <p className="font-sans text-xs text-stone-400 mt-0.5">
-                Practical, production-style project selected for portfolio showcase.
-              </p>
-            </div>
-            {currentProject && (
-              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setIsEditingLinks(true)}
-                  className="font-mono text-xs px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-white rounded-full border border-white/10 transition flex items-center gap-1.5"
+                  onClick={() => setIsEditingProfile(true)}
+                  className="text-xs font-mono text-[#006cd2] hover:underline self-start sm:self-center"
                 >
-                  <Pencil className="w-3 h-3 text-[#e8702a]" />
-                  <span>Edit Links</span>
-                </button>
-                <button
-                  onClick={() => setIsConfirmingChange(true)}
-                  className="font-mono text-xs px-3 py-1.5 bg-stone-800 hover:bg-[#e8702a]/20 text-white hover:text-amber-300 rounded-full border border-white/10 transition flex items-center gap-1.5"
-                >
-                  <RefreshCw className="w-3 h-3 text-[#e8702a]" />
-                  <span>Change Project</span>
+                  Improve Profile →
                 </button>
               </div>
-            )}
-          </div>
 
-          {/* Case A: No Project Selected Yet */}
-          {!userData.selectedProjectId && (
-            <div className="p-10 rounded-2xl bg-stone-950/60 border border-dashed border-white/15 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#e8702a]/15 border border-[#e8702a]/30 flex items-center justify-center text-[#e8702a]">
-                <FolderGit2 className="w-7 h-7" />
-              </div>
-              <div className="space-y-1 max-w-md">
-                <h3 className="font-display text-lg font-bold text-white">
-                  Choose a Project to Showcase
-                </h3>
-                <p className="font-sans text-xs text-stone-300 leading-relaxed">
-                  Select a capstone project idea from our curated list to build and add to your digital resume.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsSelectingProject(true)}
-                className="px-6 py-2.5 bg-[#e8702a] hover:bg-[#d2611f] text-white font-sans font-semibold rounded-full transition shadow-lg shadow-[#e8702a]/30 flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Choose a Project Idea</span>
-              </button>
-            </div>
-          )}
-
-          {/* Case B: Project Selected & GitHub Link Saved (Active Portfolio Card) */}
-          {currentProject && (
-            <div className="p-6 md:p-8 rounded-2xl bg-stone-950/70 border border-white/10 space-y-4 relative">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div>
-                  <span className="font-mono text-[11px] font-bold text-[#e8702a] uppercase tracking-wider">
-                    FEATURED CAPSTONE • IN PORTFOLIO
-                  </span>
-                  <h3 className="font-display text-xl font-bold text-white mt-0.5">
-                    {currentProject.title}
-                  </h3>
-                </div>
-
-                <div className="flex gap-2 shrink-0">
-                  {userData.projectGithubUrl ? (
-                    <a
-                      href={userData.projectGithubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-white border border-white/10 font-mono text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"
-                    >
-                      <GithubIcon />
-                      <span>View Code</span>
-                    </a>
-                  ) : (
-                    <button
-                      onClick={() => setIsEditingLinks(true)}
-                      className="px-3 py-1.5 bg-[#e8702a]/20 text-amber-300 border border-[#e8702a]/40 font-mono text-xs font-semibold rounded-xl flex items-center gap-1.5"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      <span>Add GitHub Link</span>
-                    </button>
-                  )}
-
-                  {userData.projectLiveUrl && (
-                    <a
-                      href={userData.projectLiveUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-2 bg-[#e8702a] hover:bg-[#d2611f] text-white font-mono text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-[#e8702a]/30"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Live Demo</span>
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              <p className="font-sans text-sm text-stone-300 leading-relaxed">
-                {currentProject.description}
-              </p>
-
-              <div className="pt-2 flex flex-wrap gap-2 font-mono text-xs">
-                {currentProject.suggestedTech.map((tech, idx) => (
-                  <span
-                    key={idx}
-                    className="px-2.5 py-1 bg-stone-800 text-stone-200 border border-white/10 rounded-md"
-                  >
-                    {tech}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* 5. LeetCode Live Problem Solving Tracker Section (Only shown if LeetCode ID is registered in CSV) */}
-        {userData.leetcodeId && userData.leetcodeId.trim().length > 0 && (
-          <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-[#e8702a]/20 text-amber-300 border border-[#e8702a]/40 text-[11px] font-mono font-bold flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-[#e8702a]" /> AUTOMATIC LIVE TRACKING
-                  </span>
-                </div>
-                <h2 className="font-display text-2xl font-bold text-white flex items-center gap-2 mt-1">
-                  <Code2 className="w-6 h-6 text-[#e8702a]" />
-                  <span>LeetCode Solved Problems Tracker</span>
-                </h2>
-                <p className="font-sans text-xs text-stone-400 mt-0.5">
-                  Automatically syncs live LeetCode stats when you solve problems on LeetCode.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <button
-                  onClick={handleManualLeetCodeSync}
-                  disabled={syncingLeetCode || !userData.leetcodeId}
-                  className="px-4 py-2 bg-[#e8702a] text-white hover:bg-[#d2611f] font-mono text-xs font-bold rounded-full transition flex items-center gap-2 border border-[#e8702a]/30 shadow-lg shadow-[#e8702a]/30 disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${syncingLeetCode ? 'animate-spin' : ''}`} />
-                  <span>{syncingLeetCode ? 'Syncing...' : 'Sync Live Stats'}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Main Total Solved Highlight */}
-              <div className="lg:col-span-5 p-6 rounded-2xl bg-stone-950/70 text-white border border-white/10 space-y-4 relative overflow-hidden flex flex-col justify-between shadow-xl">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-[#e8702a]/10 rounded-full blur-xl pointer-events-none" />
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs text-[#e8702a] font-bold uppercase tracking-wider">
-                      LeetCode Profile ID
-                    </span>
-                    <a
-                      href={`https://leetcode.com/u/${userData.leetcodeId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-xs text-white/80 hover:text-amber-300 flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-full border border-white/15 transition"
-                    >
-                      <span>@{userData.leetcodeId}</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-
-                  <div className="mt-4 flex items-baseline gap-3">
-                    <span className="font-display text-5xl font-extrabold text-white tracking-tight">
-                      {userData.leetcodeStats?.totalSolved ?? 0}
-                    </span>
-                    <span className="font-sans text-base font-semibold text-[#e8702a]">
-                      Problems Solved
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-white/10 text-xs font-mono text-stone-300 flex items-center justify-between">
-                  <span>Auto-sync Status:</span>
-                  <span className="text-emerald-400 font-bold flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Active
-                  </span>
-                </div>
-              </div>
-
-              {/* Difficulty Breakdown Grid */}
-              <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Easy Card */}
-                <div className="p-5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex flex-col justify-between space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-emerald-300 uppercase">Easy</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                  </div>
-                  <div>
-                    <div className="font-display text-3xl font-bold text-emerald-200">
-                      {userData.leetcodeStats?.easySolved ?? 0}
-                    </div>
-                    <div className="font-sans text-xs text-emerald-400 font-medium">Solved</div>
-                  </div>
-                </div>
-
-                {/* Medium Card */}
-                <div className="p-5 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex flex-col justify-between space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-amber-300 uppercase">Medium</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                  </div>
-                  <div>
-                    <div className="font-display text-3xl font-bold text-amber-200">
-                      {userData.leetcodeStats?.mediumSolved ?? 0}
-                    </div>
-                    <div className="font-sans text-xs text-amber-400 font-medium">Solved</div>
-                  </div>
-                </div>
-
-                {/* Hard Card */}
-                <div className="p-5 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex flex-col justify-between space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-rose-300 uppercase">Hard</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                  </div>
-                  <div>
-                    <div className="font-display text-3xl font-bold text-rose-200">
-                      {userData.leetcodeStats?.hardSolved ?? 0}
-                    </div>
-                    <div className="font-sans text-xs text-rose-400 font-medium">Solved</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* 6. Daily Activity Log & Heatmap Section */}
-        <section className="bg-stone-900/85 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-2xl space-y-6">
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
-            <div>
-              <h2 className="font-display text-2xl font-bold text-white flex items-center gap-2">
-                <Flame className="w-6 h-6 text-[#e8702a]" />
-                <span>Coding Activity &amp; Consistency Log</span>
-              </h2>
-              <p className="font-sans text-xs text-stone-400 mt-0.5">
-                Daily DSA problem solves and module completions tracked over time.
-              </p>
-            </div>
-            <span className="font-mono text-xs px-3 py-1 bg-stone-800 text-stone-300 rounded-full border border-white/10">
-              6-MONTH HEATMAP
-            </span>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-stone-950/70 border border-white/10 text-white">
-            <HeatmapCalendar solvedDates={userData.streak?.solvedDates || []} compact={false} />
-          </div>
-        </section>
-      </main>
-
-      {/* Modal 1: Select Project Idea Modal */}
-      {isSelectingProject && (
-        <div className="fixed inset-0 bg-[#0F2E28]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full border border-[#5C7A6B]/30 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#5C7A6B]/20 pb-4">
-              <div>
-                <h3 className="font-display text-xl font-bold text-[#0F2E28]">
-                  Select a Project Idea
-                </h3>
-                <p className="font-sans text-xs text-[#5C7A6B] mt-0.5">
-                  Pick a capstone project to implement and showcase on your portfolio.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsSelectingProject(false)}
-                className="p-1 rounded-full hover:bg-[#EDF2ED] text-[#5C7A6B]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {allProjects.map((proj) => (
+              {/* Progress Bar */}
+              <div className="w-full bg-slate-950 rounded-full h-2.5 border border-slate-800 overflow-hidden">
                 <div
-                  key={proj.projectId}
-                  className="p-5 rounded-2xl bg-[#EDF2ED]/50 border border-[#5C7A6B]/20 hover:border-[#C98A3E] transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group"
-                >
-                  <div className="space-y-1.5 flex-1">
-                    <h4 className="font-display text-base font-bold text-[#0F2E28] group-hover:text-[#C98A3E] transition-colors">
-                      {proj.title}
-                    </h4>
-                    <p className="font-sans text-xs text-[#414846] leading-relaxed">
-                      {proj.description}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5 pt-1 font-mono text-[11px]">
-                      {proj.suggestedTech.map((tech, tIdx) => (
-                        <span
-                          key={tIdx}
-                          className="px-2 py-0.5 rounded bg-white text-[#5C7A6B] border border-[#5C7A6B]/20"
-                        >
-                          {tech}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleSelectProjectIdea(proj.projectId)}
-                    className="w-full sm:w-auto px-4 py-2 bg-[#C98A3E] text-[#0F2E28] font-sans font-semibold text-xs rounded-full hover:bg-[#C98A3E]/90 transition shadow-sm shrink-0 flex items-center justify-center gap-1.5"
-                  >
-                    <span>Select Project</span>
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 2: Edit Project Links Form */}
-      {isEditingLinks && (
-        <div className="fixed inset-0 bg-[#0F2E28]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-[#5C7A6B]/30 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-[#5C7A6B]/20 pb-4">
-              <div>
-                <h3 className="font-display text-xl font-bold text-[#0F2E28]">
-                  Project Links &amp; Deployment
-                </h3>
-                <p className="font-sans text-xs text-[#5C7A6B] mt-0.5">
-                  Enter repository link to publish this project to your portfolio.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsEditingLinks(false)}
-                className="p-1 rounded-full hover:bg-[#EDF2ED] text-[#5C7A6B]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveProjectLinks} className="space-y-4 font-sans text-xs">
-              <div className="space-y-1">
-                <label className="block font-mono text-[#0F2E28] font-bold uppercase">
-                  GitHub Repository URL <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="url"
-                  required
-                  value={projGithubInput}
-                  onChange={(e) => setProjGithubInput(e.target.value)}
-                  placeholder="https://github.com/username/project-repo"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
+                  className="h-full bg-gradient-to-r from-[#006cd2] via-cyan-400 to-emerald-400 transition-all duration-500 rounded-full"
+                  style={{ width: `${portfolioStrength.score}%` }}
                 />
               </div>
 
-              <div className="pt-2">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={hasDeployed}
-                    onChange={(e) => setHasDeployed(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#C98A3E] focus:ring-[#C98A3E]"
-                  />
-                  <span className="font-sans text-xs font-semibold text-[#0F2E28]">
-                    I&apos;ve deployed this project (Live Demo)
-                  </span>
-                </label>
+              {/* Check items */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                {portfolioStrength.checks.map((check, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-xs font-mono text-slate-300">
+                    {check.done ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    ) : (
+                      <span className="w-3.5 h-3.5 rounded-full border border-slate-700 shrink-0" />
+                    )}
+                    <span className={check.done ? 'text-slate-300' : 'text-slate-400'}>{check.label}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ========================================================================= */}
+          {/* 3. FEATURED EARNED SKILLS SECTION */}
+          {/* ========================================================================= */}
+          {(activeFilter === 'all' || activeFilter === 'skills') && (
+            <section id="skills" className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+                <div>
+                  <h2 className="font-display text-2xl font-extrabold text-white flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-[#006cd2]" />
+                    <span>Verified Skills</span>
+                  </h2>
+                  <p className="font-sans text-xs sm:text-sm text-slate-400 mt-0.5">
+                    Skills earned through completed learning trails and verified assessments.
+                  </p>
+                </div>
+
+                <Link
+                  href="/skills/python"
+                  className="text-xs font-mono font-semibold text-[#006cd2] hover:text-blue-300 flex items-center gap-1 self-start sm:self-center"
+                >
+                  <span>Explore All Learning Trails</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
 
-              {hasDeployed && (
-                <div className="space-y-1 pt-1 animate-fade-in">
-                  <label className="block font-mono text-[#0F2E28] font-bold uppercase">
-                    Hosted / Live Demo URL
-                  </label>
-                  <input
-                    type="url"
-                    value={projLiveInput}
-                    onChange={(e) => setProjLiveInput(e.target.value)}
-                    placeholder="https://my-app.vercel.app"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
-                  />
+              {/* Earned Skills Grid */}
+              {earnedSkills.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {earnedSkills.map(({ skill, completedCount, totalCount, earnedDate }) => (
+                    <div
+                      key={skill.skillId}
+                      className="p-6 rounded-3xl bg-slate-900/80 border border-[#006cd2]/50 hover:border-[#006cd2] transition-all shadow-lg shadow-[#006cd2]/10 space-y-4 group flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="w-12 h-12 rounded-2xl bg-[#006cd2]/20 border border-[#006cd2]/40 text-2xl flex items-center justify-center">
+                            {skill.skillId.toLowerCase() === 'python' ? '🐍' : '⚡'}
+                          </div>
+                          <span className="font-mono text-[11px] font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-800/40 flex items-center gap-1">
+                            <Check className="w-3 h-3" />
+                            <span>Verified Skill</span>
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="font-display text-xl font-bold text-white group-hover:text-blue-300 transition-colors">
+                            {skill.title}
+                          </h3>
+                          <span className="font-mono text-xs text-slate-400">Core Programming &amp; Architecture</span>
+                        </div>
+
+                        <p className="text-xs text-slate-300 line-clamp-2">
+                          {skill.description || 'Mastery of fundamental syntax, OOP, testing, and application design.'}
+                        </p>
+
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 space-y-1 font-mono text-xs text-slate-400">
+                          <div className="flex items-center justify-between text-slate-300">
+                            <span>Modules Completed:</span>
+                            <span className="text-emerald-400 font-bold">
+                              {completedCount}/{totalCount} (100%)
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span>Earned Date:</span>
+                            <span className="text-slate-400">{earnedDate}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <button
+                          onClick={() =>
+                            setSelectedSkillModal({
+                              skill,
+                              completedCount,
+                              totalCount,
+                              isEarned: true,
+                            })
+                          }
+                          className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-[#006cd2] text-slate-200 hover:text-white font-sans text-xs font-semibold border border-slate-800 transition flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <span>View Verified Skill Details</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* Empty Skill State */
+                <div className="p-8 sm:p-12 rounded-3xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 mx-auto flex items-center justify-center text-slate-500 shadow-inner">
+                    <Lock className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <div className="space-y-1 max-w-md mx-auto">
+                    <h3 className="font-display text-lg font-bold text-white">Your Verified Skills Will Appear Here</h3>
+                    <p className="font-sans text-xs sm:text-sm text-slate-400">
+                      Complete every module in a learning path and pass the assessment to unlock your official verified
+                      skill badge.
+                    </p>
+                  </div>
+                  <Link
+                    href="/skills/python"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold shadow-md shadow-[#006cd2]/30 transition"
+                  >
+                    <span>Explore Learning Trails</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               )}
 
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-[#5C7A6B]/20">
+              {/* Skills Within Reach (In Progress) */}
+              {!isRecruiterView && inProgressSkills.length > 0 && (
+                <div className="space-y-4 pt-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-amber-400 uppercase tracking-wider">
+                      SKILLS WITHIN REACH
+                    </span>
+                    <span className="text-slate-600">•</span>
+                    <span className="font-mono text-xs text-slate-400">In-progress trails nearing completion</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {inProgressSkills.map(({ skill, completedCount, totalCount, percentage }) => (
+                      <div
+                        key={skill.skillId}
+                        className="p-5 rounded-3xl bg-slate-900/40 border border-slate-800 space-y-3 opacity-90 hover:opacity-100 transition"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-xl">{skill.skillId.toLowerCase() === 'python' ? '🐍' : '⚡'}</span>
+                            <h4 className="font-display text-base font-bold text-white">{skill.title}</h4>
+                          </div>
+                          <span className="font-mono text-xs text-amber-400 font-semibold">{percentage}%</span>
+                        </div>
+
+                        {/* Progress */}
+                        <div className="w-full bg-slate-950 rounded-full h-2 border border-slate-800 overflow-hidden">
+                          <div
+                            className="h-full bg-amber-400 rounded-full transition-all"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+                          <span>
+                            {completedCount} / {totalCount} modules done
+                          </span>
+                          <span className="text-slate-500">{totalCount - completedCount} remaining</span>
+                        </div>
+
+                        <Link
+                          href={`/skills/${skill.skillId.toLowerCase()}`}
+                          className="w-full py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono text-xs font-medium border border-slate-800 flex items-center justify-center gap-1.5 transition"
+                        >
+                          <span>Continue Trail</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ========================================================================= */}
+          {/* 4. PROJECTS SECTION */}
+          {/* ========================================================================= */}
+          {(activeFilter === 'all' || activeFilter === 'projects') && (
+            <section id="projects" className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+                <div>
+                  <h2 className="font-display text-2xl font-extrabold text-white flex items-center gap-2">
+                    <FolderGit2 className="w-5 h-5 text-[#006cd2]" />
+                    <span>Projects</span>
+                  </h2>
+                  <p className="font-sans text-xs sm:text-sm text-slate-400 mt-0.5">
+                    Production systems and applications built, submitted, and verified through LevelUpDev.
+                  </p>
+                </div>
+
                 <button
-                  type="button"
-                  onClick={() => setIsEditingLinks(false)}
-                  className="px-5 py-2 rounded-full border border-[#5C7A6B]/30 text-[#0F2E28] font-medium hover:bg-[#EDF2ED] transition"
+                  onClick={() => setIsSelectingProject(true)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-mono text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition self-start sm:self-center"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingProjectLinks || !projGithubInput}
-                  className="px-6 py-2 rounded-full bg-[#C98A3E] text-[#0F2E28] font-semibold hover:bg-[#C98A3E]/90 transition shadow-sm disabled:opacity-50"
-                >
-                  {savingProjectLinks ? 'Saving...' : 'Save & Publish'}
+                  <Plus className="w-3.5 h-3.5 text-[#006cd2]" />
+                  <span>Link / Change Project</span>
                 </button>
               </div>
-            </form>
+
+              {/* Projects List */}
+              {userProjects.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {userProjects.map((proj) => (
+                    <div
+                      key={proj.projectId}
+                      className="p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-[#006cd2]/60 transition-all shadow-xl space-y-5 flex flex-col justify-between group"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-[#006cd2] bg-[#006cd2]/10 px-2.5 py-0.5 rounded-full border border-[#006cd2]/30">
+                            LEVELUPDEV VERIFIED PROJECT
+                          </span>
+                          <span className="font-mono text-xs font-medium text-emerald-400 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-800/40">
+                            {proj.status}
+                          </span>
+                        </div>
+
+                        <h3 className="font-display text-xl font-bold text-white group-hover:text-blue-300 transition-colors">
+                          {proj.title}
+                        </h3>
+
+                        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                          {proj.description}
+                        </p>
+
+                        {/* Tech Stack Chips */}
+                        <div className="space-y-1.5 pt-1">
+                          <span className="font-mono text-[11px] text-slate-400 font-bold uppercase">
+                            Technology Stack
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {proj.suggestedTech.map((tech, tIdx) => (
+                              <span
+                                key={tIdx}
+                                className="px-2 py-0.5 rounded bg-slate-950 text-slate-300 font-mono text-[11px] border border-slate-800"
+                              >
+                                {tech}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Links */}
+                      <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          {proj.githubUrl && (
+                            <a
+                              href={proj.githubUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-mono text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition"
+                            >
+                              <GithubIcon />
+                              <span>Repository</span>
+                            </a>
+                          )}
+                          {proj.liveUrl && (
+                            <a
+                              href={proj.liveUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-mono text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span>Live Demo</span>
+                            </a>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => setSelectedProjectModal(proj)}
+                          className="text-xs font-mono text-slate-400 hover:text-white transition"
+                        >
+                          View Breakdown →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* Empty Project State */
+                <div className="p-8 sm:p-12 rounded-3xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 mx-auto flex items-center justify-center text-slate-500 shadow-inner">
+                    <Plus className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <div className="space-y-1 max-w-md mx-auto">
+                    <h3 className="font-display text-lg font-bold text-white">Your Projects Will Appear Here</h3>
+                    <p className="font-sans text-xs sm:text-sm text-slate-400">
+                      Select a project challenge, build the application, and submit your GitHub repository to display it
+                      on your verified portfolio.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsSelectingProject(true)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold shadow-md shadow-[#006cd2]/30 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Select Project to Build</span>
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ========================================================================= */}
+          {/* 5. ACHIEVEMENTS SECTION */}
+          {/* ========================================================================= */}
+          {!isRecruiterView && (activeFilter === 'all' || activeFilter === 'achievements') && (
+            <section id="achievements" className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+                <div>
+                  <h2 className="font-display text-2xl font-extrabold text-white flex items-center gap-2">
+                    <Award className="w-5 h-5 text-amber-400" />
+                    <span>Achievements</span>
+                  </h2>
+                  <p className="font-sans text-xs sm:text-sm text-slate-400 mt-0.5">
+                    Milestones and collectible badges earned across learning trails and daily challenges.
+                  </p>
+                </div>
+
+                <span className="font-mono text-xs text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-800 self-start sm:self-center">
+                  {unlockedAchCount} of {achievements.length} Unlocked
+                </span>
+              </div>
+
+              {/* Badges Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {achievements.map((ach) => (
+                  <div
+                    key={ach.id}
+                    className={`p-5 rounded-3xl border transition-all duration-300 flex flex-col justify-between space-y-3 group ${
+                      ach.isUnlocked
+                        ? `bg-slate-900/80 border-slate-800 hover:scale-[1.02] hover:shadow-lg shadow-black/40`
+                        : 'bg-slate-950/40 border-slate-900 opacity-50 grayscale hover:opacity-75'
+                    }`}
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-3xl p-2 rounded-2xl bg-slate-950 border border-slate-800 shadow-inner">
+                          {ach.icon}
+                        </span>
+                        {ach.isUnlocked ? (
+                          <span className="font-mono text-[10px] text-amber-400 bg-amber-950/50 px-2 py-0.5 rounded-full border border-amber-500/30 font-bold">
+                            UNLOCKED
+                          </span>
+                        ) : (
+                          <span className="font-mono text-[10px] text-slate-400 flex items-center gap-1">
+                            <Lock className="w-3 h-3" />
+                            <span>LOCKED</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <h4 className="font-display text-base font-bold text-white group-hover:text-amber-200 transition-colors">
+                          {ach.title}
+                        </h4>
+                        <p className="text-xs text-slate-300 mt-1 leading-snug">{ach.description}</p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800/60 font-mono text-[11px] text-slate-400">
+                      {ach.isUnlocked ? (
+                        <span className="text-emerald-400">Earned: {ach.earnedDate}</span>
+                      ) : (
+                        <span className="text-slate-400">Unlock: {ach.criteria}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ========================================================================= */}
+          {/* 6. CERTIFICATIONS SECTION */}
+          {/* ========================================================================= */}
+          {(activeFilter === 'all' || activeFilter === 'certifications') && (
+            <section id="certifications" className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+                <div>
+                  <h2 className="font-display text-2xl font-extrabold text-white flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-purple-400" />
+                    <span>Verified Certifications</span>
+                  </h2>
+                  <p className="font-sans text-xs sm:text-sm text-slate-400 mt-0.5">
+                    Official certificates granted upon 100% completion and assessment validation.
+                  </p>
+                </div>
+              </div>
+
+              {certifications.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {certifications.map((cert) => (
+                    <div
+                      key={cert.id}
+                      className="p-6 rounded-3xl bg-slate-900/80 border border-purple-500/40 hover:border-purple-400 transition-all shadow-xl space-y-4 flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center">
+                            <Award className="w-6 h-6" />
+                          </div>
+                          <span className="font-mono text-xs font-bold text-purple-300 bg-purple-950/60 px-3 py-1 rounded-full border border-purple-800/50">
+                            OFFICIAL CREDENTIAL
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="font-display text-xl font-bold text-white">{cert.title}</h3>
+                          <p className="font-mono text-xs text-slate-400 mt-0.5">{cert.issuedBy}</p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 font-mono text-xs">
+                          <div className="flex justify-between text-slate-300">
+                            <span>Credential ID:</span>
+                            <span className="text-purple-300 font-bold">{cert.credentialId}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-400">
+                            <span>Issue Date:</span>
+                            <span>{cert.issueDate}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-400">
+                            <span>Assessment Score:</span>
+                            <span className="text-emerald-400">{cert.gradeScore}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex items-center gap-3">
+                        <button
+                          onClick={() => setSelectedCertModal(cert)}
+                          className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-sans text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/30"
+                        >
+                          <Award className="w-4 h-4" />
+                          <span>View Certificate</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(cert.verificationUrl);
+                            alert(`Verification URL copied:\n${cert.verificationUrl}`);
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 font-mono text-xs font-medium border border-slate-800 transition"
+                        >
+                          Verify
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 sm:p-12 rounded-3xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 mx-auto flex items-center justify-center text-slate-500 shadow-inner">
+                    <Award className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <div className="space-y-1 max-w-md mx-auto">
+                    <h3 className="font-display text-lg font-bold text-white">No Certifications Yet</h3>
+                    <p className="font-sans text-xs sm:text-sm text-slate-400">
+                      Complete 100% of an eligible Skill Trail to automatically receive your verified digital certificate of completion.
+                    </p>
+                  </div>
+                  <Link
+                    href="/skills/python"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold shadow-md shadow-[#006cd2]/30 transition"
+                  >
+                    <span>Complete Skill Trail</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ========================================================================= */}
+          {/* 7. EXPERIENCE & EDUCATION TIMELINES */}
+          {/* ========================================================================= */}
+          {(activeFilter === 'all' || activeFilter === 'education') && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Experience Timeline */}
+              <section className="space-y-5">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-display text-xl font-bold text-white flex items-center gap-2">
+                    <Briefcase className="w-5 h-5 text-[#006cd2]" />
+                    <span>Experience &amp; Leadership</span>
+                  </h3>
+                </div>
+
+                <div className="space-y-4">
+                  {experiences.map((exp) => (
+                    <div key={exp.id} className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-display text-base font-bold text-white">{exp.role}</h4>
+                          <div className="font-mono text-xs text-[#006cd2]">{exp.organization}</div>
+                        </div>
+                        <span className="font-mono text-[11px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800">
+                          {exp.period}
+                        </span>
+                      </div>
+
+                      <ul className="space-y-1.5 pl-4 list-disc text-xs text-slate-300 leading-relaxed">
+                        {exp.description.map((line, lIdx) => (
+                          <li key={lIdx}>{line}</li>
+                        ))}
+                      </ul>
+
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        {exp.technologies.map((t, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded bg-slate-950 text-slate-400 font-mono text-[10px] border border-slate-800"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* Education Timeline */}
+              <section className="space-y-5">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-display text-xl font-bold text-white flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-cyan-400" />
+                    <span>Education</span>
+                  </h3>
+                </div>
+
+                <div className="space-y-4">
+                  {educations.map((edu) => (
+                    <div key={edu.id} className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-display text-base font-bold text-white">{edu.degree}</h4>
+                          <div className="font-mono text-xs text-cyan-400">{edu.major}</div>
+                          <div className="font-sans text-xs text-slate-300 mt-0.5">{edu.institution}</div>
+                        </div>
+                        <span className="font-mono text-[11px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800 shrink-0">
+                          {edu.period}
+                        </span>
+                      </div>
+
+                      <ul className="space-y-1.5 pl-4 list-disc text-xs text-slate-300 leading-relaxed">
+                        {edu.highlights.map((line, lIdx) => (
+                          <li key={lIdx}>{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* 8. LEARNING ACTIVITY FOOTPRINT (HEATMAP) */}
+          {/* ========================================================================= */}
+          {!isRecruiterView && (activeFilter === 'all' || activeFilter === 'skills') && (
+            <section id="activity" className="bg-slate-900/70 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-emerald-400" />
+                  <h3 className="font-display text-lg font-bold text-white">Learning Activity Footprint</h3>
+                </div>
+                <span className="font-mono text-xs text-slate-400">
+                  DSA Solves &amp; Skill Trail Completions
+                </span>
+              </div>
+
+              <HeatmapCalendar solvedDates={userData.streak?.solvedDates || []} />
+            </section>
+          )}
+        </main>
+
+        {/* ========================================================================= */}
+        {/* FOOTER */}
+        {/* ========================================================================= */}
+        <footer className="bg-slate-950 border-t border-slate-800 text-slate-500 font-mono text-xs py-8 px-6 md:px-12 mt-auto">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>© 2024 LevelUpDev • Dynamic LMS &amp; Career Portfolio</div>
+            <div className="flex items-center gap-4">
+              <Link href="/roadmaps" className="hover:text-slate-300 transition-colors">
+                Career Roadmaps
+              </Link>
+              <span>•</span>
+              <Link href="/skills/python" className="hover:text-slate-300 transition-colors">
+                Skill Trails
+              </Link>
+              <span>•</span>
+              <Link href="/daily" className="hover:text-slate-300 transition-colors">
+                Daily Challenges
+              </Link>
+              <span>•</span>
+              <Link href="/leaderboard" className="hover:text-slate-300 transition-colors">
+                Leaderboard
+              </Link>
+            </div>
           </div>
-        </div>
-      )}
+        </footer>
+      </div>
 
-      {/* Modal 3: Confirm Change Project Dialog */}
-      {isConfirmingChange && (
-        <div className="fixed inset-0 bg-[#0F2E28]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#5C7A6B]/30 shadow-2xl space-y-4 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600 mx-auto">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-
-            <div className="space-y-1">
-              <h3 className="font-display text-xl font-bold text-[#0F2E28]">
-                Change Selected Project?
-              </h3>
-              <p className="font-sans text-xs text-[#414846] leading-relaxed">
-                Switching projects will clear your current repository links from your portfolio showcase. Are you sure you want to select a new project?
-              </p>
-            </div>
-
-            <div className="pt-4 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsConfirmingChange(false)}
-                className="px-5 py-2 rounded-full border border-[#5C7A6B]/30 text-[#0F2E28] font-medium hover:bg-[#EDF2ED] transition text-xs"
-              >
-                Keep Current
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmChangeProject}
-                className="px-5 py-2 rounded-full bg-red-600 text-white font-semibold hover:bg-red-500 transition shadow-sm text-xs"
-              >
-                Yes, Change Project
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Profile Modal */}
+      {/* ========================================================================= */}
+      {/* MODAL 1: EDIT PROFILE MODAL */}
+      {/* ========================================================================= */}
       {isEditingProfile && (
-        <div className="fixed inset-0 bg-[#0F2E28]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-[#5C7A6B]/30 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#5C7A6B]/20 pb-4">
-              <h3 className="font-display text-xl font-bold text-[#0F2E28]">
-                Update Resume Profile
-              </h3>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2 font-display text-lg font-bold text-white">
+                <Settings className="w-5 h-5 text-[#006cd2]" />
+                <span>Edit Developer Profile</span>
+              </div>
               <button
                 onClick={() => setIsEditingProfile(false)}
-                className="p-1 rounded-full hover:bg-[#EDF2ED] text-[#5C7A6B]"
+                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4 font-sans text-xs">
-              {/* Profile Photo Upload Field */}
-              <div className="p-4 rounded-2xl bg-[#EDF2ED]/50 border border-[#5C7A6B]/20 space-y-2">
-                <label className="block font-mono text-[#0F2E28] font-bold uppercase">
-                  Profile Picture (Persists Across Devices)
-                </label>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#C98A3E] shrink-0 bg-white flex items-center justify-center shadow-sm">
-                    {photoInput ? (
-                      <img src={photoInput} alt="Avatar Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-7 h-7 text-[#5C7A6B]" />
-                    )}
-                  </div>
-                  <div className="flex-grow space-y-2">
-                    <div className="flex items-center gap-2">
-                      <label className="px-4 py-2 bg-[#0F2E28] text-white hover:bg-[#0F2E28]/90 font-mono text-xs font-semibold rounded-xl cursor-pointer inline-flex items-center gap-1.5 shadow-sm transition">
-                        <Upload className="w-3.5 h-3.5 text-[#C98A3E]" />
-                        <span>Choose Image File</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              if (file.size > 2 * 1024 * 1024) {
-                                alert('Please choose an image file under 2MB.');
-                                return;
-                              }
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                if (typeof reader.result === 'string') {
-                                  setPhotoInput(reader.result);
-                                }
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                          className="hidden"
-                        />
-                      </label>
-                      {photoInput && (
-                        <button
-                          type="button"
-                          onClick={() => setPhotoInput('')}
-                          className="px-3 py-2 text-red-600 font-mono text-xs hover:bg-red-50 rounded-xl transition"
-                        >
-                          Remove Photo
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="url"
-                      value={photoInput}
-                      onChange={(e) => setPhotoInput(e.target.value)}
-                      placeholder="Or paste direct image URL (e.g. https://...)"
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#5C7A6B]/30 font-mono text-xs text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="block font-mono text-[#0F2E28] font-bold uppercase mb-1">
-                  Full Name
-                </label>
+              <div className="space-y-1">
+                <label className="font-mono text-slate-300 font-bold uppercase">Full Name</label>
                 <input
                   type="text"
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
                 />
               </div>
 
-              <div>
-                <label className="block font-mono text-[#0F2E28] font-bold uppercase mb-1">
-                  Headline / Target Aspiration
-                </label>
+              <div className="space-y-1">
+                <label className="font-mono text-slate-300 font-bold uppercase">Headline</label>
                 <input
                   type="text"
                   value={headlineInput}
                   onChange={(e) => setHeadlineInput(e.target.value)}
-                  placeholder="e.g. Aspiring Backend Developer"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
+                  required
                 />
               </div>
 
-              <div>
-                <label className="block font-mono text-[#0F2E28] font-bold uppercase mb-1">
-                  Personal Bio / Summary
-                </label>
+              <div className="space-y-1">
+                <label className="font-mono text-slate-300 font-bold uppercase">Bio</label>
                 <textarea
+                  rows={3}
                   value={bioInput}
                   onChange={(e) => setBioInput(e.target.value)}
-                  rows={3}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
+                  required
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-mono text-[#0F2E28] font-bold uppercase mb-1">
-                    Degree &amp; Branch
-                  </label>
-                  <input
-                    type="text"
-                    value={branchInput}
-                    onChange={(e) => setBranchInput(e.target.value)}
-                    placeholder="e.g. B.Tech, CSE"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[#0F2E28] font-bold uppercase mb-1">
-                    College / University
-                  </label>
+                <div className="space-y-1">
+                  <label className="font-mono text-slate-300 font-bold uppercase">College / University</label>
                   <input
                     type="text"
                     value={collegeInput}
                     onChange={(e) => setCollegeInput(e.target.value)}
-                    placeholder="e.g. XYZ Institute of Technology"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-mono text-slate-300 font-bold uppercase">Major / Degree</label>
+                  <input
+                    type="text"
+                    value={branchInput}
+                    onChange={(e) => setBranchInput(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-mono text-[#0F2E28] font-bold uppercase mb-1">
-                    GitHub URL
-                  </label>
+                <div className="space-y-1">
+                  <label className="font-mono text-slate-300 font-bold uppercase">GitHub Profile URL</label>
                   <input
                     type="url"
                     value={githubInput}
                     onChange={(e) => setGithubInput(e.target.value)}
-                    placeholder="https://github.com/username"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
                   />
                 </div>
-                <div>
-                  <label className="block font-mono text-[#0F2E28] font-bold uppercase mb-1">
-                    LinkedIn URL
-                  </label>
+                <div className="space-y-1">
+                  <label className="font-mono text-slate-300 font-bold uppercase">LinkedIn Profile URL</label>
                   <input
                     type="url"
                     value={linkedinInput}
                     onChange={(e) => setLinkedinInput(e.target.value)}
-                    placeholder="https://linkedin.com/in/username"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block font-mono text-[#0F2E28] font-bold uppercase mb-1">
-                  LeetCode Profile ID (Username)
-                </label>
-                <input
-                  type="text"
-                  value={leetcodeInput}
-                  onChange={(e) => setLeetcodeInput(e.target.value)}
-                  placeholder="e.g. Swamy_Guradasu"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-mono text-[#0F2E28] font-bold uppercase mb-1">
-                  Avatar Image URL
-                </label>
+              <div className="space-y-1">
+                <label className="font-mono text-slate-300 font-bold uppercase">Avatar Photo URL</label>
                 <input
                   type="url"
                   value={photoInput}
                   onChange={(e) => setPhotoInput(e.target.value)}
                   placeholder="https://..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#EDF2ED]/60 border border-[#5C7A6B]/30 text-[#0F2E28] focus:outline-none focus:border-[#C98A3E]"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
                 />
               </div>
 
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-[#5C7A6B]/20">
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsEditingProfile(false)}
-                  className="px-5 py-2 rounded-full border border-[#5C7A6B]/30 text-[#0F2E28] font-medium hover:bg-[#EDF2ED] transition"
+                  className="px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 font-mono transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-2 rounded-full bg-[#C98A3E] text-[#0F2E28] font-semibold hover:bg-[#C98A3E]/90 transition shadow-sm"
+                  className="px-6 py-2 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-semibold shadow-md shadow-[#006cd2]/30 transition disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save Profile'}
                 </button>
@@ -1194,22 +1596,333 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="bg-transparent text-[#414846] font-mono text-xs w-full flex flex-col md:flex-row justify-between items-center gap-4 py-8 px-6 md:px-12 mt-auto border-t border-[#5C7A6B]/15">
-        <div>© 2024 Engineering Skill Trail. All rights reserved.</div>
-        <div className="flex gap-4">
-          <a className="hover:text-[#0F2E28] transition-colors" href="#">
-            Privacy Policy
-          </a>
-          <span>•</span>
-          <a className="hover:text-[#0F2E28] transition-colors" href="#">
-            Support
-          </a>
+      {/* ========================================================================= */}
+      {/* MODAL 2: SHARE PORTFOLIO MODAL */}
+      {/* ========================================================================= */}
+      {isSharingProfile && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 font-display text-lg font-bold text-white">
+                <Share2 className="w-5 h-5 text-[#006cd2]" />
+                <span>Share Developer Profile</span>
+              </div>
+              <button
+                onClick={() => setIsSharingProfile(false)}
+                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <p className="text-slate-300 leading-relaxed">
+                Share your verified LMS developer portfolio with recruiters, peers, and collaborators:
+              </p>
+
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between font-mono text-slate-300">
+                <span className="truncate pr-2">
+                  https://levelupdev.com/portfolio/{userData.uid ? userData.uid.slice(0, 12) : 'swamy'}
+                </span>
+                <button
+                  onClick={handleCopyShareLink}
+                  className="p-2 rounded-lg bg-[#006cd2] hover:bg-[#005bb5] text-white transition shrink-0"
+                  title="Copy Link"
+                >
+                  {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {copiedLink && (
+                <div className="text-emerald-400 font-mono text-[11px] text-center font-bold">
+                  ✓ Public Portfolio Link copied to clipboard!
+                </div>
+              )}
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    window.print();
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-200 font-mono text-xs flex items-center justify-center gap-2 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download / Print Resume Summary</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </footer>
-      </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: SKILL DETAIL MODAL */}
+      {/* ========================================================================= */}
+      {selectedSkillModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl p-2 rounded-xl bg-slate-950 border border-slate-800">
+                  {selectedSkillModal.skill.skillId.toLowerCase() === 'python' ? '🐍' : '⚡'}
+                </span>
+                <div>
+                  <h3 className="font-display text-lg font-bold text-white">{selectedSkillModal.skill.title}</h3>
+                  <span className="font-mono text-xs text-emerald-400 font-bold">✓ Verified Skill Unlocked</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedSkillModal(null)}
+                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+                <span className="font-mono text-slate-400 font-bold uppercase">Skills Demonstrated:</span>
+                <ul className="grid grid-cols-2 gap-1.5 text-slate-300 font-mono">
+                  {selectedSkillModal.skill.modules.map((m) => (
+                    <li key={m.moduleId} className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span className="truncate">{m.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  <div className="text-slate-400">Modules Completed:</div>
+                  <div className="text-white font-bold mt-0.5">
+                    {selectedSkillModal.completedCount} / {selectedSkillModal.totalCount} (100%)
+                  </div>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  <div className="text-slate-400">Assessment Score:</div>
+                  <div className="text-emerald-400 font-bold mt-0.5">96% (Verified)</div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center gap-3">
+                <Link
+                  href={`/skills/${selectedSkillModal.skill.skillId.toLowerCase()}`}
+                  className="flex-1 py-2.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-semibold text-center transition"
+                >
+                  View Learning Trail
+                </Link>
+                <button
+                  onClick={() => setSelectedSkillModal(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 font-mono border border-slate-800 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 4: CERTIFICATE DETAIL MODAL */}
+      {/* ========================================================================= */}
+      {selectedCertModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-purple-500/50 rounded-3xl max-w-xl w-full p-8 space-y-6 shadow-2xl animate-fade-in relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <span className="font-mono text-xs font-bold text-purple-300 uppercase tracking-wider">
+                OFFICIAL CERTIFICATE OF COMPLETION
+              </span>
+              <button
+                onClick={() => setSelectedCertModal(null)}
+                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Certificate Visual Box */}
+            <div className="p-6 rounded-2xl bg-slate-950 border-2 border-purple-500/30 text-center space-y-4 relative">
+              <div className="w-16 h-16 rounded-full bg-purple-500/20 border-2 border-purple-400 text-purple-300 mx-auto flex items-center justify-center shadow-lg">
+                <Award className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-1">
+                <span className="font-mono text-[10px] text-slate-400 uppercase tracking-widest">
+                  THIS IS TO CERTIFY THAT
+                </span>
+                <h3 className="font-display text-2xl font-extrabold text-white">{displayName}</h3>
+                <p className="text-xs text-slate-300">has successfully completed the comprehensive engineering requirements for</p>
+                <h4 className="font-display text-lg font-bold text-purple-300 pt-1">{selectedCertModal.title}</h4>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-left font-mono text-[11px] pt-3 border-t border-slate-800/80 text-slate-400">
+                <div>
+                  <span className="text-slate-400">Issuer: </span>
+                  <span className="text-slate-300">{selectedCertModal.issuedBy}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-400">Date: </span>
+                  <span className="text-slate-300">{selectedCertModal.issueDate}</span>
+                </div>
+                <div className="col-span-2 text-center text-purple-300 pt-1 font-bold">
+                  Credential ID: {selectedCertModal.credentialId}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedCertModal.verificationUrl);
+                  alert('Verification link copied to clipboard!');
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-sans text-xs font-semibold transition shadow-md shadow-purple-600/30"
+              >
+                Copy Verification URL
+              </button>
+              <button
+                onClick={() => setSelectedCertModal(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 font-mono text-xs border border-slate-800 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: SELECT / CHANGE PROJECT MODAL */}
+      {/* ========================================================================= */}
+      {isSelectingProject && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="font-display text-xl font-bold text-white">Select a Portfolio Project</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Choose a project to build and link its verified GitHub repository to your profile.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsSelectingProject(false)}
+                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              {allProjects.map((p) => (
+                <div
+                  key={p.projectId}
+                  className="p-5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-[#006cd2] transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1 flex-1">
+                    <h4 className="font-display text-base font-bold text-white">{p.title}</h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">{p.description}</p>
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {p.suggestedTech.map((t, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 font-mono text-[10px] border border-slate-800"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleSelectProjectIdea(p.projectId)}
+                    className="px-4 py-2 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold rounded-xl shrink-0 transition"
+                  >
+                    Select Project
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 6: EDIT PROJECT LINKS MODAL */}
+      {/* ========================================================================= */}
+      {isEditingLinks && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="font-display text-lg font-bold text-white">Link Project Repositories</h3>
+              <button
+                onClick={() => setIsEditingLinks(false)}
+                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProjectLinks} className="space-y-4 text-xs font-sans">
+              <div className="space-y-1">
+                <label className="font-mono text-slate-300 font-bold uppercase">GitHub Repository URL</label>
+                <input
+                  type="url"
+                  placeholder="https://github.com/your-username/repo-name"
+                  value={projGithubInput}
+                  onChange={(e) => setProjGithubInput(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2]"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="font-mono text-slate-300 font-bold uppercase">Live Deployed URL (Optional)</label>
+                  <label className="flex items-center gap-1 text-[11px] font-mono text-slate-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hasDeployed}
+                      onChange={(e) => setHasDeployed(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-950 text-[#006cd2]"
+                    />
+                    <span>Has Live Demo</span>
+                  </label>
+                </div>
+                {hasDeployed && (
+                  <input
+                    type="url"
+                    placeholder="https://your-live-demo.com"
+                    value={projLiveInput}
+                    onChange={(e) => setProjLiveInput(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#006cd2] mt-1"
+                  />
+                )}
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingLinks(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-950 text-slate-400 hover:text-white font-mono transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingProjectLinks || !projGithubInput}
+                  className="px-5 py-2 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-semibold transition disabled:opacity-50"
+                >
+                  {savingProjectLinks ? 'Saving...' : 'Save Links'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-

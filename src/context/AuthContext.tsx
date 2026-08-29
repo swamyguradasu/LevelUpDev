@@ -98,6 +98,70 @@ export function getFirestoreDocId(email: string): string {
   return email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
 }
 
+export const DUMMY_DEMO_USER: UserProfileData = {
+  uid: 'demo-preview-dummy-user',
+  name: 'Alex Rivera (Demo Preview)',
+  email: 'demo@levelupdev.preview',
+  photoUrl: '',
+  headline: 'Full-Stack & AI Systems Enthusiast • Platform Explorer',
+  college: 'National Institute of Technology • LevelUpDev Cohort',
+  branch: 'Computer Science & Engineering',
+  bio: 'Explore LevelUpDev in read-only Demo Mode. This profile demonstrates unlocked verified skill cards, production projects, collectible achievement badges, and credentials without affecting real database accounts.',
+  githubUrl: 'https://github.com/alexrivera-demo',
+  linkedinUrl: 'https://linkedin.com/in/alexrivera-demo',
+  leetcodeId: 'Alex_Rivera_Dev',
+  leetcodeStats: {
+    totalSolved: 128,
+    easySolved: 72,
+    mediumSolved: 48,
+    hardSolved: 8,
+    lastSyncedAt: new Date().toISOString(),
+  },
+  joinedDate: '2024-01-15T00:00:00.000Z',
+  skillsCompleted: ['python', 'sql'],
+  progress: {
+    python: {
+      'mod-py-1': true,
+      'mod-py-2': true,
+      'mod-py-3': true,
+      'mod-py-4': true,
+      'mod-py-5': true,
+      'mod-py-6': true,
+      'mod-py-7': true,
+    },
+    sql: {
+      'mod-sql-1': true,
+      'mod-sql-2': true,
+      'mod-sql-3': true,
+      'mod-sql-4': true,
+      'mod-sql-5': true,
+    },
+  },
+  unlockedSkills: ['python', 'sql', 'machine-learning', 'docker'],
+  streak: {
+    currentStreak: 14,
+    lastSolvedDate: new Date().toISOString().split('T')[0],
+    solvedDates: [
+      new Date().toISOString().split('T')[0],
+      new Date(Date.now() - 86400000).toISOString().split('T')[0],
+      new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0],
+      new Date(Date.now() - 86400000 * 3).toISOString().split('T')[0],
+      new Date(Date.now() - 86400000 * 4).toISOString().split('T')[0],
+      new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0],
+      new Date(Date.now() - 86400000 * 6).toISOString().split('T')[0],
+    ],
+  },
+  selectedProjectId: 'task-queue',
+  projectGithubUrl: 'https://github.com/alexrivera-demo/distributed-task-queue',
+  projectLiveUrl: 'https://taskqueue-demo.levelupdev.app',
+  lastActiveModule: {
+    skillId: 'python',
+    moduleId: 'mod-py-7',
+    moduleTitle: 'Python Mastery: Advanced Asynchronous Services',
+    updatedAt: new Date().toISOString(),
+  },
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -108,7 +172,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Load active session on mount
   useEffect(() => {
     async function loadActiveSession() {
+      const isDemo = sessionStorage.getItem('levelupdev_is_demo_mode') === 'true';
       const activeEmail = localStorage.getItem('levelupdev_active_email');
+
+      if (isDemo || activeEmail === 'demo@levelupdev.preview') {
+        setIsDemoMode(true);
+        setUserData(DUMMY_DEMO_USER);
+        setLoading(false);
+        return;
+      }
+
       if (!activeEmail) {
         setLoading(false);
         return;
@@ -301,28 +374,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setLoading(true);
+    setIsDemoMode(false);
+    sessionStorage.removeItem('levelupdev_is_demo_mode');
     localStorage.removeItem('levelupdev_active_email');
     setUserData(null);
     setLoading(false);
   };
 
   const demoLogin = () => {
-    const defaultRoster = getRosterUserByEmail('swamy@levelupdev.com') || {
-      name: 'Swamy Guradasu',
-      headline: 'Wants to become a ml engineer',
-      registerNumber: '24A21A6145',
-      branch: 'AIML',
-      bio: 'I am a student of aiml a 3rd year',
-      githubUrl: 'https://github.com/swamyguradasu',
-      linkedinUrl: 'https://www.linkedin.com/in/swamy-guradasu',
-      leetcodeId: 'Swamy_Guradasu',
-      leetcodeSolved: 52,
-      email: 'swamy@levelupdev.com',
-    };
-    login(defaultRoster.email, defaultRoster.registerNumber);
+    setIsDemoMode(true);
+    sessionStorage.setItem('levelupdev_is_demo_mode', 'true');
+    localStorage.setItem('levelupdev_active_email', 'demo@levelupdev.preview');
+    setUserData(DUMMY_DEMO_USER);
   };
 
   const saveToStore = async (updated: UserProfileData, patch: Partial<UserProfileData>) => {
+    // If in demo preview mode or dummy user, DO NOT write to database or persistent storage!
+    if (isDemoMode || updated.email === 'demo@levelupdev.preview') {
+      return;
+    }
+
     const docId = getFirestoreDocId(updated.email);
     localStorage.setItem(`levelupdev_user_${docId}`, JSON.stringify(updated));
 

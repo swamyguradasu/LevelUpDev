@@ -69,8 +69,8 @@ export default function LeaderboardPage() {
     return streakB - streakA;
   });
 
-  const MERIDIAN_VIDEO_URL =
-    'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260808_075824_7c8a2ef3-826c-43ca-81a1-162429faa306.mp4';
+  const LEADERBOARD_BG_IMAGE_URL =
+    'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=2560&q=85';
 
   if (loading || !userData) {
     return (
@@ -90,17 +90,14 @@ export default function LeaderboardPage() {
 
   return (
     <div className="relative min-h-screen bg-black text-white flex flex-col font-sans antialiased overflow-x-hidden select-none">
-      {/* Meridian Video Background Layer */}
+      {/* Professional High-Res Background Image Layer */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <video
-          src={MERIDIAN_VIDEO_URL}
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="w-full h-full object-cover"
+        <img
+          src={LEADERBOARD_BG_IMAGE_URL}
+          alt="Leaderboard Background"
+          className="w-full h-full object-cover object-center scale-105"
         />
-        <div className="absolute inset-0 bg-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-b from-stone-950/80 via-black/60 to-stone-950/90 backdrop-blur-[1px]" />
       </div>
 
       <div className="relative z-10 min-h-screen flex flex-col flex-1">
@@ -119,6 +116,9 @@ export default function LeaderboardPage() {
             <Link className="text-stone-300 hover:text-white transition" href="/home">
               Portfolio
             </Link>
+            <Link className="text-stone-300 hover:text-white transition" href="/roadmaps">
+              Career Roadmaps
+            </Link>
             <Link className="text-stone-300 hover:text-white transition" href="/skills/python">
               Skill Trails
             </Link>
@@ -131,8 +131,8 @@ export default function LeaderboardPage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#006cd2]/20 border border-[#006cd2]/40 text-amber-300 rounded-full text-xs font-mono font-bold shadow-sm">
-              <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#006cd2]/20 border border-[#006cd2]/40 text-blue-300 rounded-full text-xs font-mono font-bold shadow-sm">
+              <Flame className="w-3.5 h-3.5 fill-[#006cd2] text-[#006cd2]" />
               <span>{userData.streak?.currentStreak || 1} Day Streak</span>
             </div>
             <button
@@ -269,7 +269,7 @@ export default function LeaderboardPage() {
                           {/* User Details */}
                           <td className="py-4 px-6">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full p-0.5 bg-gradient-to-tr from-[#006cd2] via-amber-400 to-[#006cd2] shrink-0 shadow-sm">
+                              <div className="w-10 h-10 rounded-full p-0.5 bg-gradient-to-tr from-[#006cd2] via-cyan-400 to-[#006cd2] shrink-0 shadow-sm">
                                 {member.photoUrl ? (
                                   <img
                                     src={member.photoUrl}

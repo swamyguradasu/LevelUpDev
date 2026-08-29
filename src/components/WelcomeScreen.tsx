@@ -63,7 +63,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ userData, onComple
           className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight"
         >
           <span>{displayed}</span>
-          {!done && <span className="animate-blink text-indigo-600 font-normal ml-0.5">|</span>}
+          {!done && <span className="animate-blink text-[#006cd2] font-normal ml-0.5">|</span>}
         </motion.div>
 
         {/* Subtitle Line Fading In */}
@@ -76,9 +76,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ userData, onComple
               className="text-base sm:text-lg font-medium text-slate-600 flex items-center justify-center gap-2"
             >
               {streak > 0 ? (
-                <Flame className="w-5 h-5 text-orange-500 fill-orange-500" />
+                <Flame className="w-5 h-5 text-[#006cd2] fill-[#006cd2]" />
               ) : (
-                <Sparkles className="w-5 h-5 text-indigo-500" />
+                <Sparkles className="w-5 h-5 text-[#006cd2]" />
               )}
               <span>{subtitleText}</span>
             </motion.div>
