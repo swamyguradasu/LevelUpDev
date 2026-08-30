@@ -50,6 +50,7 @@ import {
   FileSpreadsheet,
   FileCode,
   Lock,
+  KeyRound,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getHistoricalManifest } from '@/lib/historicalData';
@@ -65,7 +66,7 @@ type AdminTab =
   | 'settings';
 
 export default function AdminDashboardPage() {
-  const { userData, loading, logout } = useAuth();
+  const { userData, loading, logout, openChangePasswordModal } = useAuth();
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
@@ -645,6 +646,14 @@ export default function AdminDashboardPage() {
           </Link>
 
           <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+
+          <button
+            onClick={() => openChangePasswordModal(false)}
+            className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition"
+            title="Change Account Password"
+          >
+            <KeyRound className="w-4 h-4 text-blue-400" />
+          </button>
 
           <button
             onClick={async () => {

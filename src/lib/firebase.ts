@@ -17,6 +17,9 @@ export const isFirebaseConfigured = Boolean(
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
 );
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+const app = getApps().length > 0
+  ? getApp()
+  : (firebaseConfig.apiKey ? initializeApp(firebaseConfig) : (initializeApp({ apiKey: 'dummy-api-key', projectId: 'levelupdev-app' })));
+
+export const auth = isFirebaseConfigured ? getAuth(app) : ({} as any);
+export const db = isFirebaseConfigured ? getFirestore(app) : ({} as any);

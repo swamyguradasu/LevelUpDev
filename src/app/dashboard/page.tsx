@@ -52,6 +52,7 @@ import {
   AlertTriangle,
   Lightbulb,
   Check,
+  KeyRound,
 } from 'lucide-react';
 
 const CATEGORY_ICON_MAP: Record<string, React.ReactNode> = {
@@ -66,7 +67,7 @@ const CATEGORY_ICON_MAP: Record<string, React.ReactNode> = {
 };
 
 export default function StudentDashboardPage() {
-  const { userData, loading, syncLeetCodeStats } = useAuth();
+  const { userData, loading, syncLeetCodeStats, openChangePasswordModal } = useAuth();
   const router = useRouter();
 
   // Content Data
@@ -230,6 +231,14 @@ export default function StudentDashboardPage() {
               <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
               <span className="hidden sm:inline">Portfolio View</span>
             </Link>
+
+            <button
+              onClick={() => openChangePasswordModal(false)}
+              className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition"
+              title="Change Account Password"
+            >
+              <KeyRound className="w-4 h-4 text-blue-400" />
+            </button>
 
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-xs font-bold">
               <Flame className="w-4 h-4 text-amber-400 fill-amber-400" />

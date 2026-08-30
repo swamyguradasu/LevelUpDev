@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getStaticProfileByEmail,
-  validateMemberCredentials,
-  StaticUserProfile,
-} from '@/lib/csvRoster';
+import { getStaticProfileByEmail } from '@/lib/csvRoster';
+import { verifyUserPassword } from '@/lib/authCredentials';
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,22 +28,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Validate password securely on server
-    const validProfile = validateMemberCredentials(cleanEmail, String(password));
-    if (!validProfile) {
-      return NextResponse.json(
-        {
-          error:
-            'Invalid password. Please enter your College Registration Number (e.g. 24A21A6145) to sign in.',
-        },
-        { status: 401 }
-      );
+    // 2. Validate password securely (Checks database custom password first, then default registration number)
+    const authResult = await verifyUserPassword(cleanEmail, String(password));
+    if (!authResult.valid || !authResult.profile) {
+      const errorMsg = authResult.isCustom
+        ? 'Invalid password. Please use the custom password you set for this account.'
+        : 'Invalid password. Please enter your College Registration Number (e.g. 24A21A6145) to sign in.';
+
+      return NextResponse.json({ error: errorMsg }, { status: 401 });
     }
 
-    // 3. Return sanitized static profile and authorization info
+    const validProfile = authResult.profile;
+
+    // 3. Return sanitized static profile, authorization info, and promptChange flag
     return NextResponse.json(
       {
         success: true,
+        mustPromptChange: authResult.mustPromptChange,
+        isCustomPassword: authResult.isCustom,
         user: {
           email: validProfile.levelupdevEmail,
           name: validProfile.fullName,

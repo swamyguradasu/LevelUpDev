@@ -77,6 +77,7 @@ import {
   Target,
   Clock,
   Zap,
+  KeyRound,
 } from 'lucide-react';
 
 function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -133,6 +134,7 @@ export default function HomePage() {
     removePortfolioProject,
     logout,
     syncLeetCodeStats,
+    openChangePasswordModal,
   } = useAuth();
   const router = useRouter();
 
@@ -628,6 +630,17 @@ export default function HomePage() {
               <Share2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Share</span>
             </button>
+
+            {/* Change Password Button */}
+            {!isDemoMode && (
+              <button
+                onClick={() => openChangePasswordModal(false)}
+                className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition"
+                title="Change Account Password"
+              >
+                <KeyRound className="w-4 h-4 text-blue-400" />
+              </button>
+            )}
 
             {/* Logout */}
             <button

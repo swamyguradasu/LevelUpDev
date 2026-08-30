@@ -1,7 +1,7 @@
 {
   "snapshotVersion": "1.0.0",
-  "createdAt": "2026-08-30T04:21:45.599Z",
-  "sourceExportDate": "2026-08-30T04:21:45.442Z",
+  "createdAt": "2026-08-30T06:03:21.239Z",
+  "sourceExportDate": "2026-08-30T06:03:21.088Z",
   "description": "LevelUpDev immutable historical student activity snapshot prior to Firebase quota reset",
   "recordCounts": {
     "students": 3,

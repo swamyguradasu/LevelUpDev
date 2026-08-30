@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getSkillById } from '@/lib/content';
 import type { StaticUserProfile } from '@/lib/csvRoster';
+import ChangePasswordModal from '@/components/ChangePasswordModal';
 import {
   fetchUserDynamicData,
   saveUserDynamicData,
@@ -111,6 +112,9 @@ interface AuthContextType {
   signup: (name: string, email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
   demoLogin: () => void;
+  openChangePasswordModal: (isFirstTime?: boolean) => void;
+  closeChangePasswordModal: () => void;
+  isChangePasswordOpen: boolean;
   updateProfile: (updates: Partial<UserProfileData>) => Promise<void>;
   updateUserProject: (
     projectId: string | null,
@@ -224,6 +228,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userData, setUserData] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
+  const [isFirstTimePasswordPrompt, setIsFirstTimePasswordPrompt] = useState<boolean>(false);
+
+  const openChangePasswordModal = (isFirstTime = false) => {
+    setIsFirstTimePasswordPrompt(isFirstTime);
+    setIsChangePasswordOpen(true);
+  };
+
+  const closeChangePasswordModal = () => {
+    setIsChangePasswordOpen(false);
+    setIsFirstTimePasswordPrompt(false);
+  };
 
   // Helper to convert dynamic database structure to view model
   function assembleUserProfile(
@@ -392,6 +408,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsDemoMode(false);
       localStorage.setItem('levelupdev_active_email', cleanEmail);
       sessionStorage.removeItem('levelupdev_is_demo_mode');
+
+      // If user signed in with default registration number, prompt them with popup card
+      if (data.mustPromptChange) {
+        setIsFirstTimePasswordPrompt(true);
+        setIsChangePasswordOpen(true);
+      }
     } catch (err: any) {
       setLoading(false);
       throw err;
@@ -768,6 +790,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signup,
         logout,
         demoLogin,
+        openChangePasswordModal,
+        closeChangePasswordModal,
+        isChangePasswordOpen,
         updateProfile,
         updateUserProject,
         addProjectToPortfolio,
@@ -781,6 +806,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }}
     >
       {children}
+      {userData && (
+        <ChangePasswordModal
+          isOpen={isChangePasswordOpen}
+          onClose={closeChangePasswordModal}
+          userEmail={userData.email}
+          isFirstTimePrompt={isFirstTimePasswordPrompt}
+        />
+      )}
     </AuthContext.Provider>
   );
 };
