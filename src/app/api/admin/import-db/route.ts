@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
           skills: app.skills || '',
           status: app.status || 'Interested',
           submitted_at: app.applied_at || app.submitted_at || new Date().toISOString(),
-          admin_notes: app.admin_notes || undefined,
+          admin_notes: app.admin_notes || '',
         });
         validInternshipsCount++;
       });

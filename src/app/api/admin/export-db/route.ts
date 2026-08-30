@@ -36,19 +36,27 @@ export async function GET(req: NextRequest) {
     // 2. Fetch all dynamic activity docs
     const dynamicDocs: UserDynamicData[] = [];
     if (isFirebaseConfigured) {
-      const snap = await getDocs(collection(db, 'user_activity'));
-      snap.forEach((docSnap) => {
-        dynamicDocs.push(docSnap.data() as UserDynamicData);
-      });
+      try {
+        const snap = await getDocs(collection(db, 'user_activity'));
+        snap.forEach((docSnap) => {
+          dynamicDocs.push(docSnap.data() as UserDynamicData);
+        });
+      } catch (err: any) {
+        console.warn('Notice: Firestore user_activity export fallback:', err?.code || err?.message);
+      }
     }
 
     // 3. Fetch all internship applications
     const applications: InternshipApplication[] = [];
     if (isFirebaseConfigured) {
-      const snap = await getDocs(collection(db, 'internship_applications'));
-      snap.forEach((docSnap) => {
-        applications.push(docSnap.data() as InternshipApplication);
-      });
+      try {
+        const snap = await getDocs(collection(db, 'internship_applications'));
+        snap.forEach((docSnap) => {
+          applications.push(docSnap.data() as InternshipApplication);
+        });
+      } catch (err: any) {
+        console.warn('Notice: Firestore internship_applications export fallback:', err?.code || err?.message);
+      }
     }
 
     // 4. Flatten into structured datasets for CSV & JSON export

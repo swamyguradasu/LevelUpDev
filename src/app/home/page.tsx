@@ -563,7 +563,7 @@ export default function HomePage() {
             </div>
             <div>
               <span className="font-display font-bold text-base sm:text-lg text-white tracking-tight flex items-center gap-1.5">
-                LevelUpDev <span className="text-slate-500 font-mono text-xs font-normal">/ Portfolio</span>
+                Level<span className="text-[#006cd2]">Up</span>Dev <span className="text-slate-500 font-mono text-xs font-normal">/ Portfolio</span>
               </span>
             </div>
           </div>
@@ -573,6 +573,10 @@ export default function HomePage() {
             <Link className="text-[#006cd2] font-semibold flex items-center gap-1" href="/home">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Portfolio</span>
+            </Link>
+            <Link className="text-slate-300 hover:text-white transition flex items-center gap-1" href="/dashboard">
+              <Activity className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Dashboard</span>
             </Link>
             <Link className="text-slate-300 hover:text-white transition" href="/roadmaps">
               Career Roadmaps
@@ -732,6 +736,7 @@ export default function HomePage() {
                     className="w-full h-full rounded-2xl object-cover border-2 border-slate-900"
                     src={userData.photoUrl && userData.photoUrl.trim() !== '' ? userData.photoUrl : DEFAULT_AVATAR}
                     alt={displayName}
+                    referrerPolicy="no-referrer"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                     }}

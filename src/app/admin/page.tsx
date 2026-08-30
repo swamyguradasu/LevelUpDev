@@ -45,13 +45,14 @@ import {
   Mail,
   GraduationCap,
   LogOut,
-  MapPin,
   Flame,
   Check,
   FileSpreadsheet,
   FileCode,
   Lock,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { getHistoricalManifest } from '@/lib/historicalData';
 
 type AdminTab =
   | 'dashboard'
@@ -94,14 +95,8 @@ export default function AdminDashboardPage() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Restore States
-  const [isValidatingImport, setIsValidatingImport] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
-  const [importPreviewData, setImportPreviewData] = useState<any | null>(null);
-  const [importBackupPackage, setImportBackupPackage] = useState<any | null>(null);
-  const [showRestorePreviewModal, setShowRestorePreviewModal] = useState(false);
-
   // Danger Zone Reset States
+  const [dangerAcknowledged, setDangerAcknowledged] = useState(false);
   const [dangerConfirmText, setDangerConfirmText] = useState('');
   const [isResettingDB, setIsResettingDB] = useState(false);
 
@@ -336,7 +331,119 @@ export default function AdminDashboardPage() {
     link.click();
   };
 
-  // Export Handler
+  // Excel Multi-Sheet Export Handler
+  const handleExportExcel = async () => {
+    if (!userData?.email) return;
+    setIsExporting(true);
+    try {
+      const res = await fetch(`/api/admin/export-db?adminEmail=${encodeURIComponent(userData.email)}`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert('Failed to retrieve export datasets.');
+        setIsExporting(false);
+        return;
+      }
+
+      const datasets = data.datasets || {};
+      const dateTag = new Date().toISOString().split('T')[0];
+      const wb = XLSX.utils.book_new();
+
+      // 1. Skill Progress Sheet
+      const progressData = (datasets.students_progress || []).map((r: any) => ({
+        'User ID': r.user_id,
+        'Email': r.email,
+        'Skill': r.skill,
+        'Module ID': r.module_id,
+        'Status': r.status,
+        'Completed At': r.completed_at || '',
+        'Last Accessed At': r.last_accessed_at || '',
+      }));
+      const wsProgress = XLSX.utils.json_to_sheet(progressData);
+      XLSX.utils.book_append_sheet(wb, wsProgress, 'Skill Progress');
+
+      // 2. Projects Sheet
+      const projectsData = (datasets.projects || []).map((r: any) => ({
+        'User ID': r.user_id,
+        'Email': r.email,
+        'Project ID': r.project_id,
+        'Title': r.title,
+        'Category': r.category,
+        'Status': r.status,
+        'GitHub URL': r.github_url || '',
+        'Live URL': r.live_url || '',
+        'Updated At': r.updated_at || '',
+      }));
+      const wsProjects = XLSX.utils.json_to_sheet(projectsData);
+      XLSX.utils.book_append_sheet(wb, wsProjects, 'Projects');
+
+      // 3. Internships Sheet
+      const internshipsData = (datasets.internships || []).map((r: any) => ({
+        'Application ID': r.id,
+        'User ID': r.user_id,
+        'Email': r.email,
+        'Internship ID': r.internship_id,
+        'Internship Title': r.internship_title,
+        'Status': r.status,
+        'Applied At': r.applied_at,
+        'Full Name': r.full_name,
+        'Phone': r.phone || '',
+        'Education': r.education || '',
+        'Skills': r.skills || '',
+        'Admin Notes': r.admin_notes || '',
+      }));
+      const wsInternships = XLSX.utils.json_to_sheet(internshipsData);
+      XLSX.utils.book_append_sheet(wb, wsInternships, 'Internships');
+
+      // 4. Achievements Sheet
+      const achievementsData = (datasets.achievements || []).map((r: any) => ({
+        'User ID': r.user_id,
+        'Email': r.email,
+        'Achievement ID': r.achievement_id,
+        'Achievement Title': r.achievement_title,
+        'Achievement Type': r.achievement_type,
+        'Earned At': r.earned_at || '',
+      }));
+      const wsAchievements = XLSX.utils.json_to_sheet(achievementsData);
+      XLSX.utils.book_append_sheet(wb, wsAchievements, 'Achievements');
+
+      // 5. Calendar Activity Sheet
+      const calendarData = (datasets.calendar || []).map((r: any) => ({
+        'User ID': r.user_id,
+        'Email': r.email,
+        'Activity Date': r.activity_date,
+        'Activity Type': r.activity_type,
+        'Timestamp': r.timestamp || '',
+      }));
+      const wsCalendar = XLSX.utils.json_to_sheet(calendarData);
+      XLSX.utils.book_append_sheet(wb, wsCalendar, 'Calendar Activity');
+
+      // 6. Backup Metadata Sheet
+      const metadataData = [
+        { Property: 'Backup Format Version', Value: data.manifest?.formatVersion || 'levelupdev-backup-v1.0' },
+        { Property: 'Application Version', Value: '1.0.0' },
+        { Property: 'Exported At', Value: data.manifest?.exportedAt || new Date().toISOString() },
+        { Property: 'Exported By', Value: data.manifest?.exportedBy || userData.email },
+        { Property: 'Total Students in Roster', Value: String(data.metadata?.totalStudentsInRoster || staticProfiles.length) },
+        { Property: 'Total Active Dynamic Users', Value: String(data.metadata?.totalActiveDynamicUsers || dynamicUsers.length) },
+        { Property: 'Skill Progress Records', Value: String(progressData.length) },
+        { Property: 'Projects Records', Value: String(projectsData.length) },
+        { Property: 'Internship Applications', Value: String(internshipsData.length) },
+        { Property: 'Achievements Records', Value: String(achievementsData.length) },
+        { Property: 'Calendar Records', Value: String(calendarData.length) },
+      ];
+      const wsMetadata = XLSX.utils.json_to_sheet(metadataData);
+      XLSX.utils.book_append_sheet(wb, wsMetadata, 'Backup Metadata');
+
+      XLSX.writeFile(wb, `levelupdev_backup_${dateTag}.xlsx`);
+      alert('✓ Excel export successfully generated with all 6 dynamic dataset sheets.');
+    } catch (err: any) {
+      alert(`Excel Export error: ${err.message || err}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Export Handler (JSON / CSVs)
   const handlePerformExport = async (type: 'all-csv' | 'json' | 'progress' | 'projects' | 'internships' | 'achievements' | 'calendar') => {
     if (!userData?.email) return;
     setIsExporting(true);
@@ -442,76 +549,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Restore Handler: Validate Backup File & Show Preview
-  const handleFileSelectForRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !userData?.email) return;
-
-    setIsValidatingImport(true);
-    try {
-      const text = await file.text();
-      const backupPackage = JSON.parse(text);
-
-      const res = await fetch('/api/admin/import-db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminEmail: userData.email,
-          backupPackage,
-          validateOnly: true,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        alert(data.error || 'Failed to validate backup file format.');
-        return;
-      }
-
-      setImportPreviewData(data.previewSummary);
-      setImportBackupPackage(backupPackage);
-      setShowRestorePreviewModal(true);
-    } catch (err: any) {
-      alert(`Failed to parse backup JSON: ${err.message || err}`);
-    } finally {
-      setIsValidatingImport(false);
-      e.target.value = '';
-    }
-  };
-
-  // Restore Handler: Commit Database Restore
-  const handleConfirmRestore = async () => {
-    if (!importBackupPackage || !userData?.email) return;
-
-    setIsRestoring(true);
-    try {
-      const res = await fetch('/api/admin/import-db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminEmail: userData.email,
-          backupPackage: importBackupPackage,
-          validateOnly: false,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        alert(data.error || 'Failed to restore dynamic database.');
-      } else {
-        alert(`✓ ${data.message}`);
-        setShowRestorePreviewModal(false);
-        setImportPreviewData(null);
-        setImportBackupPackage(null);
-        await loadAllData();
-      }
-    } catch (err: any) {
-      alert(`Restore execution error: ${err.message || err}`);
-    } finally {
-      setIsRestoring(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center font-mono text-sm text-slate-400">
@@ -587,7 +624,7 @@ export default function AdminDashboardPage() {
           </div>
           <div>
             <span className="font-display font-bold text-base text-white tracking-tight flex items-center gap-1.5">
-              LevelUpDev <span className="text-blue-400 font-mono text-xs font-semibold bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">Admin</span>
+              Level<span className="text-[#006cd2]">Up</span>Dev <span className="text-blue-400 font-mono text-xs font-semibold bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">Admin</span>
             </span>
           </div>
         </div>
@@ -1229,92 +1266,122 @@ export default function AdminDashboardPage() {
           )}
 
           {/* ========================================================================= */}
-          {/* TAB 7: DATA EXPORT — MAIN FEATURE */}
+          {/* TAB 7: DATABASE EXPORT CENTER */}
           {/* ========================================================================= */}
           {activeTab === 'export' && (
             <div className="space-y-8 animate-fade-in max-w-4xl">
               <div className="border-b border-slate-800 pb-4">
-                <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-2.5">
-                  <Download className="w-7 h-7 text-[#006cd2]" />
-                  <span>Database Export &amp; Backup Center</span>
-                </h1>
-                <p className="font-sans text-xs sm:text-sm text-slate-400 mt-1">
-                  Export dynamic platform data into clean, structured CSV files and full JSON backup archives ready for future re-import.
-                </p>
-              </div>
-
-              {/* Main Export & Restore Card */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Export Card */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
-                  <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-[#006cd2] via-cyan-400 to-[#006cd2]" />
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-bold uppercase">
-                      <Download className="w-4 h-4" />
-                      <span>Step 1: Backup Platform Data</span>
-                    </div>
-                    <h3 className="font-display text-xl font-bold text-white">Export Dynamic Platform Data</h3>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      Generates a versioned portable backup archive (`levelupdev-backup-v1.0`) with manifest metadata and structured datasets.
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-2.5">
+                      <Download className="w-7 h-7 text-[#006cd2]" />
+                      <span>Database Export Center</span>
+                    </h1>
+                    <p className="font-sans text-xs sm:text-sm text-slate-400 mt-1">
+                      Export live dynamic database records into portable Excel (.xlsx) and JSON files for offline snapshot creation.
                     </p>
                   </div>
-
-                  <div className="flex flex-col gap-2.5 pt-2">
-                    <button
-                      onClick={() => setShowExportModal(true)}
-                      className="w-full py-3 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-bold rounded-xl shadow-lg shadow-[#006cd2]/30 flex items-center justify-center gap-2 transition"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Export All Data (All CSVs + JSON)</span>
-                    </button>
-
-                    <button
-                      onClick={() => handlePerformExport('json')}
-                      disabled={isExporting}
-                      className="w-full py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-200 font-mono text-xs rounded-xl flex items-center justify-center gap-2 transition"
-                    >
-                      <FileCode className="w-4 h-4 text-cyan-400" />
-                      <span>Download Versioned JSON Backup</span>
-                    </button>
-                  </div>
                 </div>
+              </div>
 
-                {/* Restore Card */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+              {/* THREE-TIER ARCHITECTURE STATUS CARD */}
+              {(() => {
+                const histManifest = getHistoricalManifest();
+                return (
+                  <div className="p-6 rounded-3xl bg-slate-900/90 border border-[#006cd2]/40 space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2.5 text-blue-400">
+                        <ShieldCheck className="w-5 h-5 text-[#006cd2]" />
+                        <h3 className="font-display text-base font-bold text-white">System Data Architecture Status</h3>
+                      </div>
+                      <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 font-mono text-xs font-bold">
+                        Historical Snapshot v{histManifest.snapshotVersion} Active
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
+                      {/* Tier 1 */}
+                      <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                        <span className="text-slate-400 font-bold block text-[11px] uppercase tracking-wider">1. Static Member Source</span>
+                        <div className="text-sm font-bold text-emerald-400">{staticProfiles.length} Verified Members</div>
+                        <p className="text-[10px] text-slate-500 font-sans">Sourced from static CSV (read-only identity source).</p>
+                      </div>
+
+                      {/* Tier 2 */}
+                      <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                        <span className="text-slate-400 font-bold block text-[11px] uppercase tracking-wider">2. Historical Snapshot</span>
+                        <div className="text-sm font-bold text-purple-400">{histManifest.recordCounts.skillProgressRecords + histManifest.recordCounts.projectRecords + histManifest.recordCounts.internshipRecords} Records</div>
+                        <p className="text-[10px] text-slate-500 font-sans">Compiled static baseline prior to database reset.</p>
+                      </div>
+
+                      {/* Tier 3 */}
+                      <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                        <span className="text-slate-400 font-bold block text-[11px] uppercase tracking-wider">3. Live Dynamic Activity</span>
+                        <div className="text-sm font-bold text-cyan-400">{dynamicUsers.length} Active Users</div>
+                        <p className="text-[10px] text-slate-500 font-sans">Current activity created in Firebase after reset.</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* MAIN EXPORT ACTIONS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {/* Excel Export Card */}
+                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
                   <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500" />
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 font-bold uppercase">
-                      <RefreshCw className="w-4 h-4" />
-                      <span>Step 2: Restore Platform Data</span>
+                      <FileSpreadsheet className="w-4 h-4" />
+                      <span>Multi-Sheet Workbook</span>
                     </div>
-                    <h3 className="font-display text-xl font-bold text-white">Restore Dynamic Backup</h3>
+                    <h3 className="font-display text-lg font-bold text-white">Download Excel (.xlsx)</h3>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      Upload an exported JSON backup file to validate schemas and restore student progress, projects, and applications without duplicates.
+                      Exports a single .xlsx file with dedicated sheets for Skill Progress, Projects, Internships, Achievements, Calendar, and Metadata.
                     </p>
                   </div>
 
-                  <div className="pt-2">
-                    <label className="w-full py-3 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 font-mono text-xs font-bold rounded-xl cursor-pointer flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/40">
-                      <Upload className="w-4 h-4" />
-                      <span>{isValidatingImport ? 'Validating Backup File...' : 'Select Backup JSON to Restore'}</span>
-                      <input
-                        type="file"
-                        accept=".json"
-                        className="hidden"
-                        disabled={isValidatingImport || isRestoring}
-                        onChange={handleFileSelectForRestore}
-                      />
-                    </label>
+                  <button
+                    onClick={handleExportExcel}
+                    disabled={isExporting}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-sans text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Download Multi-Sheet Excel</span>
+                  </button>
+                </div>
+
+                {/* JSON Archive Card */}
+                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                  <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-[#006cd2] via-cyan-400 to-[#006cd2]" />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-bold uppercase">
+                      <FileCode className="w-4 h-4" />
+                      <span>Portable JSON Archive</span>
+                    </div>
+                    <h3 className="font-display text-lg font-bold text-white">Download JSON Archive</h3>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Exports versioned portable JSON backup data with schema manifests, ready for manual Antigravity CLI compilation into the codebase.
+                    </p>
                   </div>
+
+                  <button
+                    onClick={() => handlePerformExport('json')}
+                    disabled={isExporting}
+                    className="w-full py-3 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-bold rounded-xl shadow-lg shadow-[#006cd2]/30 flex items-center justify-center gap-2 transition"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download JSON Backup</span>
+                  </button>
                 </div>
               </div>
 
               {/* Individual CSV Downloads */}
-              <div className="space-y-4 pt-4">
-                <h3 className="font-display text-lg font-bold text-white">Individual Dataset Downloads</h3>
+              <div className="space-y-4 pt-2">
+                <h3 className="font-display text-lg font-bold text-white">Individual CSV Table Downloads</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
-                    { id: 'progress', title: 'skill_progress.csv', desc: 'User ID, skill, module ID, status, completion timestamp' },
+                    { id: 'progress', title: 'students_progress.csv', desc: 'User ID, skill, module ID, status, completion timestamp' },
                     { id: 'projects', title: 'projects.csv', desc: 'User ID, project ID, status, GitHub URL, live demo URL' },
                     { id: 'internships', title: 'internships.csv', desc: 'Applications, status, submitted applicant details' },
                     { id: 'achievements', title: 'achievements.csv', desc: 'User ID, achievement ID, date earned' },
@@ -1345,7 +1412,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* ========================================================================= */}
-          {/* TAB 8: SETTINGS & DANGER ZONE */}
+          {/* TAB 8: SETTINGS & DANGER ZONE (SAFEGUARDED RESET) */}
           {/* ========================================================================= */}
           {activeTab === 'settings' && (
             <div className="space-y-8 animate-fade-in max-w-4xl">
@@ -1355,42 +1422,79 @@ export default function AdminDashboardPage() {
                   <span>Platform Settings &amp; Danger Zone</span>
                 </h1>
                 <p className="font-sans text-xs sm:text-sm text-slate-400 mt-1">
-                  Administrative configuration and controlled database maintenance tools.
+                  Controlled database maintenance, quota optimization, and safe dynamic clearing.
                 </p>
               </div>
 
-              {/* Danger Zone */}
-              <div className="p-8 rounded-3xl bg-rose-950/20 border border-rose-500/30 space-y-5">
+              {/* Danger Zone Card */}
+              <div className="p-8 rounded-3xl bg-rose-950/20 border border-rose-500/30 space-y-6">
                 <div className="flex items-center gap-2.5 text-rose-400">
                   <AlertTriangle className="w-6 h-6 shrink-0" />
                   <h3 className="font-display text-lg font-bold">Danger Zone — Reset Dynamic Database</h3>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  This action will delete all dynamic activity records (skill progress, project selections, internship applications, streak logs) from Firestore.
-                  <br />
-                  <strong>It will NOT delete the static CSV, static member profiles, or LeetCode data.</strong>
-                </p>
+                <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/20 space-y-2 text-xs text-rose-200 leading-relaxed">
+                  <p>
+                    <strong>⚠️ Warning:</strong> This operation will clear all dynamic student activity (completed modules, selected projects, submitted internship applications, and streak logs) from Firebase to reduce usage/quota.
+                  </p>
+                  <p className="text-slate-300">
+                    <strong>Safe Guardrails:</strong> The static CSV (<code className="font-mono text-amber-300">LevelUpDev – Portfolio Profile.csv</code>), member login credentials, historical data snapshot, and LeetCode problem configurations <strong>will NEVER be deleted</strong>.
+                  </p>
+                </div>
 
-                <div className="space-y-3 pt-2">
-                  <label className="block font-mono text-xs text-slate-400">
-                    To confirm, please type <strong className="text-white">RESET DATABASE</strong> below:
-                  </label>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Current Estimated Record Counts */}
+                <div className="space-y-2">
+                  <span className="font-mono text-xs font-bold text-slate-300 uppercase block">Current Database Contents to be Cleared</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs">
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-500 block">Active Dynamic Users</span>
+                      <span className="text-sm font-bold text-white">{dynamicUsers.length}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-500 block">Internship Apps</span>
+                      <span className="text-sm font-bold text-white">{applications.length}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-500 block">Static Profiles (Safe)</span>
+                      <span className="text-sm font-bold text-emerald-400">{staticProfiles.length} Members</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Explicit Checkbox Confirmation */}
+                <div className="pt-2 space-y-4">
+                  <label className="flex items-start gap-3 cursor-pointer group">
                     <input
-                      type="text"
-                      placeholder="RESET DATABASE"
-                      value={dangerConfirmText}
-                      onChange={(e) => setDangerConfirmText(e.target.value)}
-                      className="bg-slate-950 border border-rose-500/40 rounded-xl px-4 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-rose-500"
+                      type="checkbox"
+                      checked={dangerAcknowledged}
+                      onChange={(e) => setDangerAcknowledged(e.target.checked)}
+                      className="w-4 h-4 mt-0.5 rounded bg-slate-950 border-rose-500/50 text-rose-600 focus:ring-rose-500 focus:ring-offset-slate-900 cursor-pointer"
                     />
-                    <button
-                      onClick={handleExecuteResetDB}
-                      disabled={dangerConfirmText !== 'RESET DATABASE' || isResettingDB}
-                      className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-mono text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-rose-600/30"
-                    >
-                      {isResettingDB ? 'Clearing Database...' : 'Execute Dynamic DB Reset'}
-                    </button>
+                    <span className="text-xs text-slate-300 group-hover:text-white leading-relaxed">
+                      I understand that dynamic database data will be cleared and confirm that a verified export has been created.
+                    </span>
+                  </label>
+
+                  <div className="space-y-2">
+                    <label className="block font-mono text-xs text-slate-400">
+                      To execute reset, please type <strong className="text-white font-bold">RESET DATABASE</strong>:
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <input
+                        type="text"
+                        placeholder="RESET DATABASE"
+                        value={dangerConfirmText}
+                        onChange={(e) => setDangerConfirmText(e.target.value)}
+                        className="bg-slate-950 border border-rose-500/40 rounded-xl px-4 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-rose-500 flex-1"
+                      />
+                      <button
+                        onClick={handleExecuteResetDB}
+                        disabled={dangerConfirmText !== 'RESET DATABASE' || !dangerAcknowledged || isResettingDB}
+                        className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-mono text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-rose-600/30 shrink-0"
+                      >
+                        {isResettingDB ? 'Clearing Database...' : 'Reset Dynamic Database'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1452,7 +1556,7 @@ export default function AdminDashboardPage() {
 
               return (
                 <div className="space-y-4">
-                  <h4 className="font-mono text-xs font-bold text-emerald-400 uppercase">Dynamic Activity (From Database)</h4>
+                  <h4 className="font-mono text-xs font-bold text-emerald-400 uppercase">Combined Activity (Historical + Live)</h4>
 
                   {/* Skill Progress */}
                   <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
@@ -1612,106 +1716,6 @@ export default function AdminDashboardPage() {
                 className="px-6 py-2.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-bold transition shadow-lg shadow-[#006cd2]/30 flex items-center gap-2"
               >
                 {isExporting ? 'Preparing Export...' : 'Confirm & Export Data'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODAL 4: RESTORE BACKUP PREVIEW MODAL */}
-      {/* ========================================================================= */}
-      {showRestorePreviewModal && importPreviewData && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                  <RefreshCw className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-display text-lg font-bold text-white">Restore Backup Summary</h3>
-                  <div className="font-mono text-xs text-slate-400">
-                    Format: {importPreviewData.manifest?.formatVersion || 'v1.0'}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowRestorePreviewModal(false);
-                  setImportPreviewData(null);
-                  setImportBackupPackage(null);
-                }}
-                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs font-sans">
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Export Timestamp:</span>
-                  <span className="font-mono text-slate-200">{new Date(importPreviewData.manifest?.exportedAt).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Exported By:</span>
-                  <span className="font-mono text-slate-200">{importPreviewData.manifest?.exportedBy || 'Admin'}</span>
-                </div>
-                <div className="flex justify-between border-t border-slate-800/80 pt-2">
-                  <span className="font-bold text-white">Matched Students:</span>
-                  <span className="font-mono font-bold text-emerald-400">{importPreviewData.matchedStudentsCount} Members</span>
-                </div>
-              </div>
-
-              {/* Dataset Breakdown */}
-              <div className="space-y-2">
-                <span className="font-mono text-xs font-bold text-slate-300 uppercase block">Records Ready to Restore</span>
-                <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                    <span className="text-slate-500 block">Skill Progress:</span>
-                    <span className="font-bold text-purple-400">{importPreviewData.recordCounts?.skillProgress || 0} Records</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                    <span className="text-slate-500 block">Projects:</span>
-                    <span className="font-bold text-amber-400">{importPreviewData.recordCounts?.projects || 0} Records</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                    <span className="text-slate-500 block">Applications:</span>
-                    <span className="font-bold text-cyan-400">{importPreviewData.recordCounts?.internships || 0} Records</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                    <span className="text-slate-500 block">Achievements:</span>
-                    <span className="font-bold text-emerald-400">{importPreviewData.recordCounts?.achievements || 0} Records</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Warnings / Unknown Users if any */}
-              {importPreviewData.skippedUnknownUsers?.length > 0 && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-[11px] space-y-1">
-                  <strong>Notice:</strong> {importPreviewData.skippedUnknownUsers.length} user(s) in backup not found in current CSV roster will be skipped.
-                </div>
-              )}
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-800">
-              <button
-                onClick={() => {
-                  setShowRestorePreviewModal(false);
-                  setImportPreviewData(null);
-                  setImportBackupPackage(null);
-                }}
-                className="px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white font-mono text-xs transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmRestore}
-                disabled={isRestoring}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-sans text-xs font-bold transition shadow-lg shadow-emerald-600/30 flex items-center gap-2"
-              >
-                {isRestoring ? 'Restoring Previous Progress...' : 'Confirm & Restore Backup'}
               </button>
             </div>
           </div>

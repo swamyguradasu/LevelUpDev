@@ -251,50 +251,111 @@ export function calculateStreakFromActivity(activities: CalendarActivityRecord[]
   };
 }
 
+import {
+  getHistoricalProgressForUser,
+  getHistoricalProjectsForUser,
+  getHistoricalAchievementsForUser,
+  getHistoricalCalendarForUser,
+} from '@/lib/historicalData';
+
 /**
- * Fetch dynamic data for a user from Firestore (or LocalStorage fallback).
+ * Fetch dynamic data for a user by merging static historical snapshot with live Firebase data.
+ * Architecture: Historical Snapshot (Read-Only) + Live Firebase (Read/Write)
  */
 export async function fetchUserDynamicData(email: string): Promise<UserDynamicData> {
   const cleanEmail = email.trim().toLowerCase();
   const userId = normalizeUserId(cleanEmail);
   const empty = createEmptyDynamicData(cleanEmail);
 
+  // 1. Load static historical data (read-only baseline)
+  const histProgress = getHistoricalProgressForUser(cleanEmail);
+  const histProjects = getHistoricalProjectsForUser(cleanEmail);
+  const histAchievements = getHistoricalAchievementsForUser(cleanEmail);
+  const histCalendar = getHistoricalCalendarForUser(cleanEmail);
+
+  // 2. Load dynamic Firebase data (new activity created after reset)
+  let liveData: Partial<UserDynamicData> = {};
+
   if (isFirebaseConfigured) {
     try {
       const userRef = doc(db, 'user_activity', userId);
       const snap = await getDoc(userRef);
       if (snap.exists()) {
-        const data = snap.data() as Partial<UserDynamicData>;
-        return {
-          ...empty,
-          ...data,
-          userId,
-          email: cleanEmail,
-        };
+        liveData = snap.data() as Partial<UserDynamicData>;
       }
-    } catch (err) {
-      console.warn('Firestore fetch notice for user_activity:', err);
+    } catch (err: any) {
+      console.warn('Firestore fetch notice for user_activity:', err?.code || err?.message);
     }
   }
 
-  if (typeof window !== 'undefined') {
+  if (Object.keys(liveData).length === 0 && typeof window !== 'undefined') {
     const raw = localStorage.getItem(`levelupdev_dynamic_${userId}`);
     if (raw) {
       try {
-        const parsed = JSON.parse(raw);
-        return {
-          ...empty,
-          ...parsed,
-          userId,
-          email: cleanEmail,
-        };
+        liveData = JSON.parse(raw);
       } catch {
-        return empty;
+        liveData = {};
       }
     }
   }
 
-  return empty;
+  // 3. Merge Progress (Deep merge, Live overrides Historical)
+  const mergedProgress: Record<string, Record<string, ModuleProgressRecord>> = {
+    ...histProgress,
+  };
+  if (liveData.progress) {
+    Object.keys(liveData.progress).forEach((skill) => {
+      if (!mergedProgress[skill]) mergedProgress[skill] = {};
+      Object.keys(liveData.progress![skill]).forEach((modId) => {
+        mergedProgress[skill][modId] = liveData.progress![skill][modId];
+      });
+    });
+  }
+
+  // 4. Merge Projects (Deduplicated by projectId, Live overrides Historical)
+  const projectMap = new Map<string, UserProjectRecord>();
+  histProjects.forEach((p) => projectMap.set(p.projectId, p));
+  (liveData.projects || []).forEach((p) => projectMap.set(p.projectId, p));
+  const mergedProjects = Array.from(projectMap.values());
+
+  // 5. Merge Achievements (Deduplicated by achievementId)
+  const achMap = new Map<string, UserAchievementRecord>();
+  histAchievements.forEach((a) => achMap.set(a.achievementId, a));
+  (liveData.achievements || []).forEach((a) => achMap.set(a.achievementId, a));
+  const mergedAchievements = Array.from(achMap.values());
+
+  // 6. Merge Calendar Activity (Deduplicated by date + type)
+  const calKeySet = new Set<string>();
+  const mergedCalendar: CalendarActivityRecord[] = [];
+  [...histCalendar, ...(liveData.calendarActivity || [])].forEach((c) => {
+    const key = `${c.activityDate}_${c.activityType}`;
+    if (!calKeySet.has(key)) {
+      calKeySet.add(key);
+      mergedCalendar.push(c);
+    }
+  });
+
+  // 7. Calculate combined streak metrics from merged activity
+  const mergedStreak = calculateStreakFromActivity(mergedCalendar);
+
+  // Active selected project
+  const selectedProj = mergedProjects.find((p) => p.status === 'Selected' || p.status === 'In Progress') || mergedProjects[0];
+
+  return {
+    ...empty,
+    ...liveData,
+    userId,
+    email: cleanEmail,
+    progress: mergedProgress,
+    projects: mergedProjects,
+    selectedProjectId: selectedProj ? selectedProj.projectId : liveData.selectedProjectId || null,
+    projectGithubUrl: selectedProj ? selectedProj.githubUrl : liveData.projectGithubUrl || null,
+    projectLiveUrl: selectedProj ? selectedProj.liveUrl : liveData.projectLiveUrl || null,
+    achievements: mergedAchievements,
+    calendarActivity: mergedCalendar,
+    streak: mergedStreak,
+    updatedAt: liveData.updatedAt || empty.updatedAt,
+  };
 }
 
 /**
@@ -323,8 +384,8 @@ export async function saveUserDynamicData(
     try {
       const userRef = doc(db, 'user_activity', userId);
       await setDoc(userRef, payload, { merge: true });
-    } catch (err) {
-      console.warn('Firestore save notice for user_activity:', err);
+    } catch (err: any) {
+      console.warn('Firestore save notice for user_activity:', err?.code || err?.message);
     }
   }
 }
@@ -356,8 +417,8 @@ export async function resetAllDynamicDatabase(): Promise<{ clearedUsers: number;
       for (const docSnap of appsSnap.docs) {
         await deleteDoc(docSnap.ref);
       }
-    } catch (err) {
-      console.error('Error during Firestore database reset:', err);
+    } catch (err: any) {
+      console.warn('Firestore database reset notice:', err?.code || err?.message);
     }
   }
 

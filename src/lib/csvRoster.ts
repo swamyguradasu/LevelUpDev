@@ -36,6 +36,38 @@ export interface StaticUserProfile {
 }
 
 /**
+ * Formats raw Google Drive / cloud storage links into direct loadable image URLs.
+ */
+export function formatProfilePhotoUrl(url: string): string {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  // Convert Google Drive form view/open links to direct high-res CDN URLs
+  if (trimmed.includes('drive.google.com') || trimmed.includes('docs.google.com')) {
+    // 1. Extract ?id=... or &id=...
+    const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (idMatch && idMatch[1]) {
+      return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+    }
+
+    // 2. Extract /d/...
+    const dMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (dMatch && dMatch[1]) {
+      return `https://lh3.googleusercontent.com/d/${dMatch[1]}`;
+    }
+
+    // 3. Extract /file/d/...
+    const fileMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileMatch && fileMatch[1]) {
+      return `https://lh3.googleusercontent.com/d/${fileMatch[1]}`;
+    }
+  }
+
+  return trimmed;
+}
+
+/**
  * Standard CSV Parser handling quotes, commas, and multiline cells.
  */
 export function parseCSV(csvContent: string): string[][] {
@@ -85,8 +117,6 @@ export function parseCSV(csvContent: string): string[][] {
 
 const ADMIN_EMAILS = [
   'swamy@levelupdev.com',
-  'levelupdev@admin.com',
-  'swamy@learn.com',
 ];
 
 /**
@@ -125,6 +155,7 @@ export function getStaticProfilesFromCSV(): StaticUserProfile[] {
     if (!levelupdevEmail) continue;
 
     const isAdmin = ADMIN_EMAILS.includes(levelupdevEmail);
+    const rawPhotoUrl = (row[7] || '').trim();
 
     const profile: StaticUserProfile = {
       timestamp: (row[0] || '').trim(),
@@ -134,7 +165,7 @@ export function getStaticProfilesFromCSV(): StaticUserProfile[] {
       fullName: (row[4] || '').trim(),
       headline: (row[5] || '').trim(),
       shortBio: (row[6] || '').trim(),
-      photoUrl: (row[7] || '').trim(),
+      photoUrl: formatProfilePhotoUrl(rawPhotoUrl),
       aboutMe: (row[8] || '').trim(),
       college: (row[9] || '').trim(),
       degree: (row[10] || '').trim(),
@@ -161,43 +192,6 @@ export function getStaticProfilesFromCSV(): StaticUserProfile[] {
     };
 
     profiles.push(profile);
-  }
-
-  // Fallback for default admin if not in CSV
-  if (!profiles.some((p) => p.levelupdevEmail === 'levelupdev@admin.com')) {
-    profiles.push({
-      timestamp: new Date().toISOString(),
-      levelupdevEmail: 'levelupdev@admin.com',
-      username: 'LevelUp Admin',
-      personalEmail: 'admin@levelupdev.com',
-      fullName: 'LevelUp Admin',
-      headline: 'Platform Administrator',
-      shortBio: 'System Administrator for LevelUpDev LMS.',
-      photoUrl: '',
-      aboutMe: 'Platform Administrator with system management capabilities.',
-      college: 'Swarnandhra College of Engineering and Technology',
-      degree: 'BTech',
-      registerNumber: 'admin@2508',
-      branch: 'CSE',
-      currentYear: 'Staff',
-      graduationYear: '2026',
-      city: 'Hyderabad',
-      state: 'Telangana',
-      country: 'India',
-      currentRole: 'Administrator',
-      careerInterest: 'System Architecture',
-      githubUrl: 'https://github.com',
-      linkedinUrl: 'https://linkedin.com',
-      websiteUrl: '',
-      otherUrl: '',
-      contactEmail: 'admin@levelupdev.com',
-      phone: '',
-      isPortfolioPublic: true,
-      showEmailPublicly: true,
-      showPhonePublicly: false,
-      accuracyDeclaration: 'Confirmed',
-      role: 'admin',
-    });
   }
 
   return profiles;

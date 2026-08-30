@@ -110,13 +110,16 @@ export default function LeaderboardPage() {
               <img src="/levelupdev-icon.png" alt="LevelUpDev Logo" className="w-full h-full object-contain rounded-lg" />
             </div>
             <span className="font-display font-bold text-lg text-white tracking-tight">
-              LevelUpDev <span className="text-stone-400 font-mono text-xs font-normal">/ Trail Tracker</span>
+              Level<span className="text-[#006cd2]">Up</span>Dev <span className="text-stone-400 font-mono text-xs font-normal">/ Trail Tracker</span>
             </span>
           </div>
 
           <nav className="hidden md:flex gap-8 items-center text-sm font-medium">
             <Link className="text-stone-300 hover:text-white transition" href="/home">
               Portfolio
+            </Link>
+            <Link className="text-stone-300 hover:text-white transition" href="/dashboard">
+              Dashboard
             </Link>
             <Link className="text-stone-300 hover:text-white transition" href="/roadmaps">
               Career Roadmaps
@@ -281,7 +284,18 @@ export default function LeaderboardPage() {
                                     <img
                                       src={member.photoUrl}
                                       alt={member.name}
+                                      referrerPolicy="no-referrer"
                                       className="w-full h-full object-cover rounded-full"
+                                      onError={(e) => {
+                                        (e.target as HTMLElement).style.display = 'none';
+                                        const parent = (e.target as HTMLElement).parentElement;
+                                        if (parent && !parent.querySelector('.fallback-initials')) {
+                                          const div = document.createElement('div');
+                                          div.className = 'fallback-initials w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white uppercase';
+                                          div.innerText = (member.name || 'DEV').substring(0, 2);
+                                          parent.appendChild(div);
+                                        }
+                                      }}
                                     />
                                   ) : (
                                     <div className="w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white uppercase">

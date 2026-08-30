@@ -43,31 +43,46 @@ function saveLocalApplications(apps: InternshipApplication[]) {
   }
 }
 
+import { getAllHistoricalInternships } from '@/lib/historicalData';
+
 /**
- * Fetch all internship applications (Firestore + LocalStorage fallback)
+ * Fetch all internship applications by merging static historical snapshot with live Firebase applications.
  */
 export async function getInternshipApplications(): Promise<InternshipApplication[]> {
+  const historical = getAllHistoricalInternships();
+  let liveList: InternshipApplication[] = [];
+
   if (isFirebaseConfigured) {
     try {
       const q = query(collection(db, 'internship_applications'));
       const snap = await getDocs(q);
-      const list: InternshipApplication[] = [];
       snap.forEach((d) => {
-        list.push(d.data() as InternshipApplication);
+        liveList.push(d.data() as InternshipApplication);
       });
-      if (list.length > 0) {
-        list.sort((a, b) => (b.submitted_at || '').localeCompare(a.submitted_at || ''));
-        saveLocalApplications(list);
-        return list;
-      }
-    } catch (err) {
-      console.warn('Firestore fetch failed for internship applications, fallback to local:', err);
+    } catch (err: any) {
+      console.warn('Firestore notice for internship applications:', err?.code || err?.message || 'fallback to local');
     }
   }
 
-  const local = getLocalApplications();
-  local.sort((a, b) => (b.submitted_at || '').localeCompare(a.submitted_at || ''));
-  return local;
+  if (liveList.length === 0) {
+    liveList = getLocalApplications();
+  }
+
+  // Deduplicate and merge: key by application id or ${user_id}_${internship_id}
+  // Live state overrides historical state
+  const appMap = new Map<string, InternshipApplication>();
+  historical.forEach((app) => {
+    const key = app.id || `${app.user_id}_${app.internship_id}`;
+    appMap.set(key, app);
+  });
+  liveList.forEach((app) => {
+    const key = app.id || `${app.user_id}_${app.internship_id}`;
+    appMap.set(key, app);
+  });
+
+  const merged = Array.from(appMap.values());
+  merged.sort((a, b) => (b.submitted_at || '').localeCompare(a.submitted_at || ''));
+  return merged;
 }
 
 /**
@@ -133,8 +148,8 @@ export async function submitInternshipApplication(
     try {
       const docRef = doc(db, 'internship_applications', newApp.id);
       await setDoc(docRef, newApp, { merge: true });
-    } catch (err) {
-      console.warn('Failed to save internship application to Firestore:', err);
+    } catch (err: any) {
+      console.warn('Firestore save notice for internship application:', err?.code || err?.message);
     }
   }
 
@@ -168,8 +183,8 @@ export async function updateApplicationStatus(
         status: newStatus,
         ...(adminNotes !== undefined ? { admin_notes: adminNotes } : {}),
       });
-    } catch (err) {
-      console.warn('Failed to update status in Firestore:', err);
+    } catch (err: any) {
+      console.warn('Firestore status update notice:', err?.code || err?.message);
     }
   }
 
@@ -190,8 +205,8 @@ export async function deleteApplication(applicationId: string): Promise<boolean>
     try {
       const docRef = doc(db, 'internship_applications', applicationId);
       await deleteDoc(docRef);
-    } catch (err) {
-      console.warn('Failed to delete application in Firestore:', err);
+    } catch (err: any) {
+      console.warn('Firestore delete notice:', err?.code || err?.message);
     }
   }
 

@@ -203,27 +203,7 @@ async function runSync() {
     }
   }
 
-  // Ensure Admin account is present
-  const adminEmail = 'levelupdev@admin.com';
-  if (!allowedEmailsList.includes(adminEmail)) {
-    allowedEmailsList.push(adminEmail);
-  }
-
-  const hasAdminInJson = updatedJsonDevelopers.some((d) => d.email === adminEmail);
-  if (!hasAdminInJson) {
-    updatedJsonDevelopers.push({
-      name: 'LevelUp Admin',
-      headline: 'System Administrator',
-      registerNumber: 'admin@2508',
-      branch: 'CSE',
-      bio: 'Platform Administrator',
-      githubUrl: 'https://github.com',
-      linkedinUrl: 'https://linkedin.com',
-      leetcodeId: 'LeetCode',
-      leetcodeSolved: 100,
-      email: adminEmail,
-    });
-  }
+  // Only authentic roster members are kept
 
   try {
     fs.writeFileSync(CSV_PATH, updatedCSVLines.join('\n') + '\n', 'utf-8');

@@ -2,8 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users Collection Security Rules for CSV Roster Persistence across devices
+    // Allow read/write across all collections for LevelUpDev (users, user_activity, internship_applications)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
     match /users/{docId} {
+      allow read, write: if true;
+    }
+
+    match /user_activity/{docId} {
+      allow read, write: if true;
+    }
+
+    match /internship_applications/{docId} {
       allow read, write: if true;
     }
   }

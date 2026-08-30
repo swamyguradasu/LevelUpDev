@@ -207,7 +207,18 @@ export default function RecruiterPortfolioPage() {
                   <img
                     src={profile.photoUrl}
                     alt={profile.fullName}
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover rounded-[22px]"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                      const parent = (e.target as HTMLElement).parentElement;
+                      if (parent && !parent.querySelector('.fallback-initials')) {
+                        const div = document.createElement('div');
+                        div.className = 'fallback-initials w-full h-full bg-slate-950 rounded-[22px] flex items-center justify-center font-display font-extrabold text-2xl text-blue-400';
+                        div.innerText = (profile.fullName || 'DEV').slice(0, 2).toUpperCase();
+                        parent.appendChild(div);
+                      }
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full bg-slate-950 rounded-[22px] flex items-center justify-center font-display font-extrabold text-2xl text-blue-400">

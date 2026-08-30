@@ -23,27 +23,27 @@ export async function GET(req: NextRequest) {
     const applications: InternshipApplication[] = [];
 
     if (isFirebaseConfigured) {
-      const colRef = collection(db, 'internship_applications');
-      let q = query(colRef);
+      try {
+        const colRef = collection(db, 'internship_applications');
+        let q = query(colRef);
 
-      if (email && role !== 'admin') {
-        const userId = normalizeUserId(email);
-        q = query(colRef, where('user_id', '==', userId));
+        if (email && role !== 'admin') {
+          const userId = normalizeUserId(email);
+          q = query(colRef, where('user_id', '==', userId));
+        }
+
+        const snap = await getDocs(q);
+        snap.forEach((d) => {
+          applications.push(d.data() as InternshipApplication);
+        });
+      } catch (fbErr: any) {
+        console.warn('Notice: Firestore query fallback for internship_applications:', fbErr?.code || fbErr?.message);
       }
-
-      const snap = await getDocs(q);
-      snap.forEach((d) => {
-        applications.push(d.data() as InternshipApplication);
-      });
     }
 
     return NextResponse.json({ applications }, { status: 200 });
   } catch (err: any) {
-    console.error('Internship GET error:', err);
-    return NextResponse.json(
-      { error: 'Failed to fetch internship applications.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ applications: [] }, { status: 200 });
   }
 }
 
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       skills: skills || profile.careerInterest || 'Full-Stack Development',
       status: 'Interested',
       submitted_at: nowIso,
-      admin_notes: undefined,
+      admin_notes: '',
     };
 
     if (isFirebaseConfigured) {

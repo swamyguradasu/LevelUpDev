@@ -153,13 +153,16 @@ export default function DailyChallengePage() {
               <img src="/levelupdev-icon.png" alt="LevelUpDev Logo" className="w-full h-full object-contain rounded-lg" />
             </div>
             <span className="font-display font-bold text-lg text-white tracking-tight">
-              LevelUpDev <span className="text-stone-400 font-mono text-xs font-normal">/ Trail Tracker</span>
+              Level<span className="text-[#006cd2]">Up</span>Dev <span className="text-stone-400 font-mono text-xs font-normal">/ Trail Tracker</span>
             </span>
           </div>
 
           <nav className="hidden md:flex gap-8 items-center text-sm font-medium">
             <Link className="text-stone-300 hover:text-white transition" href="/home">
               Portfolio
+            </Link>
+            <Link className="text-stone-300 hover:text-white transition" href="/dashboard">
+              Dashboard
             </Link>
             <Link className="text-stone-300 hover:text-white transition" href="/roadmaps">
               Career Roadmaps

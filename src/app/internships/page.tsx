@@ -236,6 +236,13 @@ export default function InternshipsPage() {
 
             <div className="flex items-center gap-3">
               <Link
+                href="/dashboard"
+                className="text-xs font-mono text-cyan-400 hover:text-white px-3 py-1.5 rounded-xl border border-slate-800 hover:bg-slate-900 transition flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>Dashboard</span>
+              </Link>
+              <Link
                 href="/roadmaps"
                 className="text-xs font-mono text-slate-400 hover:text-white px-3 py-1.5 rounded-xl border border-slate-800 hover:bg-slate-900 transition"
               >
