@@ -14,6 +14,7 @@ import {
   MiniProject,
   ProjectIdea,
   isAdminEmail,
+  isPlacementPrepAllowed,
 } from '@/lib/content';
 import { UserPortfolioProject } from '@/context/AuthContext';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
@@ -40,7 +41,6 @@ import {
   Sparkles,
   Play,
   Mail,
-  Share2,
   Code2,
   LogOut,
   Plus,
@@ -149,7 +149,6 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals
-  const [isSharingProfile, setIsSharingProfile] = useState(false);
   const [selectedSkillModal, setSelectedSkillModal] = useState<{
     skill: Skill;
     completedCount: number;
@@ -175,7 +174,6 @@ export default function HomePage() {
   });
   const [urlError, setUrlError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
 
   // Content Data
   const [allSkills, setAllSkills] = useState<Skill[]>([]);
@@ -504,15 +502,6 @@ export default function HomePage() {
     router.push('/login');
   };
 
-  const handleCopyShareLink = () => {
-    if (typeof window !== 'undefined') {
-      const shareUrl = `${window.location.origin}/home?user=${userData.uid || 'public'}`;
-      navigator.clipboard.writeText(shareUrl);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-    }
-  };
-
   const displayName = userData.name || userData.username || 'Developer';
   const displayHeadline = userData.headline || 'AIML Developer • ML Enthusiast • Full-Stack Builder';
   const displayCollege = userData.college || 'Swarnandhra College of Engineering & Technology';
@@ -595,6 +584,15 @@ export default function HomePage() {
             <Link className="text-slate-300 hover:text-white transition" href="/leaderboard">
               Leaderboard
             </Link>
+            {isPlacementPrepAllowed(userData?.email) && (
+              <Link
+                className="text-amber-300 font-bold hover:text-white transition flex items-center gap-1 bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30 text-xs"
+                href="/placement-preparation"
+              >
+                <Target className="w-3.5 h-3.5 text-amber-400" />
+                <span>Placement Prep</span>
+              </Link>
+            )}
             {isAdminEmail(userData?.email || '') && (
               <Link
                 className="text-blue-300 font-bold hover:text-white transition flex items-center gap-1 bg-[#006cd2]/20 px-2.5 py-0.5 rounded-full border border-[#006cd2]/40 text-xs"
@@ -619,16 +617,6 @@ export default function HomePage() {
             >
               <Eye className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{isRecruiterView ? 'Recruiter Mode: ON' : 'Recruiter View'}</span>
-            </button>
-
-            {/* Share Profile Button */}
-            <button
-              onClick={() => setIsSharingProfile(true)}
-              className="px-3 py-1.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-[#006cd2]/30 transition"
-              title="Share Public Portfolio"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Share</span>
             </button>
 
             {/* Change Password Button */}
@@ -1602,65 +1590,6 @@ export default function HomePage() {
           </div>
         </footer>
       </div>
-
-      {/* ========================================================================= */}
-      {/* MODAL 2: SHARE PORTFOLIO MODAL */}
-      {/* ========================================================================= */}
-      {isSharingProfile && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 font-display text-lg font-bold text-white">
-                <Share2 className="w-5 h-5 text-[#006cd2]" />
-                <span>Share Developer Profile</span>
-              </div>
-              <button
-                onClick={() => setIsSharingProfile(false)}
-                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              <p className="text-slate-300 leading-relaxed">
-                Share your verified LMS developer portfolio with recruiters, peers, and collaborators:
-              </p>
-
-              <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between font-mono text-slate-300">
-                <span className="truncate pr-2">
-                  https://levelupdev.com/portfolio/{userData.uid ? userData.uid.slice(0, 12) : 'swamy'}
-                </span>
-                <button
-                  onClick={handleCopyShareLink}
-                  className="p-2 rounded-lg bg-[#006cd2] hover:bg-[#005bb5] text-white transition shrink-0"
-                  title="Copy Link"
-                >
-                  {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {copiedLink && (
-                <div className="text-emerald-400 font-mono text-[11px] text-center font-bold">
-                  ✓ Public Portfolio Link copied to clipboard!
-                </div>
-              )}
-
-              <div className="pt-2 flex flex-col gap-2">
-                <button
-                  onClick={() => {
-                    window.print();
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-200 font-mono text-xs flex items-center justify-center gap-2 transition"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Download / Print Resume Summary</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL 3: SKILL DETAIL MODAL */}

@@ -116,5 +116,11 @@ export function isAdminEmail(email: string): boolean {
   return list.some((e) => e.trim().toLowerCase() === cleanEmail);
 }
 
+export function isPlacementPrepAllowed(email?: string | null): boolean {
+  if (!email) return false;
+  const cleanEmail = email.trim().toLowerCase();
+  return cleanEmail === 'swamy@levelupdev.com';
+}
+
 
 

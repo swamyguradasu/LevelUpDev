@@ -23,6 +23,9 @@ import {
   BarChart3,
   Cpu,
   Bot,
+  MessageSquare,
+  Workflow,
+  Camera,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -40,6 +43,9 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Sparkles: <Sparkles className="w-7 h-7" />,
   Cpu: <Cpu className="w-7 h-7" />,
   Bot: <Bot className="w-7 h-7" />,
+  MessageSquare: <MessageSquare className="w-7 h-7" />,
+  Workflow: <Workflow className="w-7 h-7" />,
+  Camera: <Camera className="w-7 h-7" />,
 };
 
 export default function CareerRoadmapsHubPage() {
@@ -272,6 +278,26 @@ export default function CareerRoadmapsHubPage() {
               <span>•</span>
               <Link href="/roadmaps/generative-ai-engineer" className="hover:text-slate-300 transition-colors">
                 GenAI Engineer
+              </Link>
+              <span>•</span>
+              <Link href="/roadmaps/nlp-engineer" className="hover:text-slate-300 transition-colors">
+                NLP Engineer
+              </Link>
+              <span>•</span>
+              <Link href="/roadmaps/mlops-engineer" className="hover:text-slate-300 transition-colors">
+                MLOps Engineer
+              </Link>
+              <span>•</span>
+              <Link href="/roadmaps/computer-vision-engineer" className="hover:text-slate-300 transition-colors">
+                CV Engineer
+              </Link>
+              <span>•</span>
+              <Link href="/roadmaps/data-engineer" className="hover:text-slate-300 transition-colors">
+                Data Engineer
+              </Link>
+              <span>•</span>
+              <Link href="/roadmaps/bi-analyst" className="hover:text-slate-300 transition-colors">
+                BI Analyst
               </Link>
             </div>
           </div>

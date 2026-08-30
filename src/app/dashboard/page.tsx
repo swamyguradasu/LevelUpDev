@@ -10,6 +10,7 @@ import {
   getAllDailyChallenges,
   DailyChallenge,
   isAdminEmail,
+  isPlacementPrepAllowed,
 } from '@/lib/content';
 import {
   getAllFoundationLevels,
@@ -212,6 +213,15 @@ export default function StudentDashboardPage() {
             <Link className="text-slate-300 hover:text-white transition" href="/leaderboard">
               Leaderboard
             </Link>
+            {isPlacementPrepAllowed(userData?.email) && (
+              <Link
+                className="text-amber-300 font-bold hover:text-white transition flex items-center gap-1 bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30 text-xs"
+                href="/placement-preparation"
+              >
+                <Target className="w-3.5 h-3.5 text-amber-400" />
+                <span>Placement Prep</span>
+              </Link>
+            )}
             {isAdminEmail(userData?.email || '') && (
               <Link
                 className="text-blue-300 font-bold hover:text-white transition flex items-center gap-1 bg-[#006cd2]/20 px-2.5 py-0.5 rounded-full border border-[#006cd2]/40 text-xs"
