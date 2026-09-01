@@ -8,15 +8,28 @@ import {
   ModuleProgressRecord,
 } from '@/lib/dynamicDatabase';
 import { getSkillById } from '@/lib/content';
+import { getPythonModuleById } from '@/data/pythonSkillsData';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, skillId, moduleId, status } = body;
+    const {
+      email,
+      skillId,
+      moduleId,
+      status,
+      topicId,
+      topicCompleted,
+      assignmentScore,
+      assignmentPassed,
+      assignmentAttempt,
+      weakTopics,
+      finalChallenge,
+    } = body;
 
-    if (!email || !skillId || !moduleId) {
+    if (!email || !skillId) {
       return NextResponse.json(
-        { error: 'Email, skillId, and moduleId are required.' },
+        { error: 'Email and skillId are required.' },
         { status: 400 }
       );
     }
@@ -33,19 +46,85 @@ export async function POST(req: NextRequest) {
     const normSkill = String(skillId).toLowerCase();
     const nowIso = new Date().toISOString();
     const todayStr = nowIso.split('T')[0];
-    const isCompleted = status === 'completed' || status === true;
 
     // Load existing dynamic data
     const dynamicData = await fetchUserDynamicData(cleanEmail);
 
-    // Update progress
+    // Handle Final Challenge submission
+    if (finalChallenge) {
+      await saveUserDynamicData(cleanEmail, {
+        finalChallenge: {
+          completed: Boolean(finalChallenge.completed),
+          score: finalChallenge.score,
+          completedAt: nowIso,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        finalChallenge: {
+          completed: Boolean(finalChallenge.completed),
+          score: finalChallenge.score,
+          completedAt: nowIso,
+        },
+      });
+    }
+
+    if (!moduleId) {
+      return NextResponse.json(
+        { error: 'ModuleId is required.' },
+        { status: 400 }
+      );
+    }
+
     const skillProgress: Record<string, ModuleProgressRecord> = dynamicData.progress[normSkill] || {};
-    const updatedRecord: ModuleProgressRecord = {
+    const currentModRecord: ModuleProgressRecord = skillProgress[moduleId] || {
       skillId: normSkill,
       moduleId: String(moduleId),
-      status: isCompleted ? 'completed' : 'in_progress',
-      completedAt: isCompleted ? nowIso : skillProgress[moduleId]?.completedAt,
+      status: 'in_progress',
       lastAccessedAt: nowIso,
+      topicsCompleted: [],
+    };
+
+    // Update topics completed
+    let updatedTopicsCompleted = [...(currentModRecord.topicsCompleted || [])];
+    if (topicId) {
+      if (topicCompleted !== false) {
+        if (!updatedTopicsCompleted.includes(topicId)) {
+          updatedTopicsCompleted.push(topicId);
+        }
+      } else {
+        updatedTopicsCompleted = updatedTopicsCompleted.filter((t) => t !== topicId);
+      }
+    }
+
+    // Determine module status
+    let modStatus = currentModRecord.status;
+    if (status !== undefined) {
+      modStatus = status === 'completed' || status === true ? 'completed' : 'in_progress';
+    }
+
+    if (assignmentPassed === true) {
+      modStatus = 'completed';
+    }
+
+    // Update assignment attempt history
+    const existingAttempts = currentModRecord.assignmentAttempts || [];
+    let updatedAttempts = [...existingAttempts];
+    if (assignmentAttempt) {
+      updatedAttempts.push(assignmentAttempt);
+    }
+
+    const updatedRecord: ModuleProgressRecord = {
+      ...currentModRecord,
+      status: modStatus,
+      completedAt: modStatus === 'completed' ? (currentModRecord.completedAt || nowIso) : undefined,
+      lastAccessedAt: nowIso,
+      topicsCompleted: updatedTopicsCompleted,
+      assignmentPassed: assignmentPassed !== undefined ? assignmentPassed : currentModRecord.assignmentPassed,
+      assignmentScore: assignmentScore !== undefined ? assignmentScore : currentModRecord.assignmentScore,
+      assignmentAttempts: updatedAttempts,
+      weakTopics: weakTopics !== undefined ? weakTopics : currentModRecord.weakTopics,
     };
 
     const newSkillProgress: Record<string, ModuleProgressRecord> = {
@@ -72,7 +151,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Add activity record
+    // Add calendar activity record
     const newActivity: CalendarActivityRecord = {
       activityDate: todayStr,
       activityType: 'module_completion',
@@ -81,11 +160,14 @@ export async function POST(req: NextRequest) {
     const updatedActivities = [...dynamicData.calendarActivity, newActivity];
     const updatedStreak = calculateStreakFromActivity(updatedActivities);
 
+    const pythonModDef = normSkill === 'python' ? getPythonModuleById(moduleId) : null;
     const modDef = skillDef?.modules.find((m) => m.moduleId === moduleId);
+    const modTitle = pythonModDef ? `Module ${pythonModDef.moduleNumber}: ${pythonModDef.title}` : (modDef?.title || moduleId);
+
     const lastActiveModule = {
       skillId: normSkill,
       moduleId: String(moduleId),
-      moduleTitle: modDef ? `${skillDef?.title || normSkill}: ${modDef.title}` : normSkill,
+      moduleTitle: `${skillDef?.title || normSkill}: ${modTitle}`,
       updatedAt: nowIso,
     };
 

@@ -8,12 +8,26 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 
+export interface AssignmentAttemptRecord {
+  attemptNumber: number;
+  scorePercent: number;
+  passed: boolean;
+  timeTakenSeconds: number;
+  date: string;
+  weakTopicIds: string[];
+}
+
 export interface ModuleProgressRecord {
   skillId: string;
   moduleId: string;
   status: 'completed' | 'in_progress';
   completedAt?: string;
   lastAccessedAt: string;
+  topicsCompleted?: string[];
+  assignmentPassed?: boolean;
+  assignmentScore?: number;
+  assignmentAttempts?: AssignmentAttemptRecord[];
+  weakTopics?: Array<{ id: string; title: string }>;
 }
 
 export interface UserProjectRecord {
@@ -151,6 +165,11 @@ export interface UserDynamicData {
     mediumSolved: number;
     hardSolved: number;
     lastSyncedAt?: string;
+  };
+  finalChallenge?: {
+    completed: boolean;
+    score?: number;
+    completedAt?: string;
   };
   updatedAt: string;
 }

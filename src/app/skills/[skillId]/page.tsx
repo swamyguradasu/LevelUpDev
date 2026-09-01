@@ -5,15 +5,44 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getSkillById, Skill, Module } from '@/lib/content';
-import { ArrowLeft, Check, Lock, HelpCircle, Sparkles, BookOpen, Compass } from 'lucide-react';
+import {
+  PYTHON_MODULES,
+  PYTHON_TOPICS_MAP,
+  PYTHON_FINAL_CHALLENGE,
+  PythonModuleMetadata,
+} from '@/data/pythonSkillsData';
+import {
+  fetchUserDynamicData,
+  UserDynamicData,
+  ModuleProgressRecord,
+} from '@/lib/dynamicDatabase';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Lock,
+  HelpCircle,
+  Sparkles,
+  BookOpen,
+  Compass,
+  Trophy,
+  Award,
+  AlertTriangle,
+  Play,
+  RotateCcw,
+  Code2,
+} from 'lucide-react';
 
 export default function SkillPathMapPage() {
   const params = useParams();
   const router = useRouter();
-  const skillId = params.skillId as string;
+  const skillId = (params.skillId as string)?.toLowerCase();
 
   const { userData, loading } = useAuth();
   const [skill, setSkill] = useState<Skill | null>(null);
+  const [dynamicData, setDynamicData] = useState<UserDynamicData | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!loading && !userData) {
@@ -28,56 +57,87 @@ export default function SkillPathMapPage() {
     }
   }, [skillId]);
 
-  // Compute status for each module in sequence (memoized for performance)
-  const { modulesWithStatus, firstUncompletedIndex, completedCount, totalCount } = useMemo(() => {
-    if (!skill || !userData) {
-      return { modulesWithStatus: [], firstUncompletedIndex: -1, completedCount: 0, totalCount: 0 };
+  // Load fresh dynamic database data for real-time progress & assignment records
+  useEffect(() => {
+    async function loadDynamic() {
+      if (userData?.email) {
+        const d = await fetchUserDynamicData(userData.email);
+        setDynamicData(d);
+      }
     }
+    loadDynamic();
+  }, [userData, refreshKey]);
 
-    const skillProgress = userData.progress?.[skill.skillId.toLowerCase()] || {};
-    const uncompletedIdx = skill.modules.findIndex((mod: Module) => !skillProgress[mod.moduleId]);
-    let done = 0;
+  // Specialized Python Trail Modules Computation
+  const pythonModulesWithStatus = useMemo(() => {
+    if (skillId !== 'python' || !userData) return [];
 
-    const list = skill.modules.map((mod: Module, index: number) => {
-      const isCompleted = !!skillProgress[mod.moduleId];
-      if (isCompleted) done++;
+    const pyProgress: Record<string, ModuleProgressRecord> =
+      dynamicData?.progress?.python || ({} as Record<string, ModuleProgressRecord>);
 
+    return PYTHON_MODULES.map((mod, index) => {
+      const modRecord = pyProgress[mod.id] || pyProgress[`module-${mod.moduleNumber}`];
+      const completedTopics = modRecord?.topicsCompleted || [];
+      const totalTopicsCount = mod.topicIds.length;
+      const completedTopicsCount = completedTopics.length;
+      const allTopicsCompleted = completedTopicsCount >= totalTopicsCount;
+      const assignmentPassed = !!modRecord?.assignmentPassed || modRecord?.status === 'completed';
+      const hasFailedAttempt =
+        (modRecord?.assignmentAttempts || []).length > 0 && !assignmentPassed;
+
+      // Sequential lock state
       let isUnlocked = false;
       if (index === 0) {
-        isUnlocked = true; // Module 1 is always unlocked
+        isUnlocked = true;
       } else {
-        const prevModule = skill.modules[index - 1];
-        isUnlocked = !!skillProgress[prevModule.moduleId];
+        const prevMod = PYTHON_MODULES[index - 1];
+        const prevRecord = pyProgress[prevMod.id] || pyProgress[`module-${prevMod.moduleNumber}`];
+        isUnlocked = !!prevRecord?.assignmentPassed || prevRecord?.status === 'completed';
       }
 
-      const isCurrent = !isCompleted && isUnlocked && (uncompletedIdx === -1 ? false : index === uncompletedIdx);
+      // Determine UI status
+      let moduleStatus: 'Not Started' | 'In Progress' | 'Topics Completed' | 'Completed' | 'Assignment Failed' = 'Not Started';
+      let assignmentStatus: 'Locked' | 'Available' | 'Passed' | 'Failed' = 'Locked';
 
-      let status: 'completed' | 'in-progress' | 'locked' = 'locked';
-      if (isCompleted) {
-        status = 'completed';
-      } else if (isUnlocked) {
-        status = 'in-progress';
+      if (assignmentPassed) {
+        moduleStatus = 'Completed';
+        assignmentStatus = 'Passed';
+      } else if (hasFailedAttempt) {
+        moduleStatus = 'Assignment Failed';
+        assignmentStatus = 'Failed';
+      } else if (allTopicsCompleted) {
+        moduleStatus = 'Topics Completed';
+        assignmentStatus = 'Available';
+      } else if (completedTopicsCount > 0) {
+        moduleStatus = 'In Progress';
+        assignmentStatus = 'Locked';
       } else {
-        status = 'locked';
+        moduleStatus = 'Not Started';
+        assignmentStatus = isUnlocked ? 'Locked' : 'Locked';
       }
 
       return {
         ...mod,
-        status,
         isUnlocked,
-        isCompleted,
-        isCurrent,
-        moduleNumber: index + 1,
+        isCompleted: assignmentPassed,
+        allTopicsCompleted,
+        completedTopicsCount,
+        totalTopicsCount,
+        moduleStatus,
+        assignmentStatus,
+        bestScore: modRecord?.assignmentScore,
+        attemptsCount: (modRecord?.assignmentAttempts || []).length,
       };
     });
+  }, [skillId, userData, dynamicData]);
 
-    return {
-      modulesWithStatus: list,
-      firstUncompletedIndex: uncompletedIdx,
-      completedCount: done,
-      totalCount: skill.modules.length,
-    };
-  }, [skill, userData]);
+  // Is Final Challenge Unlocked (All 7 modules passed)
+  const isFinalChallengeUnlocked = useMemo(() => {
+    if (skillId !== 'python') return false;
+    return pythonModulesWithStatus.length === 7 && pythonModulesWithStatus.every((m) => m.isCompleted);
+  }, [skillId, pythonModulesWithStatus]);
+
+  const finalChallengeCompleted = !!dynamicData?.finalChallenge?.completed;
 
   if (loading || !userData) {
     return (
@@ -112,11 +172,14 @@ export default function SkillPathMapPage() {
     );
   }
 
-  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  // Calculate overall Python progress
+  const completedPythonModulesCount = pythonModulesWithStatus.filter((m) => m.isCompleted).length;
+  const totalPythonModulesCount = pythonModulesWithStatus.length || 7;
+  const progressPercent = Math.round((completedPythonModulesCount / totalPythonModulesCount) * 100);
 
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-[#006cd2] selection:text-white flex flex-col">
-      {/* Lightweight Static Ambient Background (Zero lag, zero canvas/mousemove CPU load) */}
+      {/* Ambient static background glow */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[450px] bg-[#006cd2]/15 rounded-full blur-[140px]" />
         <div className="absolute top-[40%] -left-40 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[160px]" />
@@ -144,153 +207,259 @@ export default function SkillPathMapPage() {
 
             <div className="flex items-center gap-3">
               <span className="hidden sm:inline text-xs font-mono text-slate-400">
-                Progress: <strong className="text-blue-400">{completedCount}/{totalCount} Modules ({progressPercent}%)</strong>
+                Progress: <strong className="text-blue-400">{completedPythonModulesCount}/{totalPythonModulesCount} Modules ({progressPercent}%)</strong>
               </span>
               <div className="flex items-center gap-1.5 text-xs font-mono text-slate-300 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
                 <Compass className="w-3.5 h-3.5 text-[#006cd2]" />
-                <span className="font-bold text-white">{skill.title} Trail</span>
+                <span className="font-bold text-white">Python Skills Trail</span>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Hero Banner */}
-        <div className="max-w-4xl mx-auto w-full px-4 pt-10 pb-4 text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#006cd2]/10 border border-[#006cd2]/30 text-blue-400 text-xs font-mono font-semibold">
+        {/* Hero Section */}
+        <div className="max-w-4xl mx-auto w-full px-4 pt-10 pb-6 text-center space-y-3">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#006cd2]/10 border border-[#006cd2]/30 text-blue-400 text-xs font-mono font-semibold tracking-wide">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>INTERACTIVE LEARNING TRAIL</span>
+            <span>STRUCTURED SEQUENTIAL MASTERY</span>
           </div>
           <h1 className="text-3xl sm:text-5xl font-display font-extrabold text-white tracking-tight">
-            {skill.title} <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">Trail</span>
+            Python <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-500">Skills Trail</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto">
-            {skill.description || 'Master core programming fundamentals, data structures, and problem-solving through interactive lessons and assessments.'}
+          <p className="text-xs sm:text-base text-slate-300 max-w-2xl mx-auto font-sans leading-relaxed">
+            Master Python step by step through concepts, practice, and challenging module assignments.
           </p>
+
+          {/* Sequential Flow Explanation Banner */}
+          <div className="max-w-2xl mx-auto bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center justify-between text-xs font-mono text-slate-400 text-left gap-3">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center shrink-0">1</span>
+              <span>Complete Topics</span>
+            </div>
+            <span className="text-slate-600">→</span>
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center shrink-0">2</span>
+              <span>Attempt Assignment</span>
+            </div>
+            <span className="text-slate-600">→</span>
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">3</span>
+              <span>Pass (≥70%) to Unlock Next</span>
+            </div>
+          </div>
         </div>
 
-        {/* Trail Roadmap Canvas */}
-        <main className="relative max-w-[1100px] mx-auto w-full min-h-[700px] py-8 px-4 sm:px-6 flex-1">
-          {/* Desktop SVG Trail Line */}
-          <div className="absolute inset-0 pointer-events-none z-0 hidden md:block">
-            <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1000 800">
-              <path
-                d="M 500,30 Q 720,180 500,340 T 500,680"
-                stroke="#006cd2"
-                strokeOpacity="0.4"
-                strokeWidth="3"
-                strokeDasharray="8 8"
-                fill="none"
-              />
-            </svg>
-          </div>
-
-          {/* Mobile SVG Trail Line */}
-          <div className="absolute inset-0 pointer-events-none z-0 block md:hidden">
-            <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 400 800">
-              <path
-                d="M 200,30 Q 280,180 200,340 T 200,680"
-                stroke="#006cd2"
-                strokeOpacity="0.4"
-                strokeWidth="3"
-                strokeDasharray="8 8"
-                fill="none"
-              />
-            </svg>
-          </div>
-
-          {/* Trail Nodes Container */}
-          <div className="relative z-10 flex flex-col items-center gap-24 md:gap-32 w-full max-w-4xl mx-auto my-6">
-            {modulesWithStatus.map((mod, index) => {
-              const isEven = index % 2 === 0;
-              const modCode = `M${String(index + 1).padStart(2, '0')}`;
-              const topicSummary =
-                mod.topics.map((t) => t.name).join(', ') || 'Core concepts and practical exercises.';
+        {/* 7 Sequential Module Cards Grid */}
+        <main className="max-w-5xl mx-auto w-full py-6 px-4 sm:px-6 space-y-6 flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {pythonModulesWithStatus.map((mod) => {
+              const isLocked = !mod.isUnlocked;
 
               return (
-                <div key={mod.moduleId} className="relative flex items-center justify-center w-full min-h-[140px]">
-                  {/* Center Axis Node Badge */}
-                  <div className="absolute left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
-                    {mod.isCompleted ? (
-                      <div className="w-12 h-12 rounded-full bg-[#006cd2] flex items-center justify-center shadow-lg shadow-[#006cd2]/40 border-2 border-white/30 hover:scale-110 transition-transform">
-                        <Check className="w-6 h-6 text-white stroke-[3]" />
+                <div
+                  key={mod.id}
+                  className={`flex flex-col justify-between rounded-3xl p-6 sm:p-7 border backdrop-blur-xl transition-all duration-300 relative group overflow-hidden ${
+                    isLocked
+                      ? 'bg-slate-950/40 border-slate-900/80 opacity-60'
+                      : mod.isCompleted
+                      ? 'bg-slate-900/90 border-emerald-500/40 shadow-xl shadow-emerald-950/20 hover:border-emerald-500/70'
+                      : 'bg-slate-900/90 border-[#006cd2]/40 shadow-xl shadow-blue-950/30 hover:border-[#006cd2]/80'
+                  }`}
+                >
+                  <div className="space-y-4">
+                    {/* Card Header: Module Number & Status Badge */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-blue-400 bg-blue-500/10 px-3 py-1 rounded-lg uppercase tracking-wider border border-blue-500/20">
+                        MODULE {mod.moduleNumber}
+                      </span>
+
+                      {/* Status Badges */}
+                      {isLocked ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-500 text-[11px] font-mono font-medium">
+                          <Lock className="w-3 h-3" /> Locked
+                        </span>
+                      ) : mod.isCompleted ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-[11px] font-mono font-bold">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Completed ✓
+                        </span>
+                      ) : mod.moduleStatus === 'Topics Completed' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[11px] font-mono font-bold animate-pulse">
+                          <Award className="w-3.5 h-3.5 text-amber-400" /> Assignment Available
+                        </span>
+                      ) : mod.moduleStatus === 'Assignment Failed' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 text-[11px] font-mono font-bold">
+                          <RotateCcw className="w-3.5 h-3.5 text-rose-400" /> Retry Assignment
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#006cd2]/15 border border-[#006cd2]/40 text-blue-300 text-[11px] font-mono font-bold">
+                          <Sparkles className="w-3.5 h-3.5 text-[#006cd2]" /> In Progress
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title and Description */}
+                    <div>
+                      <h2 className="font-display text-xl sm:text-2xl font-bold text-white group-hover:text-blue-300 transition-colors">
+                        {mod.title}
+                      </h2>
+                      <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed font-sans">
+                        {mod.shortDescription}
+                      </p>
+                    </div>
+
+                    {/* Progress Stats Block */}
+                    <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+                        <span>Topics Progress</span>
+                        <strong className="text-slate-200">
+                          {mod.completedTopicsCount}/{mod.totalTopicsCount} Completed
+                        </strong>
                       </div>
-                    ) : mod.isCurrent || (mod.isUnlocked && !mod.isCompleted && firstUncompletedIndex === index) ? (
-                      <div className="w-14 h-14 rounded-full bg-slate-950 border-4 border-[#006cd2] flex items-center justify-center shadow-[0_0_25px_rgba(0,108,210,0.7)] animate-pulse">
-                        <div className="w-5 h-5 rounded-full bg-[#006cd2] shadow-inner"></div>
+
+                      {/* Mini Progress Bar */}
+                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-500 ${
+                            mod.isCompleted
+                              ? 'bg-emerald-500'
+                              : 'bg-gradient-to-r from-blue-500 to-cyan-400'
+                          }`}
+                          style={{
+                            width: `${(mod.completedTopicsCount / mod.totalTopicsCount) * 100}%`,
+                          }}
+                        />
                       </div>
-                    ) : (
-                      <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center bg-slate-900 shadow-inner">
-                        <Lock className="w-4 h-4 text-slate-500" />
+
+                      {/* Assignment Status Row */}
+                      <div className="flex items-center justify-between text-[11px] font-mono pt-1">
+                        <span className="text-slate-500">Assignment:</span>
+                        <span
+                          className={
+                            mod.assignmentStatus === 'Passed'
+                              ? 'text-emerald-400 font-bold'
+                              : mod.assignmentStatus === 'Available'
+                              ? 'text-amber-400 font-bold'
+                              : mod.assignmentStatus === 'Failed'
+                              ? 'text-rose-400 font-bold'
+                              : 'text-slate-500'
+                          }
+                        >
+                          {mod.assignmentStatus === 'Passed'
+                            ? `Passed (${mod.bestScore || 100}%)`
+                            : mod.assignmentStatus === 'Available'
+                            ? 'Ready to Attempt'
+                            : mod.assignmentStatus === 'Failed'
+                            ? 'Failed (Retry Available)'
+                            : 'Locked (Complete topics first)'}
+                        </span>
                       </div>
-                    )}
+                    </div>
                   </div>
 
-                  {/* Node Content Card (Alternating Left/Right) */}
-                  <div
-                    className={`absolute z-10 w-[calc(50%-2.5rem)] sm:w-80 ${
-                      isEven
-                        ? 'right-1/2 mr-8 md:mr-12 text-right'
-                        : 'left-1/2 ml-8 md:ml-12 text-left'
-                    }`}
-                  >
-                    {mod.isCompleted ? (
-                      <Link
-                        href={`/skills/${skill.skillId}/${mod.moduleId}`}
-                        className="bg-slate-900/80 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl hover:border-[#006cd2]/60 hover:shadow-2xl hover:shadow-[#006cd2]/20 hover:translate-y-[-2px] transition-all duration-200 block group"
-                      >
-                        <div className={`flex items-center justify-between mb-2 ${isEven ? 'flex-row-reverse' : 'flex-row'}`}>
-                          <span className="font-mono text-xs text-[#006cd2] font-bold">{modCode}</span>
-                          <span className="text-[11px] text-emerald-400 font-mono font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                            Completed ✓
-                          </span>
-                        </div>
-                        <h3 className="font-display text-base sm:text-lg text-white group-hover:text-blue-300 transition-colors mb-1.5 font-bold">{mod.title}</h3>
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                          {topicSummary}
-                        </p>
-                      </Link>
-                    ) : mod.isCurrent || (mod.isUnlocked && !mod.isCompleted && firstUncompletedIndex === index) ? (
-                      <div className="bg-slate-900/90 backdrop-blur-xl p-5 sm:p-6 rounded-3xl border-2 border-[#006cd2] shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_25px_rgba(0,108,210,0.25)] relative group hover:translate-y-[-2px] transition-all duration-200">
-                        <div className={`flex items-center justify-between mb-3 ${isEven ? 'flex-row-reverse' : 'flex-row'}`}>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs text-blue-400 font-bold">{modCode}</span>
-                            <span className="bg-[#006cd2] text-white px-2 py-0.5 rounded-full text-[10px] font-mono font-extrabold uppercase tracking-wider">
-                              CURRENT
-                            </span>
-                          </div>
-                          <span className="font-mono text-[11px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
-                            {mod.topics.length} Topics
-                          </span>
-                        </div>
-                        <h3 className="font-display text-lg sm:text-xl text-white mb-2 font-extrabold tracking-tight">
-                          {mod.title}
-                        </h3>
-                        <p className="text-xs text-slate-300 mb-4 line-clamp-2 leading-relaxed">
-                          {topicSummary}
-                        </p>
-                        <Link
-                          href={`/skills/${skill.skillId}/${mod.moduleId}`}
-                          className="w-full bg-[#006cd2] hover:bg-[#005bb5] text-white font-semibold text-xs font-mono py-2.5 px-4 rounded-xl shadow-lg shadow-[#006cd2]/30 hover:shadow-[#006cd2]/50 active:scale-95 transition-all block text-center mt-3"
-                        >
-                          Resume Trail →
-                        </Link>
+                  {/* CTA Action Button */}
+                  <div className="pt-5 mt-4">
+                    {isLocked ? (
+                      <div className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900/60 border border-slate-800/80 text-slate-500 text-xs font-mono select-none">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Complete Module {mod.moduleNumber - 1} first</span>
                       </div>
                     ) : (
-                      <div className="bg-slate-950/40 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-900/80 shadow-none opacity-50">
-                        <div className={`flex items-center justify-between mb-2 ${isEven ? 'flex-row-reverse' : 'flex-row'}`}>
-                          <span className="font-mono text-xs text-slate-500 font-medium">{modCode}</span>
-                          <span className="text-[11px] text-slate-600 font-mono">Locked</span>
-                        </div>
-                        <h3 className="font-display text-sm sm:text-base text-slate-400 mb-1 font-semibold">
-                          {mod.title}
-                        </h3>
-                        <p className="text-xs text-slate-600 line-clamp-2">{topicSummary}</p>
-                      </div>
+                      <Link
+                        href={`/skills/python/${mod.id}`}
+                        className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-mono font-bold tracking-wide transition shadow-lg ${
+                          mod.isCompleted
+                            ? 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30'
+                            : mod.moduleStatus === 'Topics Completed'
+                            ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-amber-600/30'
+                            : mod.moduleStatus === 'Assignment Failed'
+                            ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30'
+                            : 'bg-[#006cd2] hover:bg-[#005bb5] text-white shadow-[#006cd2]/30'
+                        }`}
+                      >
+                        <span>
+                          {mod.isCompleted
+                            ? 'Review Module'
+                            : mod.moduleStatus === 'Topics Completed'
+                            ? 'Take Module Assignment →'
+                            : mod.moduleStatus === 'Assignment Failed'
+                            ? 'Retry Assignment →'
+                            : mod.completedTopicsCount > 0
+                            ? 'Continue Learning'
+                            : 'Start Module'}
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
                     )}
                   </div>
                 </div>
               );
             })}
+          </div>
+
+          {/* Section 8: Final Python Beginner Challenge Card */}
+          <div
+            className={`rounded-3xl p-7 sm:p-8 border backdrop-blur-xl transition-all duration-300 relative overflow-hidden ${
+              isFinalChallengeUnlocked
+                ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 border-indigo-500/40 shadow-2xl shadow-indigo-950/30'
+                : 'bg-slate-950/40 border-slate-900/80 opacity-50'
+            }`}
+          >
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-3 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-lg uppercase tracking-wider border border-indigo-500/30">
+                    CAPSTONE PROJECT
+                  </span>
+                  {finalChallengeCompleted ? (
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                      Completed 🎉
+                    </span>
+                  ) : !isFinalChallengeUnlocked ? (
+                    <span className="text-[11px] font-mono text-slate-500 bg-slate-900 px-2.5 py-0.5 rounded-full border border-slate-800 flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> Pass All 7 Modules to Unlock
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-mono text-indigo-300 bg-indigo-500/15 px-2.5 py-0.5 rounded-full border border-indigo-500/30 animate-pulse">
+                      Unlocked & Ready!
+                    </span>
+                  )}
+                </div>
+
+                <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
+                  Python Beginner Final Challenge
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
+                  Synthesize everything learned across Modules 1–7 into an end-to-end practical application: Student Performance & Analytics System.
+                </p>
+
+                <div className="flex flex-wrap gap-2 pt-1 text-[11px] font-mono text-slate-400">
+                  <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800">Variables & I/O</span>
+                  <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800">Operators & Logic</span>
+                  <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800">Loops & Conditions</span>
+                  <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800">Lists & Dicts</span>
+                  <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800">Sets & Functions</span>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="shrink-0 w-full md:w-auto">
+                {isFinalChallengeUnlocked ? (
+                  <Link
+                    href="/skills/python/final-challenge"
+                    className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-mono text-xs font-bold shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 transition-all"
+                  >
+                    <Trophy className="w-4 h-4 text-amber-300" />
+                    <span>{finalChallengeCompleted ? 'Review Final Challenge' : 'Launch Final Challenge'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                ) : (
+                  <div className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-500 font-mono text-xs select-none">
+                    <Lock className="w-4 h-4" />
+                    <span>Locked (Complete M1–M7)</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </main>
       </div>
