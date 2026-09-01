@@ -36,12 +36,6 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = String(email).trim().toLowerCase();
     const profile = getStaticProfileByEmail(cleanEmail);
-    if (!profile) {
-      return NextResponse.json(
-        { error: 'User does not exist in member roster.' },
-        { status: 404 }
-      );
-    }
 
     const normSkill = String(skillId).toLowerCase();
     const nowIso = new Date().toISOString();
@@ -77,24 +71,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Canonical moduleId resolution
+    const pythonModDef = normSkill === 'python' ? getPythonModuleById(String(moduleId)) : null;
+    const canonicalModId = pythonModDef ? pythonModDef.id : String(moduleId).toLowerCase();
+
     const skillProgress: Record<string, ModuleProgressRecord> = dynamicData.progress[normSkill] || {};
-    const currentModRecord: ModuleProgressRecord = skillProgress[moduleId] || {
-      skillId: normSkill,
-      moduleId: String(moduleId),
-      status: 'in_progress',
-      lastAccessedAt: nowIso,
-      topicsCompleted: [],
-    };
+    const currentModRecord: ModuleProgressRecord =
+      skillProgress[canonicalModId] ||
+      skillProgress[moduleId] ||
+      (pythonModDef ? skillProgress[`module-${pythonModDef.moduleNumber}`] : null) || {
+        skillId: normSkill,
+        moduleId: canonicalModId,
+        status: 'in_progress',
+        lastAccessedAt: nowIso,
+        topicsCompleted: [],
+      };
 
     // Update topics completed
     let updatedTopicsCompleted = [...(currentModRecord.topicsCompleted || [])];
     if (topicId) {
+      const cleanTopicId = String(topicId).trim();
       if (topicCompleted !== false) {
-        if (!updatedTopicsCompleted.includes(topicId)) {
-          updatedTopicsCompleted.push(topicId);
+        if (!updatedTopicsCompleted.includes(cleanTopicId)) {
+          updatedTopicsCompleted.push(cleanTopicId);
         }
       } else {
-        updatedTopicsCompleted = updatedTopicsCompleted.filter((t) => t !== topicId);
+        updatedTopicsCompleted = updatedTopicsCompleted.filter((t) => t !== cleanTopicId);
       }
     }
 
@@ -117,6 +119,7 @@ export async function POST(req: NextRequest) {
 
     const updatedRecord: ModuleProgressRecord = {
       ...currentModRecord,
+      moduleId: canonicalModId,
       status: modStatus,
       completedAt: modStatus === 'completed' ? (currentModRecord.completedAt || nowIso) : undefined,
       lastAccessedAt: nowIso,
@@ -129,8 +132,13 @@ export async function POST(req: NextRequest) {
 
     const newSkillProgress: Record<string, ModuleProgressRecord> = {
       ...skillProgress,
-      [moduleId]: updatedRecord,
+      [canonicalModId]: updatedRecord,
     };
+
+    // Also populate alias key if needed for backwards compatibility
+    if (pythonModDef) {
+      newSkillProgress[`module-${pythonModDef.moduleNumber}`] = updatedRecord;
+    }
 
     const newProgress = {
       ...dynamicData.progress,
@@ -160,13 +168,12 @@ export async function POST(req: NextRequest) {
     const updatedActivities = [...dynamicData.calendarActivity, newActivity];
     const updatedStreak = calculateStreakFromActivity(updatedActivities);
 
-    const pythonModDef = normSkill === 'python' ? getPythonModuleById(moduleId) : null;
-    const modDef = skillDef?.modules.find((m) => m.moduleId === moduleId);
+    const modDef = skillDef?.modules.find((m) => m.moduleId === canonicalModId || m.moduleId === moduleId);
     const modTitle = pythonModDef ? `Module ${pythonModDef.moduleNumber}: ${pythonModDef.title}` : (modDef?.title || moduleId);
 
     const lastActiveModule = {
       skillId: normSkill,
-      moduleId: String(moduleId),
+      moduleId: canonicalModId,
       moduleTitle: `${skillDef?.title || normSkill}: ${modTitle}`,
       updatedAt: nowIso,
     };

@@ -12,6 +12,7 @@ import {
 } from '@/data/pythonSkillsData';
 import {
   fetchUserDynamicData,
+  saveUserDynamicData,
   UserDynamicData,
   ModuleProgressRecord,
 } from '@/lib/dynamicDatabase';
@@ -112,7 +113,78 @@ export default function PythonTopicDetailPage() {
     }));
   };
 
-  const handleSubmitCheckpoint = (e: React.FormEvent) => {
+  const handleCompleteTopic = async () => {
+    if (!userData || !topic) return;
+    setSavingProgress(true);
+
+    const canonicalModId = moduleMeta ? moduleMeta.id : topic.moduleId;
+    const nowIso = new Date().toISOString();
+
+    // 1. Immediately persist to client-side cache & state
+    try {
+      const currentDyn = await fetchUserDynamicData(userData.email);
+      const existingPyProg = currentDyn.progress?.python || {};
+      const existingModRec =
+        existingPyProg[canonicalModId] ||
+        existingPyProg[rawModuleId] || {
+          skillId: 'python',
+          moduleId: canonicalModId,
+          status: 'in_progress',
+          lastAccessedAt: nowIso,
+          topicsCompleted: [],
+        };
+
+      const existingTopics = existingModRec.topicsCompleted || [];
+      const updatedTopics = existingTopics.includes(topic.id)
+        ? existingTopics
+        : [...existingTopics, topic.id];
+
+      const newPyProg = {
+        ...existingPyProg,
+        [canonicalModId]: {
+          ...existingModRec,
+          moduleId: canonicalModId,
+          topicsCompleted: updatedTopics,
+          lastAccessedAt: nowIso,
+        },
+      };
+
+      const updatedDynData = {
+        ...currentDyn,
+        progress: {
+          ...currentDyn.progress,
+          python: newPyProg,
+        },
+      };
+
+      await saveUserDynamicData(userData.email, updatedDynData);
+      setIsTopicCompleted(true);
+      setDynamicData(updatedDynData);
+    } catch (localErr) {
+      console.warn('Local dynamic cache update notice:', localErr);
+    }
+
+    // 2. Persist to server API database
+    try {
+      await fetch('/api/db/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userData.email,
+          skillId: 'python',
+          moduleId: canonicalModId,
+          topicId: topic.id,
+          topicCompleted: true,
+        }),
+      });
+    } catch (err) {
+      console.warn('Server progress save notice:', err);
+    } finally {
+      setSavingProgress(false);
+    }
+  };
+
+  const handleSubmitCheckpoint = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic || topic.checkpoint.length === 0) return;
 
@@ -137,35 +209,10 @@ export default function PythonTopicDetailPage() {
     const passed = correctCount === topic.checkpoint.length;
     setCheckpointPassed(passed);
     setCheckpointSubmitted(true);
-  };
 
-  const handleCompleteTopic = async () => {
-    if (!userData || !topic || !checkpointPassed) return;
-    setSavingProgress(true);
-
-    try {
-      const res = await fetch('/api/db/progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: userData.email,
-          skillId: 'python',
-          moduleId: topic.moduleId,
-          topicId: topic.id,
-          topicCompleted: true,
-        }),
-      });
-
-      if (res.ok) {
-        setIsTopicCompleted(true);
-        // Refresh local cache
-        const d = await fetchUserDynamicData(userData.email);
-        setDynamicData(d);
-      }
-    } catch (err) {
-      console.warn('Failed to save topic completion:', err);
-    } finally {
-      setSavingProgress(false);
+    // Automatically mark and record topic as completed as soon as checkpoint is verified
+    if (passed) {
+      await handleCompleteTopic();
     }
   };
 

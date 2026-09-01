@@ -76,11 +76,18 @@ export default function SkillPathMapPage() {
       dynamicData?.progress?.python || ({} as Record<string, ModuleProgressRecord>);
 
     return PYTHON_MODULES.map((mod, index) => {
-      const modRecord = pyProgress[mod.id] || pyProgress[`module-${mod.moduleNumber}`];
+      const modRecord =
+        pyProgress[mod.id] ||
+        pyProgress[`module-${mod.moduleNumber}`] ||
+        pyProgress[`m${mod.moduleNumber}`] ||
+        pyProgress[String(mod.moduleNumber)];
       const completedTopics = modRecord?.topicsCompleted || [];
       const totalTopicsCount = mod.topicIds.length;
       const completedTopicsCount = completedTopics.length;
-      const allTopicsCompleted = completedTopicsCount >= totalTopicsCount;
+      const allTopicsCompleted =
+        totalTopicsCount > 0 &&
+        (completedTopicsCount >= totalTopicsCount ||
+          mod.topicIds.every((tid) => completedTopics.includes(tid)));
       const assignmentPassed = !!modRecord?.assignmentPassed || modRecord?.status === 'completed';
       const hasFailedAttempt =
         (modRecord?.assignmentAttempts || []).length > 0 && !assignmentPassed;
@@ -91,7 +98,11 @@ export default function SkillPathMapPage() {
         isUnlocked = true;
       } else {
         const prevMod = PYTHON_MODULES[index - 1];
-        const prevRecord = pyProgress[prevMod.id] || pyProgress[`module-${prevMod.moduleNumber}`];
+        const prevRecord =
+          pyProgress[prevMod.id] ||
+          pyProgress[`module-${prevMod.moduleNumber}`] ||
+          pyProgress[`m${prevMod.moduleNumber}`] ||
+          pyProgress[String(prevMod.moduleNumber)];
         isUnlocked = !!prevRecord?.assignmentPassed || prevRecord?.status === 'completed';
       }
 

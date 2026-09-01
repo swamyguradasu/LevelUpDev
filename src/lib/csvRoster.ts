@@ -201,7 +201,15 @@ export function getStaticProfileByEmail(email: string): StaticUserProfile | null
   if (!email) return null;
   const clean = email.trim().toLowerCase();
   const all = getStaticProfilesFromCSV();
-  return all.find((p) => p.levelupdevEmail === clean) || null;
+  return (
+    all.find(
+      (p) =>
+        p.levelupdevEmail === clean ||
+        (p.personalEmail && p.personalEmail.toLowerCase() === clean) ||
+        (p.contactEmail && p.contactEmail.toLowerCase() === clean) ||
+        (p.username && p.username.toLowerCase() === clean)
+    ) || null
+  );
 }
 
 /**

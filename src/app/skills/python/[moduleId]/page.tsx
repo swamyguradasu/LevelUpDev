@@ -81,9 +81,16 @@ export default function PythonModulePage() {
     > = {};
 
     allModules.forEach((m, idx) => {
-      const rec = pyProgress[m.id] || pyProgress[`module-${m.moduleNumber}`];
+      const rec =
+        pyProgress[m.id] ||
+        pyProgress[`module-${m.moduleNumber}`] ||
+        pyProgress[`m${m.moduleNumber}`] ||
+        pyProgress[String(m.moduleNumber)];
       const completedTopics = rec?.topicsCompleted || [];
-      const allDone = completedTopics.length >= m.topicIds.length;
+      const allDone =
+        m.topicIds.length > 0 &&
+        (completedTopics.length >= m.topicIds.length ||
+          m.topicIds.every((tid) => completedTopics.includes(tid)));
       const passed = !!rec?.assignmentPassed || rec?.status === 'completed';
 
       let unlocked = false;
@@ -91,7 +98,11 @@ export default function PythonModulePage() {
         unlocked = true;
       } else {
         const prevM = allModules[idx - 1];
-        const prevRec = pyProgress[prevM.id] || pyProgress[`module-${prevM.moduleNumber}`];
+        const prevRec =
+          pyProgress[prevM.id] ||
+          pyProgress[`module-${prevM.moduleNumber}`] ||
+          pyProgress[`m${prevM.moduleNumber}`] ||
+          pyProgress[String(prevM.moduleNumber)];
         unlocked = !!prevRec?.assignmentPassed || prevRec?.status === 'completed';
       }
 
@@ -141,13 +152,16 @@ export default function PythonModulePage() {
     );
   }
 
-  const currentModStatus = moduleStatusMap[moduleMeta.id] || {
-    isUnlocked: moduleMeta.moduleNumber === 1,
-    isCompleted: false,
-    topicsCompleted: [],
-    allTopicsCompleted: false,
-    assignmentPassed: false,
-  };
+  const currentModStatus =
+    moduleStatusMap[moduleMeta.id] ||
+    moduleStatusMap[`module-${moduleMeta.moduleNumber}`] ||
+    moduleStatusMap[`m${moduleMeta.moduleNumber}`] || {
+      isUnlocked: moduleMeta.moduleNumber === 1,
+      isCompleted: false,
+      topicsCompleted: [],
+      allTopicsCompleted: false,
+      assignmentPassed: false,
+    };
 
   // URL Bypass Protection
   if (!currentModStatus.isUnlocked) {

@@ -10,6 +10,11 @@ import {
   AssignmentQuestion,
   ModuleAssignmentConfig,
 } from '@/data/pythonSkillsData';
+import {
+  fetchUserDynamicData,
+  saveUserDynamicData,
+  ModuleProgressRecord,
+} from '@/lib/dynamicDatabase';
 import { runPythonCode } from '@/lib/pythonRunner';
 import PythonAssignmentResult, { QuestionResultSummary } from '@/components/PythonAssignmentResult';
 import {
@@ -292,7 +297,52 @@ export default function PythonModuleAssignmentPage() {
       weakTopicIds: weakTopicsList.map((t) => t.id),
     };
 
-    // Save attempt and score to dynamic database
+    // 1. Immediately persist attempt and score to client-side local database
+    const nowIso = new Date().toISOString();
+    try {
+      const currentDyn = await fetchUserDynamicData(userData.email);
+      const existingPyProg = currentDyn.progress?.python || {};
+      const existingModRec: ModuleProgressRecord =
+        existingPyProg[moduleMeta.id] ||
+        existingPyProg[`module-${moduleMeta.moduleNumber}`] || {
+          skillId: 'python',
+          moduleId: moduleMeta.id,
+          status: isPassing ? 'completed' : 'in_progress',
+          lastAccessedAt: nowIso,
+          topicsCompleted: [],
+        };
+
+      const existingAttempts = existingModRec.assignmentAttempts || [];
+      const updatedRecord: ModuleProgressRecord = {
+        ...existingModRec,
+        moduleId: moduleMeta.id,
+        status: isPassing ? 'completed' : existingModRec.status || 'in_progress',
+        completedAt: isPassing ? existingModRec.completedAt || nowIso : existingModRec.completedAt,
+        assignmentPassed: isPassing || existingModRec.assignmentPassed,
+        assignmentScore: Math.max(calculatedScorePercent, existingModRec.assignmentScore || 0),
+        assignmentAttempts: [...existingAttempts, attemptRecord],
+        weakTopics: weakTopicsList,
+        lastAccessedAt: nowIso,
+      };
+
+      const updatedDynData = {
+        ...currentDyn,
+        progress: {
+          ...currentDyn.progress,
+          python: {
+            ...existingPyProg,
+            [moduleMeta.id]: updatedRecord,
+            [`module-${moduleMeta.moduleNumber}`]: updatedRecord,
+          },
+        },
+      };
+
+      await saveUserDynamicData(userData.email, updatedDynData);
+    } catch (localErr) {
+      console.warn('Local dynamic assignment cache notice:', localErr);
+    }
+
+    // 2. Persist to server API database
     try {
       await fetch('/api/db/progress', {
         method: 'POST',

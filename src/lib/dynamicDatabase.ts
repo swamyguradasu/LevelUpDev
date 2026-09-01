@@ -318,33 +318,87 @@ export async function fetchUserDynamicData(email: string): Promise<UserDynamicDa
   const histAchievements = getHistoricalAchievementsForUser(cleanEmail);
   const histCalendar = getHistoricalCalendarForUser(cleanEmail);
 
-  // 2. Load dynamic Firebase data (new activity created after reset)
-  let liveData: Partial<UserDynamicData> = {};
+  // 2. Load dynamic Firebase data
+  let firestoreData: Partial<UserDynamicData> = {};
 
   if (isFirebaseConfigured) {
     try {
       const userRef = doc(db, 'user_activity', userId);
       const snap = await getDoc(userRef);
       if (snap.exists()) {
-        liveData = snap.data() as Partial<UserDynamicData>;
+        firestoreData = snap.data() as Partial<UserDynamicData>;
       }
     } catch (err: any) {
       console.warn('Firestore fetch notice for user_activity:', err?.code || err?.message);
     }
   }
 
-  if (Object.keys(liveData).length === 0 && typeof window !== 'undefined') {
+  // Load client-side localStorage dynamic data if present
+  let localCacheData: Partial<UserDynamicData> = {};
+  if (typeof window !== 'undefined') {
     const raw = localStorage.getItem(`levelupdev_dynamic_${userId}`);
     if (raw) {
       try {
-        liveData = JSON.parse(raw);
+        localCacheData = JSON.parse(raw);
       } catch {
-        liveData = {};
+        localCacheData = {};
       }
     }
   }
 
-  // 3. Merge Progress (Deep merge, Live overrides Historical)
+  // Merge live Firestore and local cache data (prioritizing the most complete progress records)
+  const combinedProgress: Record<string, Record<string, ModuleProgressRecord>> = {
+    ...(localCacheData.progress || {}),
+    ...(firestoreData.progress || {}),
+  };
+
+  // Merge each skill's modules
+  if (localCacheData.progress && firestoreData.progress) {
+    const allSkills = Array.from(
+      new Set([
+        ...Object.keys(localCacheData.progress),
+        ...Object.keys(firestoreData.progress),
+      ])
+    );
+    allSkills.forEach((sk) => {
+      combinedProgress[sk] = {
+        ...(localCacheData.progress?.[sk] || {}),
+        ...(firestoreData.progress?.[sk] || {}),
+      };
+
+      // Also merge topicsCompleted arrays if both exist
+      const localSkill = localCacheData.progress?.[sk] || {};
+      const fireSkill = firestoreData.progress?.[sk] || {};
+      const allMods = Array.from(new Set([...Object.keys(localSkill), ...Object.keys(fireSkill)]));
+      allMods.forEach((mId) => {
+        const lMod = localSkill[mId];
+        const fMod = fireSkill[mId];
+        if (lMod && fMod) {
+          const mergedTopics = Array.from(
+            new Set([...(lMod.topicsCompleted || []), ...(fMod.topicsCompleted || [])])
+          );
+          combinedProgress[sk][mId] = {
+            ...lMod,
+            ...fMod,
+            topicsCompleted: mergedTopics,
+            assignmentPassed: lMod.assignmentPassed || fMod.assignmentPassed,
+            status:
+              lMod.status === 'completed' || fMod.status === 'completed'
+                ? 'completed'
+                : 'in_progress',
+          };
+        }
+      });
+    });
+  }
+
+  const liveData: Partial<UserDynamicData> = {
+    ...localCacheData,
+    ...firestoreData,
+    progress: combinedProgress,
+  };
+
+  // 3. Merge Progress (Deep merge, Live/Local overrides Historical)
   const mergedProgress: Record<string, Record<string, ModuleProgressRecord>> = {
     ...histProgress,
   };
@@ -386,7 +440,7 @@ export async function fetchUserDynamicData(email: string): Promise<UserDynamicDa
   // Active selected project
   const selectedProj = mergedProjects.find((p) => p.status === 'Selected' || p.status === 'In Progress') || mergedProjects[0];
 
-  return {
+  const finalMerged: UserDynamicData = {
     ...empty,
     ...liveData,
     userId,
@@ -401,6 +455,15 @@ export async function fetchUserDynamicData(email: string): Promise<UserDynamicDa
     streak: mergedStreak,
     updatedAt: liveData.updatedAt || empty.updatedAt,
   };
+
+  // Sync back to local storage on client if in browser to guarantee immediate local cache consistency
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`levelupdev_dynamic_${userId}`, JSON.stringify(finalMerged));
+    } catch {}
+  }
+
+  return finalMerged;
 }
 
 /**
@@ -414,15 +477,45 @@ export async function saveUserDynamicData(
   const userId = normalizeUserId(cleanEmail);
   const nowIso = new Date().toISOString();
 
-  const payload = {
+  let existingLocal: Partial<UserDynamicData> = {};
+  if (typeof window !== 'undefined') {
+    const raw = localStorage.getItem(`levelupdev_dynamic_${userId}`);
+    if (raw) {
+      try {
+        existingLocal = JSON.parse(raw);
+      } catch {}
+    }
+  }
+
+  // Deep merge progress objects
+  const mergedProgress: Record<string, Record<string, ModuleProgressRecord>> = {
+    ...(existingLocal.progress || {}),
+    ...(dynamicData.progress || {}),
+  };
+
+  if (existingLocal.progress && dynamicData.progress) {
+    Object.keys(dynamicData.progress).forEach((sk) => {
+      mergedProgress[sk] = {
+        ...(existingLocal.progress?.[sk] || {}),
+        ...(dynamicData.progress?.[sk] || {}),
+      };
+    });
+  }
+
+  const payload: UserDynamicData = {
+    ...createEmptyDynamicData(cleanEmail),
+    ...existingLocal,
     ...dynamicData,
+    progress: mergedProgress,
     userId,
     email: cleanEmail,
     updatedAt: nowIso,
   };
 
   if (typeof window !== 'undefined') {
-    localStorage.setItem(`levelupdev_dynamic_${userId}`, JSON.stringify(payload));
+    try {
+      localStorage.setItem(`levelupdev_dynamic_${userId}`, JSON.stringify(payload));
+    } catch {}
   }
 
   if (isFirebaseConfigured) {
