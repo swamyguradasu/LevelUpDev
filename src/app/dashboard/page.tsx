@@ -173,7 +173,7 @@ export default function StudentDashboardPage() {
         />
       </div>
 
-      <div className="relative z-10 flex flex-col flex-1">
+      <div className="relative z-10 flex flex-col flex-1 pb-mobile-nav">
         {/* ========================================================================= */}
         {/* TOP NAVIGATION HEADER */}
         {/* ========================================================================= */}

@@ -12,8 +12,10 @@ import {
   UserProjectRecord,
   ModuleProgressRecord,
   CalendarActivityRecord,
+  DailyChallengeSubmissionRecord,
   normalizeUserId,
 } from '@/lib/dynamicDatabase';
+import { getISTDateString } from '@/data/dailyChallenges';
 
 export interface UserStreak {
   currentStreak: number;
@@ -98,9 +100,22 @@ export interface UserProfileData {
   unlockedSkills: string[];
   streak: UserStreak;
 
+  // Daily Challenge Tracking
+  dailyChallengeProgress?: Record<string, DailyChallengeSubmissionRecord>;
+  dailyChallengeCompletedIds?: number[];
+
   // LeetCode Integration
   leetcodeId?: string;
   leetcodeStats?: LeetCodeStats;
+}
+
+export interface DailySolveOptions {
+  challengeId?: number;
+  sequenceNumber?: number;
+  language?: string;
+  submittedSolution?: string;
+  problemTitle?: string;
+  leetcodeNumber?: number;
 }
 
 interface AuthContextType {
@@ -126,7 +141,7 @@ interface AuthContextType {
   removePortfolioProject: (projectId: string) => Promise<void>;
   toggleModuleProgress: (skillId: string, moduleId: string, forceState?: boolean) => Promise<void>;
   unlockSkill: (skillId: string) => Promise<void>;
-  recordDailySolve: (targetDate?: string) => Promise<void>;
+  recordDailySolve: (targetDate?: string, options?: DailySolveOptions) => Promise<void>;
   syncLeetCodeStats: (username?: string) => Promise<void>;
   resetDatabase: () => Promise<{ success: boolean; message: string }>;
 }
@@ -220,6 +235,8 @@ export const DUMMY_DEMO_USER: UserProfileData = {
     hardSolved: 8,
     lastSyncedAt: new Date().toISOString(),
   },
+  dailyChallengeProgress: {},
+  dailyChallengeCompletedIds: [],
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -330,6 +347,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       projectGithubUrl: dynamicData.projectGithubUrl || null,
       projectLiveUrl: dynamicData.projectLiveUrl || null,
       lastActiveModule: dynamicData.lastActiveModule,
+      dailyChallengeProgress: dynamicData.dailyChallengeProgress || {},
+      dailyChallengeCompletedIds: dynamicData.dailyChallengeCompletedIds || [],
       leetcodeId: dynamicData.leetcodeId || '',
       leetcodeStats: dynamicData.leetcodeStats,
     };
@@ -680,27 +699,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const recordDailySolve = async (targetDate?: string) => {
+  const recordDailySolve = async (targetDate?: string, options?: DailySolveOptions) => {
     if (!userData) return;
-    const todayStr = targetDate || new Date().toISOString().split('T')[0];
+    const todayStr = targetDate || getISTDateString();
 
     const dynamicData = await fetchUserDynamicData(userData.email);
+
+    // Prevent duplicate entries on the same date for calendar activity
+    const alreadyLoggedToday = (dynamicData.calendarActivity || []).some(
+      (a) => a.activityDate === todayStr && a.activityType === 'daily_solve'
+    );
+
     const newActivity: CalendarActivityRecord = {
       activityDate: todayStr,
       activityType: 'daily_solve',
       timestamp: new Date().toISOString(),
     };
 
-    const updatedActivities = [...dynamicData.calendarActivity, newActivity];
+    const updatedActivities = alreadyLoggedToday
+      ? dynamicData.calendarActivity || []
+      : [...(dynamicData.calendarActivity || []), newActivity];
+
     const updatedStreak = calculateStreakFromActivity(updatedActivities);
+
+    // Update daily challenge records
+    const challengeId = options?.challengeId || 1;
+    const sequenceNumber = options?.sequenceNumber || 1;
+    const existingProgress = dynamicData.dailyChallengeProgress || {};
+    const existingCompletedIds = dynamicData.dailyChallengeCompletedIds || [];
+
+    const newSubmission: DailyChallengeSubmissionRecord = {
+      challengeId,
+      sequenceNumber,
+      date: todayStr,
+      completedAt: new Date().toISOString(),
+      language: options?.language || 'Python',
+      submittedSolution: options?.submittedSolution || '',
+      problemTitle: options?.problemTitle,
+      leetcodeNumber: options?.leetcodeNumber,
+    };
+
+    const updatedProgress = {
+      ...existingProgress,
+      [todayStr]: newSubmission,
+    };
+
+    const updatedCompletedIds = Array.from(new Set([...existingCompletedIds, challengeId]));
 
     await saveUserDynamicData(userData.email, {
       calendarActivity: updatedActivities,
       streak: updatedStreak,
+      dailyChallengeProgress: updatedProgress,
+      dailyChallengeCompletedIds: updatedCompletedIds,
     });
 
     setUserData({
       ...userData,
+      dailyChallengeProgress: updatedProgress,
+      dailyChallengeCompletedIds: updatedCompletedIds,
       streak: {
         currentStreak: updatedStreak.currentStreak,
         lastSolvedDate: updatedStreak.lastActivityDate,

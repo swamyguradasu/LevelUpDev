@@ -158,7 +158,7 @@ export default function RecruiterPortfolioPage() {
   const activeDays = dynamicData?.streak?.activeDays || 0;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-[#006cd2] selection:text-white flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-[#006cd2] selection:text-white flex flex-col pb-mobile-nav">
       {/* Top Recruiter View Navigation Bar */}
       <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">

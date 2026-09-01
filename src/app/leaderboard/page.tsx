@@ -102,7 +102,7 @@ export default function LeaderboardPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-stone-950/80 via-black/60 to-stone-950/90 backdrop-blur-[1px]" />
       </div>
 
-      <div className="relative z-10 min-h-screen flex flex-col flex-1">
+      <div className="relative z-10 min-h-screen flex flex-col flex-1 pb-mobile-nav">
         {/* Header Navigation */}
         <header className="bg-stone-900/80 backdrop-blur-xl border-b border-white/10 w-full top-0 left-0 flex justify-between items-center px-6 md:px-12 py-4 z-50 sticky">
           <div className="flex items-center gap-3">
@@ -214,171 +214,274 @@ export default function LeaderboardPage() {
                 <span>Fetching user rankings...</span>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse font-sans">
-                  <thead>
-                    <tr className="border-b border-white/10 bg-stone-950/80 font-mono text-[11px] font-bold text-stone-300 uppercase tracking-wider">
-                      <th className="py-4 px-6">Rank</th>
-                      <th className="py-4 px-6">Group Member</th>
-                      <th className="py-4 px-6">Current Streak</th>
-                      <th className="py-4 px-6">LeetCode Solved</th>
-                      <th className="py-4 px-6">Skills Mastered</th>
-                      <th className="py-4 px-6 text-right">Last Solved</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 text-xs">
-                    {sortedUsers.map((member, index) => {
-                      const rank = index + 1;
-                      const isCurrentUser = member.uid === userData.uid;
-                      const solvedCount = member.leetcodeStats?.totalSolved ?? 52;
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse font-sans">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-stone-950/80 font-mono text-[11px] font-bold text-stone-300 uppercase tracking-wider">
+                        <th className="py-4 px-6">Rank</th>
+                        <th className="py-4 px-6">Group Member</th>
+                        <th className="py-4 px-6">Current Streak</th>
+                        <th className="py-4 px-6">LeetCode Solved</th>
+                        <th className="py-4 px-6">Skills Mastered</th>
+                        <th className="py-4 px-6 text-right">Last Solved</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-xs">
+                      {sortedUsers.map((member, index) => {
+                        const rank = index + 1;
+                        const isCurrentUser = member.uid === userData.uid;
+                        const solvedCount = member.leetcodeStats?.totalSolved ?? 52;
 
-                      // Rank Badges
-                      let rankBadge = (
-                        <span className="w-8 h-8 rounded-xl bg-stone-800 text-stone-300 font-mono font-bold flex items-center justify-center text-xs border border-white/10">
-                          #{rank}
-                        </span>
-                      );
-
-                      if (rank === 1) {
-                        rankBadge = (
-                          <span className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold flex items-center justify-center text-xs shadow-sm">
-                            <Crown className="w-4.5 h-4.5 text-amber-400 fill-amber-400" />
+                        let rankBadge = (
+                          <span className="w-8 h-8 rounded-xl bg-stone-800 text-stone-300 font-mono font-bold flex items-center justify-center text-xs border border-white/10">
+                            #{rank}
                           </span>
                         );
-                      } else if (rank === 2) {
-                        rankBadge = (
-                          <span className="w-8 h-8 rounded-xl bg-stone-800 border border-white/20 text-stone-200 font-bold flex items-center justify-center text-xs">
-                            <Medal className="w-4.5 h-4.5 text-stone-300" />
-                          </span>
-                        );
-                      } else if (rank === 3) {
-                        rankBadge = (
-                          <span className="w-8 h-8 rounded-xl bg-amber-700/20 border border-amber-600/30 text-amber-400 font-bold flex items-center justify-center text-xs">
-                            <Award className="w-4.5 h-4.5 text-amber-400" />
-                          </span>
-                        );
-                      }
 
-                      return (
-                        <tr
-                          key={member.uid}
-                          className={`transition ${
-                            isCurrentUser
-                              ? 'bg-[#006cd2]/20 font-semibold border-l-4 border-l-[#006cd2] text-white'
-                              : 'hover:bg-white/5 text-stone-200'
-                          }`}
-                        >
-                          {/* Rank */}
-                          <td className="py-4 px-6">{rankBadge}</td>
+                        if (rank === 1) {
+                          rankBadge = (
+                            <span className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold flex items-center justify-center text-xs shadow-sm">
+                              <Crown className="w-4.5 h-4.5 text-amber-400 fill-amber-400" />
+                            </span>
+                          );
+                        } else if (rank === 2) {
+                          rankBadge = (
+                            <span className="w-8 h-8 rounded-xl bg-stone-800 border border-white/20 text-stone-200 font-bold flex items-center justify-center text-xs">
+                              <Medal className="w-4.5 h-4.5 text-stone-300" />
+                            </span>
+                          );
+                        } else if (rank === 3) {
+                          rankBadge = (
+                            <span className="w-8 h-8 rounded-xl bg-amber-700/20 border border-amber-600/30 text-amber-400 font-bold flex items-center justify-center text-xs">
+                              <Award className="w-4.5 h-4.5 text-amber-400" />
+                            </span>
+                          );
+                        }
 
-                          {/* User Details */}
-                          <td className="py-4 px-6">
-                            {member.isPortfolioPublic !== false ? (
-                              <Link
-                                href={`/portfolio/${member.username || member.email.split('@')[0]}`}
-                                className="flex items-center gap-3 group/member cursor-pointer"
-                                title="Click to view Recruiter Portfolio"
-                              >
-                                <div className="w-10 h-10 rounded-full p-0.5 bg-gradient-to-tr from-[#006cd2] via-cyan-400 to-[#006cd2] shrink-0 shadow-sm group-hover/member:scale-105 transition">
-                                  {member.photoUrl ? (
-                                    <img
-                                      src={member.photoUrl}
-                                      alt={member.name}
-                                      referrerPolicy="no-referrer"
-                                      className="w-full h-full object-cover rounded-full"
-                                      onError={(e) => {
-                                        (e.target as HTMLElement).style.display = 'none';
-                                        const parent = (e.target as HTMLElement).parentElement;
-                                        if (parent && !parent.querySelector('.fallback-initials')) {
-                                          const div = document.createElement('div');
-                                          div.className = 'fallback-initials w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white uppercase';
-                                          div.innerText = (member.name || 'DEV').substring(0, 2);
-                                          parent.appendChild(div);
-                                        }
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white uppercase">
-                                      {member.name ? member.name.substring(0, 2) : 'DEV'}
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-display text-sm font-bold text-white group-hover/member:text-[#006cd2] transition flex items-center gap-1">
-                                      <span>{member.name}</span>
-                                      <ExternalLink className="w-3 h-3 opacity-0 group-hover/member:opacity-100 transition text-[#006cd2]" />
-                                    </span>
-                                    {isCurrentUser && (
-                                      <span className="px-2.5 py-0.5 bg-[#006cd2] text-white text-[10px] font-mono font-bold rounded-full shadow-sm">
-                                        You
-                                      </span>
+                        return (
+                          <tr
+                            key={member.uid}
+                            className={`transition ${
+                              isCurrentUser
+                                ? 'bg-[#006cd2]/20 font-semibold border-l-4 border-l-[#006cd2] text-white'
+                                : 'hover:bg-white/5 text-stone-200'
+                            }`}
+                          >
+                            <td className="py-4 px-6">{rankBadge}</td>
+                            <td className="py-4 px-6">
+                              {member.isPortfolioPublic !== false ? (
+                                <Link
+                                  href={`/portfolio/${member.username || member.email.split('@')[0]}`}
+                                  className="flex items-center gap-3 group/member cursor-pointer"
+                                  title="Click to view Recruiter Portfolio"
+                                >
+                                  <div className="w-10 h-10 rounded-full p-0.5 bg-gradient-to-tr from-[#006cd2] via-cyan-400 to-[#006cd2] shrink-0 shadow-sm group-hover/member:scale-105 transition">
+                                    {member.photoUrl ? (
+                                      <img
+                                        src={member.photoUrl}
+                                        alt={member.name}
+                                        referrerPolicy="no-referrer"
+                                        className="w-full h-full object-cover rounded-full"
+                                        onError={(e) => {
+                                          (e.target as HTMLElement).style.display = 'none';
+                                          const parent = (e.target as HTMLElement).parentElement;
+                                          if (parent && !parent.querySelector('.fallback-initials')) {
+                                            const div = document.createElement('div');
+                                            div.className = 'fallback-initials w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white uppercase';
+                                            div.innerText = (member.name || 'DEV').substring(0, 2);
+                                            parent.appendChild(div);
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white uppercase">
+                                        {member.name ? member.name.substring(0, 2) : 'DEV'}
+                                      </div>
                                     )}
                                   </div>
-                                  <p className="text-xs text-stone-400 line-clamp-1 max-w-xs">
-                                    {member.headline || member.bio || member.email}
-                                  </p>
-                                </div>
-                              </Link>
-                            ) : (
-                              <div className="flex items-center gap-3 opacity-75">
-                                <div className="w-10 h-10 rounded-full p-0.5 bg-stone-800 shrink-0">
-                                  <div className="w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-stone-400 uppercase">
-                                    {member.name ? member.name.substring(0, 2) : 'DEV'}
+
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-display text-sm font-bold text-white group-hover/member:text-[#006cd2] transition flex items-center gap-1">
+                                        <span>{member.name}</span>
+                                        <ExternalLink className="w-3 h-3 opacity-0 group-hover/member:opacity-100 transition text-[#006cd2]" />
+                                      </span>
+                                      {isCurrentUser && (
+                                        <span className="px-2.5 py-0.5 bg-[#006cd2] text-white text-[10px] font-mono font-bold rounded-full shadow-sm">
+                                          You
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-stone-400 line-clamp-1 max-w-xs">
+                                      {member.headline || member.bio || member.email}
+                                    </p>
+                                  </div>
+                                </Link>
+                              ) : (
+                                <div className="flex items-center gap-3 opacity-75">
+                                  <div className="w-10 h-10 rounded-full p-0.5 bg-stone-800 shrink-0">
+                                    <div className="w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-stone-400 uppercase">
+                                      {member.name ? member.name.substring(0, 2) : 'DEV'}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-display text-sm font-bold text-stone-300">
+                                        {member.name}
+                                      </span>
+                                      <span title="Private Portfolio">
+                                        <Lock className="w-3 h-3 text-stone-500" />
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-stone-500 line-clamp-1 max-w-xs">
+                                      Private Profile
+                                    </p>
                                   </div>
                                 </div>
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-display text-sm font-bold text-stone-300">
-                                      {member.name}
-                                    </span>
-                                    <span title="Private Portfolio">
-                                      <Lock className="w-3 h-3 text-stone-500" />
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-stone-500 line-clamp-1 max-w-xs">
-                                    Private Profile
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </td>
+                              )}
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-xs font-bold rounded-full">
+                                <Flame className="w-3.5 h-3.5 fill-current" />
+                                {member.streak?.currentStreak || 0} Days
+                              </span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#006cd2]/20 border border-[#006cd2]/40 text-blue-300 font-mono text-xs font-bold rounded-full">
+                                <Code2 className="w-3.5 h-3.5 text-[#006cd2]" />
+                                {solvedCount} Solved
+                              </span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-stone-800 border border-white/15 text-stone-200 font-mono text-xs font-bold rounded-full">
+                                <Award className="w-3.5 h-3.5 text-amber-400" />
+                                {member.skillsCompleted?.length || 0} Skills
+                              </span>
+                            </td>
+                            <td className="py-4 px-6 text-right text-stone-400 font-mono text-xs">
+                              {member.streak?.lastSolvedDate || 'Never'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-                          {/* Streak */}
-                          <td className="py-4 px-6">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-xs font-bold rounded-full">
-                              <Flame className="w-3.5 h-3.5 fill-current" />
-                              {member.streak?.currentStreak || 0} Days
-                            </span>
-                          </td>
+                {/* Mobile Responsive Cards View */}
+                <div className="md:hidden divide-y divide-white/5">
+                  {sortedUsers.map((member, index) => {
+                    const rank = index + 1;
+                    const isCurrentUser = member.uid === userData.uid;
+                    const solvedCount = member.leetcodeStats?.totalSolved ?? 52;
 
-                          {/* LeetCode Solved */}
-                          <td className="py-4 px-6">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#006cd2]/20 border border-[#006cd2]/40 text-blue-300 font-mono text-xs font-bold rounded-full">
-                              <Code2 className="w-3.5 h-3.5 text-[#006cd2]" />
-                              {solvedCount} Solved
-                            </span>
-                          </td>
+                    let rankBadge = (
+                      <span className="w-7 h-7 rounded-xl bg-stone-800 text-stone-300 font-mono font-bold flex items-center justify-center text-xs border border-white/10 shrink-0">
+                        #{rank}
+                      </span>
+                    );
 
-                          {/* Skills Mastered */}
-                          <td className="py-4 px-6">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-stone-800 border border-white/15 text-stone-200 font-mono text-xs font-bold rounded-full">
-                              <Award className="w-3.5 h-3.5 text-amber-400" />
-                              {member.skillsCompleted?.length || 0} Skills
-                            </span>
-                          </td>
-
-                          {/* Last Solved */}
-                          <td className="py-4 px-6 text-right text-stone-400 font-mono text-xs">
-                            {member.streak?.lastSolvedDate || 'Never'}
-                          </td>
-                        </tr>
+                    if (rank === 1) {
+                      rankBadge = (
+                        <span className="w-7 h-7 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold flex items-center justify-center text-xs shadow-sm shrink-0">
+                          <Crown className="w-4 h-4 text-amber-400 fill-amber-400" />
+                        </span>
                       );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                    } else if (rank === 2) {
+                      rankBadge = (
+                        <span className="w-7 h-7 rounded-xl bg-stone-800 border border-white/20 text-stone-200 font-bold flex items-center justify-center text-xs shrink-0">
+                          <Medal className="w-4 h-4 text-stone-300" />
+                        </span>
+                      );
+                    } else if (rank === 3) {
+                      rankBadge = (
+                        <span className="w-7 h-7 rounded-xl bg-amber-700/20 border border-amber-600/30 text-amber-400 font-bold flex items-center justify-center text-xs shrink-0">
+                          <Award className="w-4 h-4 text-amber-400" />
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={member.uid}
+                        className={`p-4 space-y-3 transition ${
+                          isCurrentUser
+                            ? 'bg-[#006cd2]/15 border-l-4 border-l-[#006cd2]'
+                            : 'hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {rankBadge}
+
+                            <div className="w-10 h-10 rounded-full p-0.5 bg-gradient-to-tr from-[#006cd2] via-cyan-400 to-[#006cd2] shrink-0">
+                              {member.photoUrl ? (
+                                <img
+                                  src={member.photoUrl}
+                                  alt={member.name}
+                                  className="w-full h-full object-cover rounded-full"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-stone-900 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white uppercase">
+                                  {member.name ? member.name.substring(0, 2) : 'DEV'}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-display text-sm font-bold text-white truncate">
+                                  {member.name}
+                                </span>
+                                {isCurrentUser && (
+                                  <span className="px-1.5 py-0.2 bg-[#006cd2] text-white text-[9px] font-mono font-bold rounded-full">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-stone-400 truncate">
+                                {member.headline || member.branch || member.email}
+                              </p>
+                            </div>
+                          </div>
+
+                          {member.isPortfolioPublic !== false && (
+                            <Link
+                              href={`/portfolio/${member.username || member.email.split('@')[0]}`}
+                              className="px-2.5 py-1 rounded-lg bg-stone-800 border border-white/10 text-xs font-mono text-cyan-400 hover:text-white shrink-0"
+                            >
+                              Profile
+                            </Link>
+                          )}
+                        </div>
+
+                        {/* Metrics Pills Grid */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-500/15 border border-rose-500/30 text-rose-300 font-bold rounded-lg">
+                            <Flame className="w-3 h-3 fill-current" />
+                            {member.streak?.currentStreak || 0}d streak
+                          </span>
+
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#006cd2]/15 border border-[#006cd2]/30 text-blue-300 font-bold rounded-lg">
+                            <Code2 className="w-3 h-3 text-[#006cd2]" />
+                            {solvedCount} solved
+                          </span>
+
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-stone-800/80 border border-white/10 text-stone-300 font-bold rounded-lg">
+                            <Award className="w-3 h-3 text-amber-400" />
+                            {member.skillsCompleted?.length || 0} skills
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </section>
         </main>

@@ -118,7 +118,7 @@ export default function ComputerVisionEngineerRoadmapPage() {
         />
       </div>
 
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="relative z-10 flex flex-col min-h-screen pb-mobile-nav">
         {/* Top Sticky Header */}
         <header className="sticky top-0 z-50 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">

@@ -54,6 +54,17 @@ export interface UserAchievementRecord {
   metadata?: Record<string, any>;
 }
 
+export interface DailyChallengeSubmissionRecord {
+  challengeId: number;
+  sequenceNumber: number;
+  date: string; // YYYY-MM-DD (IST)
+  completedAt: string;
+  language: string;
+  submittedSolution?: string;
+  problemTitle?: string;
+  leetcodeNumber?: number;
+}
+
 export interface CalendarActivityRecord {
   activityDate: string; // YYYY-MM-DD
   activityType: 'module_completion' | 'daily_solve' | 'project_update';
@@ -171,6 +182,8 @@ export interface UserDynamicData {
     score?: number;
     completedAt?: string;
   };
+  dailyChallengeProgress?: Record<string, DailyChallengeSubmissionRecord>; // date -> Submission
+  dailyChallengeCompletedIds?: number[];
   updatedAt: string;
 }
 
@@ -194,6 +207,8 @@ export function createEmptyDynamicData(email: string): UserDynamicData {
     projectLiveUrl: null,
     achievements: [],
     calendarActivity: [],
+    dailyChallengeProgress: {},
+    dailyChallengeCompletedIds: [],
     streak: {
       currentStreak: 0,
       longestStreak: 0,
@@ -249,13 +264,24 @@ export function calculateStreakFromActivity(activities: CalendarActivityRecord[]
     prevDate = currDate;
   }
 
-  // Check if current streak includes today or yesterday
-  const todayStr = new Date().toISOString().split('T')[0];
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  // Check if current streak includes today or yesterday (evaluating in IST and UTC)
+  const now = new Date();
+  let todayStr = now.toISOString().split('T')[0];
+  let yesterdayStr = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  try {
+    todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+    yesterdayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(
+      new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    );
+  } catch {}
 
-  if (lastActivityDate === todayStr || lastActivityDate === yesterdayStr) {
+  const utcTodayStr = now.toISOString().split('T')[0];
+
+  if (
+    lastActivityDate === todayStr ||
+    lastActivityDate === yesterdayStr ||
+    lastActivityDate === utcTodayStr
+  ) {
     currentStreak = tempStreak;
   } else {
     currentStreak = 0;

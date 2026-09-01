@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Space_Grotesk, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
+import MobileBottomNav from '@/components/MobileBottomNav';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -42,7 +43,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${ibmPlexMono.variable}`}>
       <body className="bg-mist text-ink font-sans min-h-screen antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <MobileBottomNav />
+        </AuthProvider>
       </body>
     </html>
   );

@@ -147,7 +147,7 @@ export default function ModuleDetailPage() {
       </div>
 
       {/* Main Container */}
-      <div className="relative z-10 min-h-screen flex flex-col flex-1">
+      <div className="relative z-10 min-h-screen flex flex-col flex-1 pb-mobile-nav">
         {/* Sticky Header Navigation */}
         <header className="sticky top-0 z-50 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
