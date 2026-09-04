@@ -46,6 +46,47 @@ export interface DailyTrainingLog {
   updatedAt: string;
 }
 
+export interface DailyPillarProgressState {
+  completed: boolean;
+  practiceAnswer?: any;
+  practiceScore?: number;
+  recordedAudioUrl?: string;
+  recordDurationSeconds?: number;
+  fillerWordCount?: number;
+  selfRating?: number;
+  notes?: string;
+  completedAt?: string;
+}
+
+export interface DailyTrainingSessionState {
+  dayNumber: number;
+  currentPillarIndex: number; // 0 to 5 (0: Grammar, 1: Vocabulary, 2: Speaking, 3: Listening, 4: TechComm, 5: Professional)
+  currentStepIndex: number; // 0 to 4 (0: Learn, 1: Practice, 2: Speak, 3: Review, 4: Complete)
+  pillarProgress: {
+    grammar?: DailyPillarProgressState;
+    vocabulary?: DailyPillarProgressState;
+    speaking?: DailyPillarProgressState;
+    listeningShadowing?: DailyPillarProgressState;
+    technicalComm?: DailyPillarProgressState;
+    professionalInterview?: DailyPillarProgressState;
+  };
+  startedAt: string;
+  lastUpdated: string;
+  completedAt?: string;
+  isDayComplete: boolean;
+}
+
+export interface CompletedDailyLessonRecord {
+  id: string;
+  dayNumber: number;
+  dateStr: string;
+  completedAt: string;
+  timeSpentMinutes: number;
+  pillarsCompletedCount: number;
+  selfRating: number;
+  journalSummary?: string;
+}
+
 export interface EnglishCareerUserState {
   userId: string;
   email: string;
@@ -57,6 +98,8 @@ export interface EnglishCareerUserState {
   journalEntries: SpeakingJournalEntry[];
   assessmentHistory: AssessmentResultRecord[];
   dailyTrainingLogs: Record<string, DailyTrainingLog>; // dateStr -> Log
+  activeDailySession?: DailyTrainingSessionState;
+  completedDailyLessons?: CompletedDailyLessonRecord[];
   lastActiveTab: string;
   updatedAt: string;
 }
@@ -103,6 +146,8 @@ export function createEmptyEnglishCareerState(email: string): EnglishCareerUserS
     journalEntries: [],
     assessmentHistory: [],
     dailyTrainingLogs: {},
+    activeDailySession: undefined,
+    completedDailyLessons: [],
     lastActiveTab: 'dashboard',
     updatedAt: nowIso,
   };
@@ -197,10 +242,18 @@ export async function saveEnglishCareerState(state: EnglishCareerUserState): Pro
 }
 
 /**
- * Calculate dynamic training streak from daily training logs & journal activity.
+ * Calculate dynamic training streak from verified completed daily lessons, daily training logs & journal activity.
  */
-export function calculateEnglishStreak(logs: Record<string, DailyTrainingLog>, journal: SpeakingJournalEntry[]): number {
+export function calculateEnglishStreak(
+  logs: Record<string, DailyTrainingLog>,
+  journal: SpeakingJournalEntry[],
+  completedDailyLessons: CompletedDailyLessonRecord[] = []
+): number {
   const activeDates = new Set<string>();
+
+  completedDailyLessons.forEach((l) => {
+    if (l.dateStr) activeDates.add(l.dateStr);
+  });
 
   Object.values(logs).forEach((log) => {
     if (log.completed || log.speechDone || log.grammarDone || log.vocabDone) {
@@ -258,6 +311,7 @@ export function calculateEnglishStreak(logs: Record<string, DailyTrainingLog>, j
  * Computes all dashboard metrics dynamically.
  */
 export function calculateEnglishCareerMetrics(state: EnglishCareerUserState): EnglishCareerMetrics {
+  const completedLessons = state.completedDailyLessons || [];
   const totalGrammar = GRAMMAR_TOPICS.length;
   const completedGrammar = GRAMMAR_TOPICS.filter((g) => state.completedTopicIds.includes(g.id)).length;
   const grammarProgress = totalGrammar > 0 ? Math.round((completedGrammar / totalGrammar) * 100) : 0;
@@ -282,17 +336,21 @@ export function calculateEnglishCareerMetrics(state: EnglishCareerUserState): En
   const completedProf = PROFESSIONAL_EMAIL_TEMPLATES.filter((p) => state.completedTopicIds.includes(p.id)).length;
   const professionalProgress = totalProf > 0 ? Math.round((completedProf / totalProf) * 100) : 0;
 
-  // Speaking confidence based on completed speaking prompts and journal ratings
+  // Speaking confidence based on completed speaking prompts, completed daily lessons, and journal ratings
   const totalSpeakingPrompts = SPEAKING_PROMPTS.length;
   const completedSpeaking = SPEAKING_PROMPTS.filter((s) => state.completedTopicIds.includes(s.id)).length;
   const journalCount = state.journalEntries.length;
   const speakingConfidence = Math.min(
     100,
-    Math.round((completedSpeaking / totalSpeakingPrompts) * 50 + Math.min(50, journalCount * 10))
+    Math.round(
+      (completedSpeaking / totalSpeakingPrompts) * 40 +
+      Math.min(30, journalCount * 8) +
+      Math.min(30, completedLessons.length * 6)
+    )
   );
 
   // Training streak
-  const streak = calculateEnglishStreak(state.dailyTrainingLogs, state.journalEntries);
+  const streak = calculateEnglishStreak(state.dailyTrainingLogs, state.journalEntries, completedLessons);
 
   // Weekly completion (past 7 days)
   const now = new Date();
@@ -300,7 +358,8 @@ export function calculateEnglishCareerMetrics(state: EnglishCareerUserState): En
   for (let i = 0; i < 7; i++) {
     const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
     const dateKey = d.toISOString().split('T')[0];
-    if (state.dailyTrainingLogs[dateKey]?.completed || state.journalEntries.some((j) => j.dateStr === dateKey)) {
+    const isCompletedLesson = completedLessons.some((l) => l.dateStr === dateKey);
+    if (isCompletedLesson || state.dailyTrainingLogs[dateKey]?.completed || state.journalEntries.some((j) => j.dateStr === dateKey)) {
       past7DaysCompleted++;
     }
   }
@@ -549,3 +608,99 @@ export async function toggleBookmark(
   await saveEnglishCareerState(nextState);
   return nextState;
 }
+
+/**
+ * Saves or updates in-progress Daily Training Session state.
+ * Allows seamless restoration if user refreshes or leaves halfway.
+ */
+export async function saveActiveDailySession(
+  currentState: EnglishCareerUserState,
+  session: DailyTrainingSessionState
+): Promise<EnglishCareerUserState> {
+  const nextSession = {
+    ...session,
+    lastUpdated: new Date().toISOString(),
+  };
+
+  const nextState: EnglishCareerUserState = {
+    ...currentState,
+    activeDailySession: nextSession,
+  };
+
+  await saveEnglishCareerState(nextState);
+  return nextState;
+}
+
+/**
+ * Marks an entire Daily Training Day as fully completed.
+ * Updates streak, appends to completedDailyLessons, marks daily log, and clears active session.
+ */
+export async function completeDailyTrainingDay(
+  currentState: EnglishCareerUserState,
+  dayNumber: number,
+  timeSpentMinutes: number,
+  selfRating: number,
+  journalSummary?: string
+): Promise<EnglishCareerUserState> {
+  const now = new Date();
+  let todayStr = now.toISOString().split('T')[0];
+  try {
+    todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+  } catch {}
+
+  const completedRecord: CompletedDailyLessonRecord = {
+    id: `daily_day_${dayNumber}_${Date.now()}`,
+    dayNumber,
+    dateStr: todayStr,
+    completedAt: now.toISOString(),
+    timeSpentMinutes,
+    pillarsCompletedCount: 6,
+    selfRating,
+    journalSummary,
+  };
+
+  const existingCompleted = currentState.completedDailyLessons || [];
+  // Avoid duplicate records for the same day
+  const filteredCompleted = existingCompleted.filter((l) => l.dayNumber !== dayNumber);
+  const nextCompletedList = [completedRecord, ...filteredCompleted];
+
+  // Update dailyTrainingLogs for today
+  const existingLog = currentState.dailyTrainingLogs[todayStr] || {
+    dateStr: todayStr,
+    speechDone: false,
+    grammarDone: false,
+    vocabDone: false,
+    completed: false,
+    updatedAt: now.toISOString(),
+  };
+
+  const updatedLog: DailyTrainingLog = {
+    ...existingLog,
+    speechDone: true,
+    grammarDone: true,
+    vocabDone: true,
+    completed: true,
+    updatedAt: now.toISOString(),
+  };
+
+  const nextState: EnglishCareerUserState = {
+    ...currentState,
+    completedDailyLessons: nextCompletedList,
+    dailyTrainingLogs: {
+      ...currentState.dailyTrainingLogs,
+      [todayStr]: updatedLog,
+    },
+    activeDailySession: currentState.activeDailySession
+      ? {
+          ...currentState.activeDailySession,
+          isDayComplete: true,
+          completedAt: now.toISOString(),
+          lastUpdated: now.toISOString(),
+        }
+      : undefined,
+  };
+
+  await saveEnglishCareerState(nextState);
+  return nextState;
+}
+

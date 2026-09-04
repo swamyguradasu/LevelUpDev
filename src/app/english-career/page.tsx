@@ -43,11 +43,22 @@ import {
   saveAssessmentResult,
   saveTopicNote,
   toggleBookmark,
+  saveActiveDailySession,
+  completeDailyTrainingDay,
   EnglishCareerUserState,
   EnglishCareerMetrics,
+  DailyTrainingSessionState,
+  CompletedDailyLessonRecord,
+  DailyPillarProgressState,
   createEmptyEnglishCareerState,
   SpeakingJournalEntry,
 } from '@/lib/englishCareerStorage';
+import {
+  DailyTrainingPlan,
+  getDailyTrainingPlan,
+  getTodayPlanForUser,
+  getUpcomingTrainingPlans,
+} from '@/data/englishDailyTrainingPlan';
 import {
   Mic,
   MicOff,
@@ -91,6 +102,7 @@ import {
   GraduationCap,
   Compass,
   Zap,
+  RotateCcw,
 } from 'lucide-react';
 
 type ActiveTab =
@@ -123,6 +135,15 @@ const NAVIGATION_TABS: Array<{ id: ActiveTab; label: string; icon: any }> = [
   { id: 'journal', label: 'Speaking Journal', icon: MessageSquare },
   { id: 'progress', label: 'Progress', icon: TrendingUp },
 ];
+
+const DAILY_PILLARS_CONFIG = [
+  { key: 'grammar', title: '1. Grammar', icon: CheckCircle2, label: 'Tenses & SVO' },
+  { key: 'vocabulary', title: '2. Vocabulary', icon: BookOpen, label: 'Power Words' },
+  { key: 'speaking', title: '3. Speaking', icon: Mic, label: 'Fluency' },
+  { key: 'listeningShadowing', title: '4. Listening', icon: Headphones, label: 'Shadowing' },
+  { key: 'technicalComm', title: '5. Tech Comm', icon: Cpu, label: '5-Step Explanations' },
+  { key: 'professionalInterview', title: '6. Executive / STAR', icon: Award, label: 'Interviews' },
+] as const;
 
 function EnglishCareerContent() {
   const { userData, loading } = useAuth();
@@ -226,6 +247,217 @@ function EnglishCareerContent() {
   const showNotification = (msg: string) => {
     setSaveToast(msg);
     setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  // =========================================================================
+  // DAILY TRAINING SYSTEM STATE & LOGIC
+  // =========================================================================
+  const [dailySubView, setDailySubView] = useState<'session' | 'history' | 'upcoming' | 'target'>('session');
+
+  const completedDailyDayNumbers = useMemo(() => {
+    return (userState?.completedDailyLessons || []).map((l) => l.dayNumber);
+  }, [userState?.completedDailyLessons]);
+
+  const todayTrainingPlan: DailyTrainingPlan = useMemo(() => {
+    return getTodayPlanForUser(completedDailyDayNumbers);
+  }, [completedDailyDayNumbers]);
+
+  const upcomingTrainingPlans: DailyTrainingPlan[] = useMemo(() => {
+    return getUpcomingTrainingPlans(todayTrainingPlan.dayNumber, 6);
+  }, [todayTrainingPlan.dayNumber]);
+
+  // Active session day & index
+  const [currentSessionDay, setCurrentSessionDay] = useState<number>(todayTrainingPlan.dayNumber);
+  const [currentPillarIdx, setCurrentPillarIdx] = useState<number>(0);
+  const [currentStepIdx, setCurrentStepIdx] = useState<number>(0);
+
+  // Sync session state from persistent storage on load
+  useEffect(() => {
+    if (userState?.activeDailySession && userState.activeDailySession.dayNumber === todayTrainingPlan.dayNumber) {
+      setCurrentSessionDay(userState.activeDailySession.dayNumber);
+      setCurrentPillarIdx(userState.activeDailySession.currentPillarIndex || 0);
+      setCurrentStepIdx(userState.activeDailySession.currentStepIndex || 0);
+    } else {
+      setCurrentSessionDay(todayTrainingPlan.dayNumber);
+    }
+  }, [userState?.activeDailySession, todayTrainingPlan.dayNumber]);
+
+  // Practice Interactive State for Daily Training
+  const [dailyPracticeSelections, setDailyPracticeSelections] = useState<Record<string, any>>({});
+  const [dailyPracticeSubmitted, setDailyPracticeSubmitted] = useState<Record<string, boolean>>({});
+  const [dailyAudioUrl, setDailyAudioUrl] = useState<string | null>(null);
+  const [dailyIsRecording, setDailyIsRecording] = useState<boolean>(false);
+  const [dailyRecordDuration, setDailyRecordDuration] = useState<number>(0);
+  const [dailySelfRating, setDailySelfRating] = useState<number>(5);
+  const [dailyFillerCount, setDailyFillerCount] = useState<number>(0);
+  const [dailyReflectionNote, setDailyReflectionNote] = useState<string>('');
+  const [dailyDayCompleteModal, setDailyDayCompleteModal] = useState<boolean>(false);
+
+  const activeDailyPlan: DailyTrainingPlan = useMemo(() => {
+    return getDailyTrainingPlan(currentSessionDay);
+  }, [currentSessionDay]);
+
+  const dailyPillarKeys = ['grammar', 'vocabulary', 'speaking', 'listeningShadowing', 'technicalComm', 'professionalInterview'] as const;
+  const currentPillarKey = dailyPillarKeys[currentPillarIdx] || 'grammar';
+
+  // Helper to persist in-progress active session immediately
+  const persistSessionProgress = async (
+    pillarIndex: number,
+    stepIndex: number,
+    partialProgress?: Partial<DailyPillarProgressState>
+  ) => {
+    if (!userState) return;
+    const existingSession: DailyTrainingSessionState = userState.activeDailySession && userState.activeDailySession.dayNumber === currentSessionDay
+      ? userState.activeDailySession
+      : {
+          dayNumber: currentSessionDay,
+          currentPillarIndex: pillarIndex,
+          currentStepIndex: stepIndex,
+          pillarProgress: {},
+          startedAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          isDayComplete: false,
+        };
+
+    const currentKey = dailyPillarKeys[pillarIndex];
+    const existingPillar = existingSession.pillarProgress[currentKey] || { completed: false };
+
+    const updatedPillar: DailyPillarProgressState = {
+      ...existingPillar,
+      ...(partialProgress || {}),
+    };
+
+    const nextSession: DailyTrainingSessionState = {
+      ...existingSession,
+      currentPillarIndex: pillarIndex,
+      currentStepIndex: stepIndex,
+      pillarProgress: {
+        ...existingSession.pillarProgress,
+        [currentKey]: updatedPillar,
+      },
+      lastUpdated: new Date().toISOString(),
+    };
+
+    try {
+      const updatedState = await saveActiveDailySession(userState, nextSession);
+      setUserState(updatedState);
+    } catch (err) {
+      console.error('Error saving active daily session:', err);
+    }
+  };
+
+  // Switch pillar in daily studio
+  const handleSelectDailyPillar = (pillarIndex: number) => {
+    setCurrentPillarIdx(pillarIndex);
+    setCurrentStepIdx(0);
+    setDailyAudioUrl(null);
+    setDailyRecordDuration(0);
+    persistSessionProgress(pillarIndex, 0);
+  };
+
+  // Switch step within pillar
+  const handleSelectDailyStep = (stepIndex: number) => {
+    setCurrentStepIdx(stepIndex);
+    persistSessionProgress(currentPillarIdx, stepIndex);
+  };
+
+  // Advance step or complete pillar
+  const handleAdvanceDailyStepOrPillar = async () => {
+    if (currentStepIdx < 4) {
+      const nextStep = currentStepIdx + 1;
+      setCurrentStepIdx(nextStep);
+      await persistSessionProgress(currentPillarIdx, nextStep);
+    } else {
+      // Step 4 reached: Mark pillar complete
+      const currentKey = dailyPillarKeys[currentPillarIdx];
+      await persistSessionProgress(currentPillarIdx, 4, {
+        completed: true,
+        recordedAudioUrl: dailyAudioUrl || undefined,
+        recordDurationSeconds: dailyRecordDuration,
+        fillerWordCount: dailyFillerCount,
+        selfRating: dailySelfRating,
+        notes: dailyReflectionNote,
+        completedAt: new Date().toISOString(),
+      });
+      showNotification(`Pillar ${currentPillarIdx + 1}/6 Completed!`);
+
+      if (currentPillarIdx < 5) {
+        const nextPillar = currentPillarIdx + 1;
+        setCurrentPillarIdx(nextPillar);
+        setCurrentStepIdx(0);
+        setDailyAudioUrl(null);
+        setDailyRecordDuration(0);
+        setDailyReflectionNote('');
+        await persistSessionProgress(nextPillar, 0);
+      } else {
+        setDailyDayCompleteModal(true);
+      }
+    }
+  };
+
+  // Audio Recording for Daily Training Studio
+  const startDailyStudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(audioBlob);
+        setDailyAudioUrl(url);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start(200);
+      setDailyIsRecording(true);
+      setDailyRecordDuration(0);
+
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = setInterval(() => {
+        setDailyRecordDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Microphone access error:', err);
+      showNotification('Microphone permission required for speech practice.');
+    }
+  };
+
+  const stopDailyStudioRecording = () => {
+    if (mediaRecorderRef.current && dailyIsRecording) {
+      mediaRecorderRef.current.stop();
+      setDailyIsRecording(false);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    }
+  };
+
+  // Finish entire daily training day
+  const handleFinalizeDailyDay = async () => {
+    if (!userState) return;
+    try {
+      const updated = await completeDailyTrainingDay(
+        userState,
+        currentSessionDay,
+        activeDailyPlan.estimatedMinutes,
+        dailySelfRating,
+        dailyReflectionNote || `Completed Day ${currentSessionDay} with 6-pillar mastery.`
+      );
+      setUserState(updated);
+      setDailyDayCompleteModal(false);
+      showNotification(`🎉 Day ${currentSessionDay} Training Completed! Streak updated.`);
+    } catch (err) {
+      console.error('Error finalizing daily day:', err);
+    }
   };
 
   // Switch Tab Handler
@@ -906,24 +1138,69 @@ function EnglishCareerContent() {
 
                 {/* Card 2: Today's Daily Training */}
                 <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 text-orange-400 font-mono text-xs font-bold">
-                      <Flame className="w-3.5 h-3.5 fill-orange-400" />
-                      <span>TODAY&apos;S MICRO-MISSION</span>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 text-orange-400 font-mono text-xs font-bold">
+                        <Flame className="w-3.5 h-3.5 fill-orange-400" />
+                        <span>TODAY&apos;S TRAINING — DAY {todayTrainingPlan.dayNumber}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {todayTrainingPlan.estimatedMinutes} min
+                      </span>
                     </div>
-                    <h3 className="text-lg font-bold font-display text-white">
-                      {dailyMission.title}
-                    </h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Impromptu Speech Drill: &ldquo;{dailyMission.speechDrill.prompt}&rdquo;
+
+                    <div>
+                      <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block mb-0.5">
+                        {todayTrainingPlan.levelTitle}
+                      </span>
+                      <h3 className="text-base font-bold font-display text-white line-clamp-1">
+                        {todayTrainingPlan.title}
+                      </h3>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
+                      {todayTrainingPlan.objective}
                     </p>
+
+                    {/* Mini Pillar Progress */}
+                    {(() => {
+                      const sessionPillars = userState?.activeDailySession?.dayNumber === todayTrainingPlan.dayNumber
+                        ? userState.activeDailySession.pillarProgress
+                        : {};
+                      const completedCount = Object.values(sessionPillars).filter((p) => p?.completed).length;
+                      const pct = Math.round((completedCount / 6) * 100);
+                      const isComplete = completedDailyDayNumbers.includes(todayTrainingPlan.dayNumber);
+
+                      return (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex justify-between text-[11px] font-mono">
+                            <span className="text-slate-400">
+                              {isComplete ? 'Day Complete' : `${completedCount}/6 Pillars Complete`}
+                            </span>
+                            <span className="text-orange-400 font-bold">{isComplete ? '100%' : `${pct}%`}</span>
+                          </div>
+                          <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-gradient-to-r from-orange-500 to-amber-400 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${isComplete ? 100 : Math.max(5, pct)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <button
                     onClick={() => handleTabChange('daily')}
-                    className="w-full py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-sans font-bold rounded-xl transition text-xs flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-sans font-bold rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
                   >
-                    <span>Start Today&apos;s Training</span>
+                    <span>
+                      {completedDailyDayNumbers.includes(todayTrainingPlan.dayNumber)
+                        ? `Review Day ${todayTrainingPlan.dayNumber}`
+                        : userState?.activeDailySession?.dayNumber === todayTrainingPlan.dayNumber && (userState.activeDailySession.currentPillarIndex || 0) > 0
+                        ? `Continue Training (Pillar ${(userState.activeDailySession.currentPillarIndex || 0) + 1}/6)`
+                        : `Start Day ${todayTrainingPlan.dayNumber} Training`}
+                    </span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -1330,143 +1607,1125 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 3. DAILY TRAINING TAB */}
+          {/* 3. DAILY TRAINING TAB (6-PILLAR, 5-STEP GUIDED SYSTEM) */}
           {/* ========================================================================= */}
           {activeTab === 'daily' && (
             <div className="space-y-8">
-              <div className="bg-gradient-to-r from-orange-950/40 via-slate-900 to-slate-900 border border-orange-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-mono font-bold rounded-full">
-                    <Flame className="w-3.5 h-3.5 fill-current" />
-                    <span>DAILY MICRO-MISSION</span>
+              {/* Daily Training Top Header Card */}
+              <div className="bg-gradient-to-r from-orange-950/50 via-slate-900 to-slate-900 border border-orange-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-mono font-bold rounded-full">
+                    <Flame className="w-4 h-4 fill-orange-400" />
+                    <span>DAILY TRAINING — DAY {activeDailyPlan.dayNumber} OF 90</span>
                   </div>
-                  <span className="text-xs font-mono text-slate-400">
-                    Date: {dailyMission.dateStr}
-                  </span>
+
+                  <div className="flex items-center gap-2 font-mono text-xs text-slate-400">
+                    <span className="text-cyan-400 font-bold">{activeDailyPlan.levelTitle}</span>
+                    <span>&bull;</span>
+                    <span className="text-amber-400 font-bold">{activeDailyPlan.estimatedMinutes} min target</span>
+                  </div>
                 </div>
 
-                <h2 className="text-2xl font-bold font-display text-white">
-                  {dailyMission.title}
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-300">
-                  Target: Complete today&apos;s 3 micro-drills to maintain your communication streak.
-                </p>
+                <div className="space-y-1">
+                  <h2 className="text-2xl sm:text-3xl font-bold font-display text-white">
+                    {activeDailyPlan.title}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl">
+                    {activeDailyPlan.objective}
+                  </p>
+                </div>
+
+                {/* Sub-View Navigation Pills */}
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80 overflow-x-auto pb-1 scrollbar-none">
+                  {[
+                    { id: 'session', label: 'Active Training Studio', icon: Flame },
+                    { id: 'history', label: `Completed Days (${(userState?.completedDailyLessons || []).length})`, icon: CheckCircle2 },
+                    { id: 'upcoming', label: 'Upcoming Roadmap', icon: Calendar },
+                    { id: 'target', label: `Weekly Consistency (${metrics.weeklyCompletion.completedDays}/7)`, icon: Target },
+                  ].map((sub) => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setDailySubView(sub.id as any)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 whitespace-nowrap ${
+                        dailySubView === sub.id
+                          ? 'bg-orange-500 text-slate-950 shadow-md shadow-orange-500/25'
+                          : 'bg-slate-950/80 border border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <sub.icon className="w-3.5 h-3.5" />
+                      <span>{sub.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* 3 Step Daily Mission Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Step 1: Speech Drill */}
-                <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-blue-400 uppercase">
-                        Drill 1: Impromptu Speech
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {dailyMission.speechDrill.targetDurationSeconds}s timer
-                      </span>
-                    </div>
+              {/* ===================================================================== */}
+              {/* SUB-VIEW 1: ACTIVE TRAINING STUDIO (6 PILLARS x 5 STEPS) */}
+              {/* ===================================================================== */}
+              {dailySubView === 'session' && (
+                <div className="space-y-6">
+                  {/* 6 Pillars Selection Bar */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {DAILY_PILLARS_CONFIG.map((pillar, pIdx) => {
+                      const sessionPillars = userState?.activeDailySession?.dayNumber === currentSessionDay
+                        ? userState.activeDailySession.pillarProgress
+                        : {};
+                      const isCompleted = sessionPillars[pillar.key]?.completed;
+                      const isActive = currentPillarIdx === pIdx;
 
-                    <h3 className="font-bold text-white text-sm">
-                      {dailyMission.speechDrill.prompt}
-                    </h3>
+                      return (
+                        <button
+                          key={pillar.key}
+                          onClick={() => handleSelectDailyPillar(pIdx)}
+                          className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between space-y-2 ${
+                            isActive
+                              ? 'bg-slate-900 border-orange-500/60 shadow-lg shadow-orange-500/10 ring-1 ring-orange-500/40'
+                              : isCompleted
+                              ? 'bg-slate-900/60 border-emerald-500/30 hover:border-emerald-500/50'
+                              : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <pillar.icon
+                              className={`w-4 h-4 ${
+                                isCompleted ? 'text-emerald-400' : isActive ? 'text-orange-400' : 'text-slate-400'
+                              }`}
+                            />
+                            {isCompleted ? (
+                              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                            ) : isActive ? (
+                              <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                            ) : null}
+                          </div>
 
-                    <div className="space-y-1 text-xs text-slate-300">
-                      <div className="text-[11px] font-mono text-slate-500 uppercase font-semibold">
-                        Key Phrases to Use:
+                          <div>
+                            <div className="font-mono text-xs font-bold text-white truncate">
+                              {pillar.title}
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-400 truncate">
+                              {pillar.label}
+                            </div>
+                          </div>
+
+                          <div className="text-[10px] font-mono">
+                            {isCompleted ? (
+                              <span className="text-emerald-400 font-bold">✓ Complete</span>
+                            ) : isActive ? (
+                              <span className="text-orange-400">Step {currentStepIdx + 1}/5</span>
+                            ) : (
+                              <span className="text-slate-500">Pending</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 5-Step Workflow Stepper Header */}
+                  <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-2 overflow-x-auto scrollbar-none">
+                    {[
+                      { idx: 0, name: 'Learn', icon: Sparkles, desc: 'Concept & Model' },
+                      { idx: 1, name: 'Practice', icon: Target, desc: 'Active Recall' },
+                      { idx: 2, name: 'Speak', icon: Mic, desc: 'Audio Studio' },
+                      { idx: 3, name: 'Review', icon: Sliders, desc: 'Self-Rating' },
+                      { idx: 4, name: 'Complete', icon: CheckCircle2, desc: 'Pillar Wrap-Up' },
+                    ].map((step) => {
+                      const isCurrent = currentStepIdx === step.idx;
+                      const isPast = currentStepIdx > step.idx;
+
+                      return (
+                        <button
+                          key={step.idx}
+                          onClick={() => handleSelectDailyStep(step.idx)}
+                          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl transition text-xs font-mono whitespace-nowrap ${
+                            isCurrent
+                              ? 'bg-[#006cd2] text-white font-bold shadow-md shadow-blue-500/20'
+                              : isPast
+                              ? 'bg-slate-950 border border-slate-800 text-emerald-400 font-semibold'
+                              : 'bg-slate-950/60 border border-slate-800/60 text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          <step.icon className={`w-3.5 h-3.5 ${isCurrent ? 'text-white' : isPast ? 'text-emerald-400' : 'text-slate-500'}`} />
+                          <span>STEP {step.idx + 1}: {step.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Main Studio Interactive Container */}
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
+                    {/* ============================================================= */}
+                    {/* STEP 1: LEARN (CONCEPT, RULES & MODELS) */}
+                    {/* ============================================================= */}
+                    {currentStepIdx === 0 && (
+                      <div className="space-y-6">
+                        <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-mono uppercase font-bold text-orange-400 tracking-wider">
+                              Step 1 of 5 &bull; Learn &amp; Assimilate
+                            </span>
+                            <h3 className="text-xl font-bold font-display text-white">
+                              {currentPillarIdx === 0 && activeDailyPlan.pillars.grammar.title}
+                              {currentPillarIdx === 1 && activeDailyPlan.pillars.vocabulary.title}
+                              {currentPillarIdx === 2 && activeDailyPlan.pillars.speaking.title}
+                              {currentPillarIdx === 3 && activeDailyPlan.pillars.listeningShadowing.title}
+                              {currentPillarIdx === 4 && activeDailyPlan.pillars.technicalComm.title}
+                              {currentPillarIdx === 5 && activeDailyPlan.pillars.professionalInterview.title}
+                            </h3>
+                          </div>
+
+                          <button
+                            onClick={handleAdvanceDailyStepOrPillar}
+                            className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-sans font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-orange-500/20"
+                          >
+                            <span>Proceed to Practice</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Pillar 0: Grammar Learn Content */}
+                        {currentPillarIdx === 0 && (
+                          <div className="space-y-6">
+                            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                              <span className="text-[10px] font-mono uppercase font-bold text-cyan-400">
+                                Core Rule:
+                              </span>
+                              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans">
+                                {activeDailyPlan.pillars.grammar.learnContent.rule}
+                              </p>
+                            </div>
+
+                            <div className="space-y-3">
+                              <span className="text-xs font-mono uppercase text-slate-400 font-semibold block">
+                                Correct vs. Incorrect Examples:
+                              </span>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {activeDailyPlan.pillars.grammar.learnContent.examples.map((ex, exIdx) => (
+                                  <div key={exIdx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                                    <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300">
+                                      <span className="font-bold">❌ Incorrect: </span>
+                                      &ldquo;{ex.incorrect}&rdquo;
+                                    </div>
+                                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                                      <span className="font-bold">✓ Correct: </span>
+                                      &ldquo;{ex.correct}&rdquo;
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 italic">
+                                      {ex.explanation}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {activeDailyPlan.pillars.grammar.learnContent.teluguPitfallNote && (
+                              <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 space-y-1 text-xs">
+                                <div className="flex items-center gap-2 text-amber-400 font-bold font-mono">
+                                  <AlertCircle className="w-4 h-4" />
+                                  <span>Regional Telugu-to-English Habit Notice:</span>
+                                </div>
+                                <p className="text-amber-200/90 leading-relaxed">
+                                  {activeDailyPlan.pillars.grammar.learnContent.teluguPitfallNote}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Pillar 1: Vocabulary Learn Content */}
+                        {currentPillarIdx === 1 && (
+                          <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {activeDailyPlan.pillars.vocabulary.words.map((w, wIdx) => (
+                                <div key={wIdx} className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-mono font-bold text-amber-400 uppercase">
+                                      {w.partOfSpeech}
+                                    </span>
+                                    <span className="text-xs font-mono text-slate-500">
+                                      {w.phonetic}
+                                    </span>
+                                  </div>
+
+                                  <div>
+                                    <h4 className="text-lg font-bold font-display text-white">
+                                      {w.term}
+                                    </h4>
+                                    <p className="text-xs text-slate-300 pt-1 leading-relaxed">
+                                      {w.definition}
+                                    </p>
+                                  </div>
+
+                                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 italic">
+                                    &ldquo;{w.sampleSentence}&rdquo;
+                                  </div>
+
+                                  {w.professionalUpgrade && (
+                                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+                                      <div className="text-[10px] font-mono text-amber-400 font-bold uppercase">
+                                        Executive Upgrade:
+                                      </div>
+                                      <div className="text-slate-400 line-through text-[11px]">&ldquo;{w.professionalUpgrade.amateur}&rdquo;</div>
+                                      <div className="text-amber-300 font-semibold text-[11px]">&ldquo;{w.professionalUpgrade.executive}&rdquo;</div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pillar 2: Speaking Learn Content */}
+                        {currentPillarIdx === 2 && (
+                          <div className="space-y-6">
+                            <div className="p-5 rounded-2xl bg-slate-950 border border-blue-500/30 space-y-3">
+                              <div className="flex items-center justify-between text-xs font-mono">
+                                <span className="text-blue-400 font-bold uppercase">Prompt Focus: {activeDailyPlan.pillars.speaking.category}</span>
+                                <span className="text-slate-400">{activeDailyPlan.pillars.speaking.targetDurationSeconds}s target duration</span>
+                              </div>
+
+                              <p className="text-base font-bold font-display text-white">
+                                &ldquo;{activeDailyPlan.pillars.speaking.prompt}&rdquo;
+                              </p>
+                            </div>
+
+                            {/* Evaluation Rubric */}
+                            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                              <span className="text-xs font-mono uppercase text-slate-400 font-semibold block">
+                                Performance Rubric:
+                              </span>
+                              <ul className="space-y-1.5 text-xs text-slate-300">
+                                {activeDailyPlan.pillars.speaking.rubric.map((r, rIdx) => (
+                                  <li key={rIdx} className="flex items-start gap-2">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                                    <span>{r}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            {/* Sample Transcript */}
+                            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                              <span className="text-[10px] font-mono uppercase font-bold text-cyan-400">
+                                Model Audio Delivery Transcript:
+                              </span>
+                              <p className="text-xs sm:text-sm text-slate-200 italic leading-relaxed">
+                                &ldquo;{activeDailyPlan.pillars.speaking.sampleAudioTranscript}&rdquo;
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pillar 3: Listening / Shadowing Learn Content */}
+                        {currentPillarIdx === 3 && (
+                          <div className="space-y-6">
+                            <div className="p-5 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-3">
+                              <div className="flex items-center justify-between text-xs font-mono">
+                                <span className="text-indigo-400 font-bold uppercase">Speaker: {activeDailyPlan.pillars.listeningShadowing.speakerRole}</span>
+                                <span className="text-slate-400">{activeDailyPlan.pillars.listeningShadowing.speedCategory}</span>
+                              </div>
+
+                              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs sm:text-sm text-slate-200 leading-relaxed font-sans">
+                                &ldquo;{activeDailyPlan.pillars.listeningShadowing.audioTranscript}&rdquo;
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <span className="text-xs font-mono uppercase text-slate-400 font-semibold block">
+                                Key Phrases to Shadow (Listen &rarr; Pause &rarr; Repeat):
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {activeDailyPlan.pillars.listeningShadowing.keyPhrasesToShadow.map((phrase, phIdx) => (
+                                  <div key={phIdx} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-indigo-300 font-mono flex items-center gap-2">
+                                    <Headphones className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                    <span>{phrase}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pillar 4: Technical Comm Learn Content */}
+                        {currentPillarIdx === 4 && (
+                          <div className="space-y-6">
+                            <div className="p-5 rounded-2xl bg-slate-950 border border-cyan-500/30 space-y-2">
+                              <span className="text-[10px] font-mono uppercase font-bold text-cyan-400">
+                                5-Step Formula: {activeDailyPlan.pillars.technicalComm.formulaStep}
+                              </span>
+                              <h4 className="text-base font-bold font-display text-white">
+                                {activeDailyPlan.pillars.technicalComm.topic}
+                              </h4>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {activeDailyPlan.pillars.technicalComm.frameworkSteps.map((step, stIdx) => (
+                                <div key={stIdx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
+                                  <span className="font-mono text-[10px] font-bold text-cyan-400 uppercase">
+                                    {step.stepName}
+                                  </span>
+                                  <p className="text-slate-300 leading-relaxed font-sans">
+                                    {step.content}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                              <span className="font-mono text-[10px] text-cyan-400 uppercase font-bold">
+                                Model Executive Explanation:
+                              </span>
+                              <p className="text-slate-200 italic leading-relaxed">
+                                &ldquo;{activeDailyPlan.pillars.technicalComm.sampleResponse}&rdquo;
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pillar 5: Professional & Interview Learn Content */}
+                        {currentPillarIdx === 5 && (
+                          <div className="space-y-6">
+                            <div className="p-5 rounded-2xl bg-slate-950 border border-purple-500/30 space-y-3">
+                              <div className="flex items-center justify-between text-xs font-mono">
+                                <span className="text-purple-400 font-bold uppercase">Framework: {activeDailyPlan.pillars.professionalInterview.methodology}</span>
+                                <span className="text-slate-400 uppercase">Type: {activeDailyPlan.pillars.professionalInterview.type}</span>
+                              </div>
+
+                              <h4 className="text-base font-bold font-display text-white">
+                                {activeDailyPlan.pillars.professionalInterview.prompt}
+                              </h4>
+                            </div>
+
+                            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
+                              <span className="text-[10px] font-mono uppercase font-bold text-purple-400">
+                                Guided Strategy / Template:
+                              </span>
+                              <p className="text-slate-300 leading-relaxed font-mono">
+                                {activeDailyPlan.pillars.professionalInterview.guidedTemplate}
+                              </p>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                              <span className="font-mono text-[10px] text-purple-400 uppercase font-bold">
+                                Executive Sample Response:
+                              </span>
+                              <p className="text-slate-200 italic leading-relaxed">
+                                &ldquo;{activeDailyPlan.pillars.professionalInterview.sampleExecutiveResponse}&rdquo;
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <ul className="list-disc list-inside text-cyan-300 text-xs space-y-1">
-                        {dailyMission.speechDrill.targetPhrases.map((phrase, idx) => (
-                          <li key={idx}>{phrase}</li>
-                        ))}
-                      </ul>
-                    </div>
+                    )}
+
+                    {/* ============================================================= */}
+                    {/* STEP 2: PRACTICE (INTERACTIVE ACTIVE RECALL DRILL) */}
+                    {/* ============================================================= */}
+                    {currentStepIdx === 1 && (
+                      <div className="space-y-6">
+                        <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-mono uppercase font-bold text-cyan-400 tracking-wider">
+                              Step 2 of 5 &bull; Active Recall Practice
+                            </span>
+                            <h3 className="text-xl font-bold font-display text-white">
+                              Interactive Skill Check &amp; Synthesis
+                            </h3>
+                          </div>
+
+                          <button
+                            onClick={handleAdvanceDailyStepOrPillar}
+                            className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-sans font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-orange-500/20"
+                          >
+                            <span>Proceed to Speak</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Practice 0: Grammar Quiz */}
+                        {currentPillarIdx === 0 && (
+                          <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                            <p className="text-sm font-bold text-white">
+                              {activeDailyPlan.pillars.grammar.practiceQuiz.question}
+                            </p>
+
+                            <div className="space-y-2">
+                              {activeDailyPlan.pillars.grammar.practiceQuiz.options.map((opt, oIdx) => {
+                                const qKey = `daily_q_${currentSessionDay}_grammar`;
+                                const selected = dailyPracticeSelections[qKey];
+                                const submitted = dailyPracticeSubmitted[qKey];
+                                const isCorrectOpt = oIdx === activeDailyPlan.pillars.grammar.practiceQuiz.correctIndex;
+
+                                return (
+                                  <button
+                                    key={oIdx}
+                                    onClick={() => {
+                                      setDailyPracticeSelections((prev) => ({ ...prev, [qKey]: oIdx }));
+                                      setDailyPracticeSubmitted((prev) => ({ ...prev, [qKey]: true }));
+                                    }}
+                                    className={`w-full p-3.5 rounded-xl border text-left text-xs font-mono transition flex items-center justify-between ${
+                                      submitted
+                                        ? isCorrectOpt
+                                          ? 'bg-emerald-950/40 border-emerald-500 text-emerald-300'
+                                          : selected === oIdx
+                                          ? 'bg-rose-950/40 border-rose-500 text-rose-300'
+                                          : 'bg-slate-900 border-slate-800 text-slate-400'
+                                        : selected === oIdx
+                                        ? 'bg-[#006cd2]/20 border-[#006cd2] text-white'
+                                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300'
+                                    }`}
+                                  >
+                                    <span>{opt}</span>
+                                    {submitted && isCorrectOpt && <Check className="w-4 h-4 text-emerald-400 shrink-0" />}
+                                  </button>
+                                );
+                              })}
+
+                              {dailyPracticeSubmitted[`daily_q_${currentSessionDay}_grammar`] && (
+                                <p className="text-xs text-slate-400 font-mono pt-2">
+                                  Explanation: {activeDailyPlan.pillars.grammar.practiceQuiz.explanation}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Practice 1: Vocabulary Fill-In-The-Blank */}
+                        {currentPillarIdx === 1 && (
+                          <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                            <p className="text-sm font-bold text-white">
+                              {activeDailyPlan.pillars.vocabulary.practiceDrill.prompt}
+                            </p>
+
+                            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs sm:text-sm font-mono text-cyan-300">
+                              &ldquo;{activeDailyPlan.pillars.vocabulary.practiceDrill.fillInBlankSentence}&rdquo;
+                            </div>
+
+                            <div className="space-y-2">
+                              <span className="text-[11px] font-mono text-slate-400">
+                                Hint: {activeDailyPlan.pillars.vocabulary.practiceDrill.hint}
+                              </span>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Type the missing executive word..."
+                                  value={dailyPracticeSelections[`daily_vocab_${currentSessionDay}`] || ''}
+                                  onChange={(e) =>
+                                    setDailyPracticeSelections((prev) => ({
+                                      ...prev,
+                                      [`daily_vocab_${currentSessionDay}`]: e.target.value,
+                                    }))
+                                  }
+                                  className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-400 flex-1"
+                                />
+                                <button
+                                  onClick={() =>
+                                    setDailyPracticeSubmitted((prev) => ({
+                                      ...prev,
+                                      [`daily_vocab_${currentSessionDay}`]: true,
+                                    }))
+                                  }
+                                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-xl text-xs font-mono transition"
+                                >
+                                  Check
+                                </button>
+                              </div>
+
+                              {dailyPracticeSubmitted[`daily_vocab_${currentSessionDay}`] && (
+                                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono">
+                                  Expected Word: <span className="text-emerald-400 font-bold">{activeDailyPlan.pillars.vocabulary.practiceDrill.missingWord}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Practice 2: Speaking Outline Builder */}
+                        {currentPillarIdx === 2 && (
+                          <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                            <span className="text-xs font-mono uppercase text-blue-400 font-bold block">
+                              Mental Outline Preparation:
+                            </span>
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                              Before recording in Step 3, organize your thoughts into three 20-second blocks:
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+                              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                                <span className="text-blue-400 font-bold">0–20s: Hook &amp; Claim</span>
+                                <p className="text-slate-400 text-[11px]">Clear declarative statement without hesitation.</p>
+                              </div>
+                              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                                <span className="text-cyan-400 font-bold">20–60s: Technical Proof</span>
+                                <p className="text-slate-400 text-[11px]">2 concrete engineering examples &amp; trade-offs.</p>
+                              </div>
+                              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                                <span className="text-emerald-400 font-bold">60–90s: Impact &amp; Close</span>
+                                <p className="text-slate-400 text-[11px]">Summary metric and crisp executive finish.</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Practice 3: Listening Comprehension Check */}
+                        {currentPillarIdx === 3 && (
+                          <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                            <p className="text-sm font-bold text-white">
+                              {activeDailyPlan.pillars.listeningShadowing.comprehensionQuestion.question}
+                            </p>
+
+                            <div className="space-y-2">
+                              {activeDailyPlan.pillars.listeningShadowing.comprehensionQuestion.options.map((opt, oIdx) => {
+                                const qKey = `daily_listening_${currentSessionDay}`;
+                                const selected = dailyPracticeSelections[qKey];
+                                const submitted = dailyPracticeSubmitted[qKey];
+                                const isCorrectOpt = oIdx === activeDailyPlan.pillars.listeningShadowing.comprehensionQuestion.correctIndex;
+
+                                return (
+                                  <button
+                                    key={oIdx}
+                                    onClick={() => {
+                                      setDailyPracticeSelections((prev) => ({ ...prev, [qKey]: oIdx }));
+                                      setDailyPracticeSubmitted((prev) => ({ ...prev, [qKey]: true }));
+                                    }}
+                                    className={`w-full p-3.5 rounded-xl border text-left text-xs font-mono transition flex items-center justify-between ${
+                                      submitted
+                                        ? isCorrectOpt
+                                          ? 'bg-emerald-950/40 border-emerald-500 text-emerald-300'
+                                          : selected === oIdx
+                                          ? 'bg-rose-950/40 border-rose-500 text-rose-300'
+                                          : 'bg-slate-900 border-slate-800 text-slate-400'
+                                        : selected === oIdx
+                                        ? 'bg-[#006cd2]/20 border-[#006cd2] text-white'
+                                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300'
+                                    }`}
+                                  >
+                                    <span>{opt}</span>
+                                    {submitted && isCorrectOpt && <Check className="w-4 h-4 text-emerald-400 shrink-0" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Practice 4: Technical 5-Step Ordering Drill */}
+                        {currentPillarIdx === 4 && (
+                          <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                            <span className="text-xs font-mono uppercase text-cyan-400 font-bold block">
+                              5-Step Structure Verification:
+                            </span>
+                            <div className="space-y-2 text-xs font-mono">
+                              {[
+                                '1. Definition — What is it in one clear sentence?',
+                                '2. Explanation — How does it work under the hood?',
+                                '3. Example — What is a concrete API/code illustration?',
+                                '4. Use Case — Why did you choose it over alternatives?',
+                                '5. Conclusion — What is the overarching engineering impact?',
+                              ].map((step, idx) => (
+                                <div key={idx} className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-2">
+                                  <Check className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>{step}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Practice 5: Interview STAR Alignment */}
+                        {currentPillarIdx === 5 && (
+                          <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                            <span className="text-xs font-mono uppercase text-purple-400 font-bold block">
+                              STAR Framework Check:
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800">
+                                <span className="text-purple-400 font-bold block mb-1">Situation &amp; Task</span>
+                                <p className="text-slate-400 text-[11px]">Set the scene in under 20 seconds. Highlight business risk or latency problem.</p>
+                              </div>
+                              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800">
+                                <span className="text-cyan-400 font-bold block mb-1">Action &amp; Result</span>
+                                <p className="text-slate-400 text-[11px]">Detail YOUR specific technical actions and state a measurable percentage outcome.</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ============================================================= */}
+                    {/* STEP 3: SPEAK (LIVE AUDIO RECORDING STUDIO) */}
+                    {/* ============================================================= */}
+                    {currentStepIdx === 2 && (
+                      <div className="space-y-6">
+                        <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-mono uppercase font-bold text-blue-400 tracking-wider">
+                              Step 3 of 5 &bull; Timed Speech Recording Studio
+                            </span>
+                            <h3 className="text-xl font-bold font-display text-white">
+                              Live Voice Delivery &amp; Articulation
+                            </h3>
+                          </div>
+
+                          <button
+                            onClick={handleAdvanceDailyStepOrPillar}
+                            className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-sans font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-orange-500/20"
+                          >
+                            <span>Proceed to Review</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Recording Studio Box */}
+                        <div className="p-8 rounded-3xl bg-slate-950 border border-slate-800 text-center space-y-6 relative overflow-hidden">
+                          <div className="space-y-2 max-w-xl mx-auto">
+                            <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest">
+                              Speaking Prompt:
+                            </span>
+                            <h4 className="text-lg font-bold font-display text-white">
+                              {currentPillarIdx === 0 && `Explain the SVO sentence rule and give 2 correct examples in under 45 seconds.`}
+                              {currentPillarIdx === 1 && `Use all 3 vocabulary words in a single cohesive 60-second standup or architecture explanation.`}
+                              {currentPillarIdx === 2 && activeDailyPlan.pillars.speaking.prompt}
+                              {currentPillarIdx === 3 && `Shadow the speaker transcript with natural cadence, pausing, and accent clarity.`}
+                              {currentPillarIdx === 4 && activeDailyPlan.pillars.technicalComm.prompt}
+                              {currentPillarIdx === 5 && activeDailyPlan.pillars.professionalInterview.prompt}
+                            </h4>
+                          </div>
+
+                          {/* Live Timer Display */}
+                          <div className="flex items-center justify-center gap-3">
+                            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 font-mono text-3xl sm:text-4xl font-black text-white flex items-center gap-3">
+                              <Clock className={`w-6 h-6 ${dailyIsRecording ? 'text-rose-500 animate-pulse' : 'text-slate-400'}`} />
+                              <span>{Math.floor(dailyRecordDuration / 60)}:{(dailyRecordDuration % 60).toString().padStart(2, '0')}</span>
+                            </div>
+                          </div>
+
+                          {/* Action Controls */}
+                          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+                            {!dailyIsRecording ? (
+                              <button
+                                onClick={startDailyStudioRecording}
+                                className="px-8 py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-sans font-bold rounded-2xl text-sm transition shadow-lg shadow-rose-600/30 flex items-center gap-2"
+                              >
+                                <Mic className="w-4 h-4" />
+                                <span>{dailyAudioUrl ? 'Re-Record Audio' : 'Start Recording Voice'}</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={stopDailyStudioRecording}
+                                className="px-8 py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-sans font-bold rounded-2xl text-sm transition border border-slate-700 flex items-center gap-2"
+                              >
+                                <Square className="w-4 h-4 text-rose-400 fill-current" />
+                                <span>Stop Recording</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Audio Playback if Recorded */}
+                          {dailyAudioUrl && (
+                            <div className="pt-4 max-w-md mx-auto space-y-2">
+                              <span className="text-[11px] font-mono text-emerald-400 block font-bold">
+                                ✓ Recording Saved Locally
+                              </span>
+                              <audio controls src={dailyAudioUrl} className="w-full h-10 rounded-xl" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ============================================================= */}
+                    {/* STEP 4: REVIEW (COMPARISON, FEEDBACK & SELF-RATING) */}
+                    {/* ============================================================= */}
+                    {currentStepIdx === 3 && (
+                      <div className="space-y-6">
+                        <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-mono uppercase font-bold text-amber-400 tracking-wider">
+                              Step 4 of 5 &bull; Review &amp; Self-Calibration
+                            </span>
+                            <h3 className="text-xl font-bold font-display text-white">
+                              Evaluate Fluency, Fillers &amp; Delivery
+                            </h3>
+                          </div>
+
+                          <button
+                            onClick={handleAdvanceDailyStepOrPillar}
+                            className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-sans font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-orange-500/20"
+                          >
+                            <span>Complete Pillar</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Model Comparison Box */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                            <span className="font-mono text-xs text-cyan-400 font-bold uppercase">
+                              Ideal Executive Model Delivery:
+                            </span>
+                            <p className="text-xs sm:text-sm text-slate-200 italic leading-relaxed">
+                              {currentPillarIdx === 0 && `&ldquo;I ran the Python script yesterday to benchmark response times. My name is Swamy, and I lead backend API development.&rdquo;`}
+                              {currentPillarIdx === 1 && `&ldquo;We investigated the latency bottleneck and implemented Redis caching to ensure horizontal scalability.&rdquo;`}
+                              {currentPillarIdx === 2 && `&ldquo;${activeDailyPlan.pillars.speaking.sampleAudioTranscript}&rdquo;`}
+                              {currentPillarIdx === 3 && `&ldquo;${activeDailyPlan.pillars.listeningShadowing.audioTranscript}&rdquo;`}
+                              {currentPillarIdx === 4 && `&ldquo;${activeDailyPlan.pillars.technicalComm.sampleResponse}&rdquo;`}
+                              {currentPillarIdx === 5 && `&ldquo;${activeDailyPlan.pillars.professionalInterview.sampleExecutiveResponse}&rdquo;`}
+                            </p>
+                          </div>
+
+                          {/* Calibration Star Rating & Filler Counter */}
+                          <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4 flex flex-col justify-between">
+                            <div className="space-y-3">
+                              <span className="font-mono text-xs text-amber-400 font-bold uppercase block">
+                                Fluency Self-Rating:
+                              </span>
+                              <div className="flex items-center gap-2">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    onClick={() => setDailySelfRating(star)}
+                                    className={`p-2 rounded-xl transition ${
+                                      dailySelfRating >= star
+                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                                        : 'bg-slate-900 border border-slate-800 text-slate-600'
+                                    }`}
+                                  >
+                                    <Star className="w-5 h-5 fill-current" />
+                                  </button>
+                                ))}
+                                <span className="font-mono text-xs text-slate-400 pl-2">
+                                  {dailySelfRating}/5 Stars
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <span className="font-mono text-xs text-rose-400 font-bold uppercase block">
+                                Filler Words Count (umm / like / basically):
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => setDailyFillerCount((prev) => Math.max(0, prev - 1))}
+                                  className="w-8 h-8 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono font-bold"
+                                >
+                                  -
+                                </button>
+                                <span className="font-mono text-base font-bold text-white w-8 text-center">
+                                  {dailyFillerCount}
+                                </span>
+                                <button
+                                  onClick={() => setDailyFillerCount((prev) => prev + 1)}
+                                  className="w-8 h-8 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono font-bold"
+                                >
+                                  +
+                                </button>
+                                <span className="text-[11px] font-mono text-slate-400">
+                                  Goal: Zero fillers
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Reflection Notes */}
+                        <div className="space-y-2">
+                          <span className="font-mono text-xs text-slate-400 uppercase font-semibold">
+                            Pillar Takeaway / Personal Notes:
+                          </span>
+                          <textarea
+                            rows={3}
+                            value={dailyReflectionNote}
+                            onChange={(e) => setDailyReflectionNote(e.target.value)}
+                            placeholder="Note down any pronunciation slips, power connectors you liked, or vocabulary nuances..."
+                            className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500 resize-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ============================================================= */}
+                    {/* STEP 5: COMPLETE (PILLAR WRAP-UP & ADVANCE) */}
+                    {/* ============================================================= */}
+                    {currentStepIdx === 4 && (
+                      <div className="p-8 rounded-3xl bg-slate-950 border border-emerald-500/40 text-center space-y-6">
+                        <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto">
+                          <CheckCircle2 className="w-8 h-8" />
+                        </div>
+
+                        <div className="space-y-2 max-w-lg mx-auto">
+                          <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest">
+                            Pillar {currentPillarIdx + 1} of 6 Completed
+                          </span>
+                          <h3 className="text-2xl font-bold font-display text-white">
+                            {currentPillarIdx === 0 && 'Grammar Accuracy Mastered'}
+                            {currentPillarIdx === 1 && 'Executive Vocabulary Integrated'}
+                            {currentPillarIdx === 2 && 'Timed Speaking Prompt Delivered'}
+                            {currentPillarIdx === 3 && 'Speech Shadowing Completed'}
+                            {currentPillarIdx === 4 && '5-Step Technical Explanation Structured'}
+                            {currentPillarIdx === 5 && 'Executive Interview Response Polished'}
+                          </h3>
+                          <p className="text-xs text-slate-400">
+                            Your performance and audio recording have been persisted.
+                          </p>
+                        </div>
+
+                        <div className="pt-2 flex justify-center">
+                          {currentPillarIdx < 5 ? (
+                            <button
+                              onClick={handleAdvanceDailyStepOrPillar}
+                              className="px-8 py-3.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-sans font-bold rounded-2xl text-xs transition flex items-center gap-2 shadow-lg shadow-orange-500/25"
+                            >
+                              <span>Proceed to Pillar {currentPillarIdx + 2}: {DAILY_PILLARS_CONFIG[currentPillarIdx + 1].title}</span>
+                              <ArrowRight className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setDailyDayCompleteModal(true)}
+                              className="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-sans font-bold rounded-2xl text-xs transition flex items-center gap-2 shadow-lg shadow-emerald-500/25"
+                            >
+                              <span>Finish &amp; Lock In Day {currentSessionDay} Completion</span>
+                              <Award className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-
-                  <button
-                    onClick={() => handleCompleteDailyPart('speech')}
-                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-sans font-bold rounded-xl text-xs transition flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Mark Speech Done</span>
-                  </button>
                 </div>
+              )}
 
-                {/* Step 2: Grammar Fix */}
-                <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-emerald-400 uppercase">
-                        Drill 2: Grammar Polish
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {dailyMission.grammarDrill.rule}
-                      </span>
-                    </div>
-
-                    <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300">
-                      <span className="font-bold">Incorrect: </span>
-                      &ldquo;{dailyMission.grammarDrill.sentenceWithFlaw}&rdquo;
-                    </div>
-
-                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-300">
-                      <span className="font-bold">Correct: </span>
-                      &ldquo;{dailyMission.grammarDrill.correctSentence}&rdquo;
-                    </div>
-
-                    <p className="text-[11px] text-slate-400 italic">
-                      Tip: {dailyMission.grammarDrill.hint}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => handleCompleteDailyPart('grammar')}
-                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-sans font-bold rounded-xl text-xs transition flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Mark Grammar Done</span>
-                  </button>
-                </div>
-
-                {/* Step 3: Vocabulary Booster */}
-                <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-amber-400 uppercase">
-                        Drill 3: Word of the Day
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {dailyMission.vocabularyWord.category}
-                      </span>
-                    </div>
-
+              {/* ===================================================================== */}
+              {/* SUB-VIEW 2: COMPLETED LESSONS HISTORY */}
+              {/* ===================================================================== */}
+              {dailySubView === 'history' && (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                     <div>
-                      <div className="text-xl font-bold font-display text-white">
-                        {dailyMission.vocabularyWord.term}
-                      </div>
-                      <div className="text-xs font-mono text-amber-300">
-                        {dailyMission.vocabularyWord.phonetic}
-                      </div>
+                      <h3 className="text-xl font-bold font-display text-white flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        <span>Completed Daily Training History</span>
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Verified records saved to Cloud Firestore &amp; LocalStorage
+                      </p>
                     </div>
-
-                    <p className="text-xs text-slate-300">
-                      {dailyMission.vocabularyWord.definition}
-                    </p>
-
-                    <p className="text-[11px] text-slate-400 italic">
-                      Example: &ldquo;{dailyMission.vocabularyWord.sampleSentences[0]}&rdquo;
-                    </p>
+                    <span className="font-mono text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-3 py-1.5 rounded-xl">
+                      {(userState?.completedDailyLessons || []).length} Days Completed
+                    </span>
                   </div>
 
-                  <button
-                    onClick={() => handleCompleteDailyPart('vocab')}
-                    className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-sans font-bold rounded-xl text-xs transition flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Mark Word Mastered</span>
-                  </button>
+                  {(userState?.completedDailyLessons || []).length === 0 ? (
+                    <div className="text-center py-12 space-y-3">
+                      <Clock className="w-10 h-10 text-slate-600 mx-auto" />
+                      <p className="text-sm font-mono text-slate-400">
+                        No completed daily training days recorded yet.
+                      </p>
+                      <button
+                        onClick={() => setDailySubView('session')}
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white font-mono text-xs rounded-xl"
+                      >
+                        Start Day 1 Training Now
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(userState?.completedDailyLessons || []).map((rec) => (
+                        <div
+                          key={rec.id}
+                          className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-bold">
+                              Day {rec.dayNumber} Complete
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-500">
+                              {rec.dateStr}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center text-xs font-mono">
+                            <span className="text-slate-400">Time Spent: {rec.timeSpentMinutes} min</span>
+                            <span className="text-amber-400 flex items-center gap-1">
+                              <Star className="w-3.5 h-3.5 fill-current" /> {rec.selfRating}/5 Rating
+                            </span>
+                          </div>
+
+                          {rec.journalSummary && (
+                            <p className="text-xs text-slate-300 italic bg-slate-900 p-3 rounded-xl border border-slate-800/80">
+                              &ldquo;{rec.journalSummary}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
+
+              {/* ===================================================================== */}
+              {/* SUB-VIEW 3: UPCOMING ROADMAP */}
+              {/* ===================================================================== */}
+              {dailySubView === 'upcoming' && (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <div>
+                      <h3 className="text-xl font-bold font-display text-white flex items-center gap-2">
+                        <Calendar className="w-5 h-5 text-cyan-400" />
+                        <span>Upcoming Daily Lessons Roadmap</span>
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Next 6 days in chronological curriculum sequence
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {upcomingTrainingPlans.map((plan) => (
+                      <div
+                        key={plan.dayNumber}
+                        className="p-5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-xs font-mono">
+                            <span className="text-orange-400 font-bold">DAY {plan.dayNumber}</span>
+                            <span className="text-slate-600">&bull;</span>
+                            <span className="text-cyan-400">{plan.levelTitle}</span>
+                            <span className="text-slate-600">&bull;</span>
+                            <span className="text-slate-400">{plan.estimatedMinutes} min</span>
+                          </div>
+
+                          <h4 className="text-sm sm:text-base font-bold font-display text-white">
+                            {plan.title}
+                          </h4>
+
+                          <p className="text-xs text-slate-300 line-clamp-2">
+                            {plan.objective}
+                          </p>
+                        </div>
+
+                        <div className="shrink-0 font-mono text-xs text-slate-500 border border-slate-800 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                          Locked until Day {plan.dayNumber - 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ===================================================================== */}
+              {/* SUB-VIEW 4: WEEKLY TARGET & CONSISTENCY */}
+              {/* ===================================================================== */}
+              {dailySubView === 'target' && (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <div>
+                      <h3 className="text-xl font-bold font-display text-white flex items-center gap-2">
+                        <Target className="w-5 h-5 text-orange-400" />
+                        <span>Weekly Target &amp; Habit Tracker</span>
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Deterministic streak verified against completed lessons and logs
+                      </p>
+                    </div>
+
+                    <div className="font-mono text-sm font-bold text-orange-400 bg-orange-950/40 border border-orange-800/40 px-4 py-2 rounded-xl flex items-center gap-2">
+                      <Flame className="w-4 h-4 fill-orange-400" />
+                      <span>{metrics.trainingStreak} Day Streak</span>
+                    </div>
+                  </div>
+
+                  {/* 7-Day Consistency Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-7 gap-3">
+                    {Array.from({ length: 7 }).map((_, idx) => {
+                      const now = new Date();
+                      const dayDate = new Date(now.getTime() - (6 - idx) * 24 * 60 * 60 * 1000);
+                      const dateKey = dayDate.toISOString().split('T')[0];
+                      const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'short' });
+                      const isComplete =
+                        (userState?.completedDailyLessons || []).some((l) => l.dateStr === dateKey) ||
+                        userState?.dailyTrainingLogs[dateKey]?.completed;
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-4 rounded-2xl border text-center space-y-2 ${
+                            isComplete
+                              ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-500'
+                          }`}
+                        >
+                          <div className="text-xs font-mono uppercase font-bold">{dayName}</div>
+                          <div className="w-8 h-8 rounded-full mx-auto flex items-center justify-center border font-mono text-xs font-bold ${isComplete ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400' : 'bg-slate-900 border-slate-800 text-slate-600'}">
+                            {isComplete ? '✓' : idx + 1}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-400">
+                            {isComplete ? 'Done' : 'Rest / Open'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Day Completion Confirmation Modal */}
+              <AnimatePresence>
+                {dailyDayCompleteModal && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+                  >
+                    <motion.div
+                      initial={{ scale: 0.95, y: 10 }}
+                      animate={{ scale: 1, y: 0 }}
+                      exit={{ scale: 0.95, y: 10 }}
+                      className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-lg w-full space-y-6 shadow-2xl text-center"
+                    >
+                      <div className="w-16 h-16 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-400 flex items-center justify-center mx-auto">
+                        <Flame className="w-8 h-8 fill-current" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <h3 className="text-2xl font-bold font-display text-white">
+                          Day {currentSessionDay} Training Completed!
+                        </h3>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          You have successfully completed all 6 communication pillars: Grammar, Vocabulary, Speaking, Listening, Technical Communication, and Interview Mastery.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                        <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                          <span className="text-slate-400 block text-[11px]">Time Invested</span>
+                          <span className="text-white font-bold text-base">{activeDailyPlan.estimatedMinutes} min</span>
+                        </div>
+                        <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                          <span className="text-slate-400 block text-[11px]">New Streak</span>
+                          <span className="text-orange-400 font-bold text-base">{metrics.trainingStreak + 1} Days</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          onClick={() => setDailyDayCompleteModal(false)}
+                          className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-xs rounded-xl"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleFinalizeDailyDay}
+                          className="px-6 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-orange-500/25"
+                        >
+                          Save &amp; Unlock Next Day
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
 
