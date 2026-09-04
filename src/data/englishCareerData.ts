@@ -1077,3 +1077,6 @@ export function getDailyMicroMission(dateStr?: string): DailyMicroMission {
     quickTip: 'Record your voice once without pausing. Listen back and count your filler words.',
   };
 }
+
+export * from './englishCareerCurriculum';
+

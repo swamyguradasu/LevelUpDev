@@ -21,6 +21,16 @@ import {
   VocabularyItem,
   SpeakingPrompt,
   GrammarTopic,
+  ALL_CURRICULUM_LEVELS,
+  CURRICULUM_CATEGORIES,
+  CurriculumLevel,
+  CurriculumModule,
+  CurriculumTopic,
+  getAllCurriculumLevels,
+  getCurriculumLevelById,
+  getCurriculumModuleById,
+  getCurriculumTopicById,
+  getTotalCurriculumTopicsCount,
 } from '@/data/englishCareerData';
 import {
   getEnglishCareerState,
@@ -71,16 +81,21 @@ import {
   AlertCircle,
   HelpCircle,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   Bookmark,
   BookmarkCheck,
   UserCheck,
   Sliders,
   Send,
+  GraduationCap,
+  Compass,
+  Zap,
 } from 'lucide-react';
 
 type ActiveTab =
   | 'dashboard'
+  | 'curriculum'
   | 'daily'
   | 'grammar'
   | 'vocabulary'
@@ -95,6 +110,7 @@ type ActiveTab =
 
 const NAVIGATION_TABS: Array<{ id: ActiveTab; label: string; icon: any }> = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
+  { id: 'curriculum', label: 'Curriculum (10 Levels)', icon: Layers },
   { id: 'daily', label: 'Daily Training', icon: Flame },
   { id: 'grammar', label: 'Grammar', icon: CheckCircle2 },
   { id: 'vocabulary', label: 'Vocabulary', icon: BookOpen },
@@ -131,8 +147,12 @@ function EnglishCareerContent() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedVocabCategory, setSelectedVocabCategory] = useState<string>('All');
-  const [activeFlashcardIndex, setActiveFlashcardIndex] = useState<number>(0);
-  const [showFlashcardBack, setShowFlashcardBack] = useState<boolean>(false);
+
+  // Curriculum Explorer State
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
+  const [selectedLevelId, setSelectedLevelId] = useState<string>(ALL_CURRICULUM_LEVELS[0].id);
+  const [selectedModuleId, setSelectedModuleId] = useState<string>(ALL_CURRICULUM_LEVELS[0].modules[0]?.id || '');
+  const [selectedTopicId, setSelectedTopicId] = useState<string>(ALL_CURRICULUM_LEVELS[0].modules[0]?.topics[0]?.id || '');
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -401,6 +421,47 @@ function EnglishCareerContent() {
       console.error('Error saving assessment result:', err);
     }
   };
+
+  // Active Curriculum Level & Module
+  const activeCurriculumLevel: CurriculumLevel = useMemo(() => {
+    return getCurriculumLevelById(selectedLevelId) || ALL_CURRICULUM_LEVELS[0];
+  }, [selectedLevelId]);
+
+  const activeCurriculumModule: CurriculumModule = useMemo(() => {
+    const found = activeCurriculumLevel.modules.find((m) => m.id === selectedModuleId);
+    return found || activeCurriculumLevel.modules[0] || ALL_CURRICULUM_LEVELS[0].modules[0];
+  }, [activeCurriculumLevel, selectedModuleId]);
+
+  const activeCurriculumTopic: CurriculumTopic = useMemo(() => {
+    const found = activeCurriculumModule.topics.find((t) => t.id === selectedTopicId);
+    return found || activeCurriculumModule.topics[0] || ALL_CURRICULUM_LEVELS[0].modules[0].topics[0];
+  }, [activeCurriculumModule, selectedTopicId]);
+
+  // Handle Level Selection
+  const handleSelectLevel = (level: CurriculumLevel) => {
+    setSelectedLevelId(level.id);
+    if (level.modules.length > 0) {
+      setSelectedModuleId(level.modules[0].id);
+      if (level.modules[0].topics.length > 0) {
+        setSelectedTopicId(level.modules[0].topics[0].id);
+      }
+    }
+  };
+
+  // Handle Module Selection
+  const handleSelectModule = (module: CurriculumModule) => {
+    setSelectedModuleId(module.id);
+    if (module.topics.length > 0) {
+      setSelectedTopicId(module.topics[0].id);
+    }
+  };
+
+  // Total topics completed across the 10-level curriculum
+  const totalCurriculumTopicsCount = useMemo(() => getTotalCurriculumTopicsCount(), []);
+  const completedCurriculumCount = useMemo(() => {
+    if (!userState) return 0;
+    return userState.completedTopicIds.length;
+  }, [userState]);
 
   // =========================================================================
   // ACCESS CONTROL SECURITY GUARD
@@ -819,7 +880,31 @@ function EnglishCareerContent() {
 
               {/* Quick Jump Modules Cards */}
               <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Card 1: Today's Daily Training */}
+                {/* Card 1: 10-Level Curriculum */}
+                <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 font-mono text-xs font-bold">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>10-LEVEL CURRICULUM</span>
+                    </div>
+                    <h3 className="text-lg font-bold font-display text-white">
+                      Full 30-Module Roadmap
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Structured progression from Sentence Foundations to Advanced Job-Ready Leadership.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleTabChange('curriculum')}
+                    className="w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-sans font-bold rounded-xl transition text-xs flex items-center justify-center gap-2"
+                  >
+                    <span>Explore 10 Levels</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Card 2: Today's Daily Training */}
                 <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4 flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 text-orange-400 font-mono text-xs font-bold">
@@ -843,7 +928,7 @@ function EnglishCareerContent() {
                   </button>
                 </div>
 
-                {/* Card 2: Speaking Sandbox */}
+                {/* Card 3: Speaking Sandbox */}
                 <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4 flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 font-mono text-xs font-bold">
@@ -866,36 +951,386 @@ function EnglishCareerContent() {
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
-
-                {/* Card 3: Diagnostic Assessment */}
-                <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-mono text-xs font-bold">
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>WEEKLY BENCHMARK</span>
-                    </div>
-                    <h3 className="text-lg font-bold font-display text-white">
-                      Diagnostic Communication Assessment
-                    </h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Evaluate technical grammar, executive vocabulary precision, and diplomatic judgment.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => handleTabChange('assessment')}
-                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-sans font-bold rounded-xl transition text-xs flex items-center justify-center gap-2"
-                  >
-                    <span>Take Weekly Assessment</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
               </section>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* 2. DAILY TRAINING TAB */}
+          {/* 2. FULL 10-LEVEL CURRICULUM EXPLORER TAB */}
+          {/* ========================================================================= */}
+          {activeTab === 'curriculum' && (
+            <div className="space-y-8">
+              {/* Category Filter Tabs */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-bold font-display text-white flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-cyan-400" />
+                      <span>10-Level Career Communication Curriculum</span>
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Category &rarr; Level &rarr; Module &rarr; Topic &rarr; Lesson &rarr; Practice
+                    </p>
+                  </div>
+
+                  <div className="font-mono text-xs text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                    {completedCurriculumCount} / {totalCurriculumTopicsCount} Topics Mastered
+                  </div>
+                </div>
+
+                {/* Categories Bar */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                  {['All', ...CURRICULUM_CATEGORIES.map((c) => c.title)].map((catTitle) => (
+                    <button
+                      key={catTitle}
+                      onClick={() => setSelectedCategoryFilter(catTitle)}
+                      className={`px-3.5 py-1.5 rounded-xl font-mono text-xs whitespace-nowrap transition ${
+                        selectedCategoryFilter === catTitle
+                          ? 'bg-[#006cd2] text-white font-bold shadow-md shadow-blue-500/25'
+                          : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {catTitle}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Level Selector Pills */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+                {ALL_CURRICULUM_LEVELS.map((lvl) => {
+                  const isSelected = selectedLevelId === lvl.id;
+                  const levelTopics = lvl.modules.flatMap((m) => m.topics);
+                  const completedInLevel = levelTopics.filter((t) => userState?.completedTopicIds.includes(t.id)).length;
+                  const isLevelDone = completedInLevel === levelTopics.length && levelTopics.length > 0;
+
+                  return (
+                    <button
+                      key={lvl.id}
+                      onClick={() => handleSelectLevel(lvl)}
+                      className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-1.5 ${
+                        isSelected
+                          ? 'bg-blue-600/20 border-blue-500 shadow-lg shadow-blue-500/15'
+                          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold text-cyan-400">
+                          {lvl.levelCode}
+                        </span>
+                        {isLevelDone && (
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        )}
+                      </div>
+                      <div className="text-xs font-bold text-white font-display line-clamp-1">
+                        {lvl.title.replace('LEVEL ', '')}
+                      </div>
+                      <span className="text-[9px] font-mono text-slate-500 block truncate">
+                        {lvl.weeks}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Module and Topic Master-Detail Workspace */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Left Column: Modules & Topic Selector */}
+                <div className="lg:col-span-4 space-y-4">
+                  <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="font-mono text-xs font-bold text-cyan-400">
+                        {activeCurriculumLevel.levelCode}: {activeCurriculumLevel.title}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300">
+                      {activeCurriculumLevel.objective}
+                    </p>
+                  </div>
+
+                  {/* Modules Accordion / List */}
+                  <div className="space-y-3">
+                    {activeCurriculumLevel.modules.map((mod) => {
+                      const isModSelected = activeCurriculumModule.id === mod.id;
+                      return (
+                        <div
+                          key={mod.id}
+                          className={`rounded-2xl border transition overflow-hidden ${
+                            isModSelected
+                              ? 'bg-slate-900/90 border-blue-500/40'
+                              : 'bg-slate-900/40 border-slate-800'
+                          }`}
+                        >
+                          <button
+                            onClick={() => handleSelectModule(mod)}
+                            className="w-full text-left p-4 flex items-center justify-between gap-2"
+                          >
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] font-mono uppercase text-blue-400 font-bold block">
+                                Module {mod.moduleNumber} (~{mod.estimatedMinutes} min)
+                              </span>
+                              <div className="text-sm font-bold text-white font-display">
+                                {mod.title}
+                              </div>
+                            </div>
+                            <ChevronRight
+                              className={`w-4 h-4 text-slate-500 transition-transform ${
+                                isModSelected ? 'rotate-90 text-blue-400' : ''
+                              }`}
+                            />
+                          </button>
+
+                          {/* Topics List under active module */}
+                          {isModSelected && (
+                            <div className="px-3 pb-3 space-y-1.5 border-t border-slate-800/60 pt-2">
+                              {mod.topics.map((top) => {
+                                const isTopSelected = activeCurriculumTopic.id === top.id;
+                                const isTopDone = userState?.completedTopicIds.includes(top.id);
+                                return (
+                                  <button
+                                    key={top.id}
+                                    onClick={() => setSelectedTopicId(top.id)}
+                                    className={`w-full text-left p-2.5 rounded-xl font-mono text-xs transition flex items-center justify-between ${
+                                      isTopSelected
+                                        ? 'bg-[#006cd2] text-white font-bold shadow-sm'
+                                        : 'bg-slate-950/60 text-slate-300 hover:bg-slate-950 hover:text-white'
+                                    }`}
+                                  >
+                                    <span className="truncate pr-2">{top.title}</span>
+                                    {isTopDone ? (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                                    ) : (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Right Column: Deep-Dive Lesson & Practice Viewer */}
+                <div className="lg:col-span-8 space-y-6">
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
+                    {/* Lesson Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                          <span className="text-cyan-400 font-bold">{activeCurriculumLevel.levelCode}</span>
+                          <span>&bull;</span>
+                          <span>Module {activeCurriculumModule.moduleNumber}</span>
+                        </div>
+                        <h3 className="text-2xl font-bold font-display text-white">
+                          {activeCurriculumTopic.title}
+                        </h3>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openNoteEditor(activeCurriculumTopic.id)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 flex items-center gap-1.5"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Notes</span>
+                        </button>
+                        <button
+                          onClick={() => handleToggleBookmark(activeCurriculumTopic.id)}
+                          className={`p-2 rounded-xl border text-xs font-mono transition ${
+                            userState?.bookmarkedIds.includes(activeCurriculumTopic.id)
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                              : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <Bookmark className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleTopic(activeCurriculumTopic.id)}
+                          className={`px-4 py-1.5 rounded-xl font-mono text-xs font-bold transition flex items-center gap-1.5 ${
+                            userState?.completedTopicIds.includes(activeCurriculumTopic.id)
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-[#006cd2] text-white hover:bg-blue-600'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>
+                            {userState?.completedTopicIds.includes(activeCurriculumTopic.id)
+                              ? 'Completed'
+                              : 'Mark Complete'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Summary & Core Concept */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1.5">
+                        <span className="font-mono text-[10px] uppercase font-bold text-cyan-400">
+                          Core Concept:
+                        </span>
+                        <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                          {activeCurriculumTopic.coreConcept}
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1.5">
+                        <span className="font-mono text-[10px] uppercase font-bold text-emerald-400">
+                          Why It Matters:
+                        </span>
+                        <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                          {activeCurriculumTopic.whyItMatters}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Lesson Overview & Key Points */}
+                    <div className="space-y-3">
+                      <div className="text-xs font-mono uppercase text-slate-400 font-semibold">
+                        Lesson Breakdown:
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        {activeCurriculumTopic.lessonContent.overview}
+                      </p>
+                      <ul className="space-y-1.5 pt-1">
+                        {activeCurriculumTopic.lessonContent.keyPoints.map((pt, pIdx) => (
+                          <li key={pIdx} className="text-xs text-slate-300 flex items-start gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#006cd2] mt-1.5 shrink-0" />
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Telugu-to-English Translation Pitfall Alert */}
+                    {activeCurriculumTopic.lessonContent.teluguPitfallNote && (
+                      <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 space-y-1 text-xs">
+                        <div className="flex items-center gap-2 text-amber-400 font-bold font-mono">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>Telugu-to-English Translation Pitfall Notice:</span>
+                        </div>
+                        <p className="text-amber-200/90 leading-relaxed">
+                          {activeCurriculumTopic.lessonContent.teluguPitfallNote}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Reusable Templates / Patterns if present */}
+                    {activeCurriculumTopic.lessonContent.templatesOrPatterns && (
+                      <div className="space-y-3 pt-2">
+                        <div className="text-xs font-mono uppercase text-slate-400 font-semibold">
+                          Reusable Sentence Patterns &amp; Formulas:
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          {activeCurriculumTopic.lessonContent.templatesOrPatterns.map((tpl, tIdx) => (
+                            <div
+                              key={tIdx}
+                              className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 text-xs"
+                            >
+                              <div className="font-mono text-cyan-400 font-bold">{tpl.pattern}</div>
+                              <p className="text-slate-300 italic">&ldquo;{tpl.example}&rdquo;</p>
+                              <span className="text-[10px] font-mono text-slate-500 block">
+                                Context: {tpl.usageTip}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Interactive Practice Workspace for Topic */}
+                    <div className="p-6 rounded-2xl bg-slate-950 border border-blue-500/30 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono font-bold text-blue-400 uppercase flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5" />
+                          Interactive Practice Exercise
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400 uppercase">
+                          Type: {activeCurriculumTopic.practice.type}
+                        </span>
+                      </div>
+
+                      <p className="text-xs sm:text-sm font-bold text-white">
+                        {activeCurriculumTopic.practice.prompt}
+                      </p>
+
+                      {/* If Quiz Practice */}
+                      {activeCurriculumTopic.practice.options && (
+                        <div className="space-y-2">
+                          {activeCurriculumTopic.practice.options.map((opt, oIdx) => {
+                            const selected = quizSelections[activeCurriculumTopic.practice.id];
+                            const submitted = quizSubmitted[activeCurriculumTopic.practice.id];
+                            return (
+                              <button
+                                key={oIdx}
+                                onClick={() => {
+                                  setQuizSelections((prev) => ({
+                                    ...prev,
+                                    [activeCurriculumTopic.practice.id]: oIdx,
+                                  }));
+                                  setQuizSubmitted((prev) => ({
+                                    ...prev,
+                                    [activeCurriculumTopic.practice.id]: true,
+                                  }));
+                                }}
+                                className={`w-full text-left p-3 rounded-xl font-mono text-xs transition border flex items-center justify-between ${
+                                  submitted
+                                    ? oIdx === activeCurriculumTopic.practice.correctIndex
+                                      ? 'bg-emerald-950/40 border-emerald-500 text-emerald-300'
+                                      : selected === oIdx
+                                      ? 'bg-rose-950/40 border-rose-500 text-rose-300'
+                                      : 'bg-slate-900 border-slate-800 text-slate-400'
+                                    : selected === oIdx
+                                    ? 'bg-[#006cd2]/20 border-[#006cd2] text-white'
+                                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300'
+                                }`}
+                              >
+                                <span>{opt}</span>
+                              </button>
+                            );
+                          })}
+                          {quizSubmitted[activeCurriculumTopic.practice.id] && (
+                            <p className="text-xs text-slate-400 font-mono pt-1">
+                              Explanation: {activeCurriculumTopic.practice.explanation}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* If Speech / Explanation Practice */}
+                      {activeCurriculumTopic.practice.sampleAnswer && (
+                        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+                          <span className="font-mono text-[10px] text-cyan-400 uppercase font-bold">
+                            Model Spoken Answer:
+                          </span>
+                          <p className="text-slate-200 italic leading-relaxed">
+                            &ldquo;{activeCurriculumTopic.practice.sampleAnswer}&rdquo;
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Tips & Rubrics */}
+                      {activeCurriculumTopic.practice.rubricOrTips && (
+                        <div className="text-[11px] text-slate-400 font-mono space-y-1">
+                          <span className="text-slate-500 uppercase font-bold block">Evaluation Rubric:</span>
+                          <ul className="list-disc list-inside space-y-0.5">
+                            {activeCurriculumTopic.practice.rubricOrTips.map((tip, tIdx) => (
+                              <li key={tIdx}>{tip}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* 3. DAILY TRAINING TAB */}
           {/* ========================================================================= */}
           {activeTab === 'daily' && (
             <div className="space-y-8">
@@ -1036,7 +1471,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 3. GRAMMAR TAB */}
+          {/* 4. GRAMMAR TAB */}
           {/* ========================================================================= */}
           {activeTab === 'grammar' && (
             <div className="space-y-6">
@@ -1195,7 +1630,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 4. VOCABULARY TAB */}
+          {/* 5. VOCABULARY TAB */}
           {/* ========================================================================= */}
           {activeTab === 'vocabulary' && (
             <div className="space-y-6">
@@ -1320,7 +1755,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 5. SPEAKING & PRONUNCIATION TAB */}
+          {/* 6. SPEAKING & PRONUNCIATION TAB */}
           {/* ========================================================================= */}
           {activeTab === 'speaking' && (
             <div className="space-y-8">
@@ -1535,7 +1970,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 6. LISTENING TAB */}
+          {/* 7. LISTENING TAB */}
           {/* ========================================================================= */}
           {activeTab === 'listening' && (
             <div className="space-y-6">
@@ -1643,7 +2078,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 7. TECHNICAL ENGLISH TAB */}
+          {/* 8. TECHNICAL ENGLISH TAB */}
           {/* ========================================================================= */}
           {activeTab === 'technical' && (
             <div className="space-y-6">
@@ -1760,7 +2195,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 8. INTERVIEW ENGLISH TAB */}
+          {/* 9. INTERVIEW ENGLISH TAB */}
           {/* ========================================================================= */}
           {activeTab === 'interview' && (
             <div className="space-y-6">
@@ -1856,7 +2291,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 9. PROFESSIONAL EMAIL TAB */}
+          {/* 10. PROFESSIONAL EMAIL TAB */}
           {/* ========================================================================= */}
           {activeTab === 'professional' && (
             <div className="space-y-6">
@@ -1933,7 +2368,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 10. WEEKLY ASSESSMENT TAB */}
+          {/* 11. WEEKLY ASSESSMENT TAB */}
           {/* ========================================================================= */}
           {activeTab === 'assessment' && (
             <div className="space-y-6">
@@ -2030,7 +2465,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 11. SPEAKING JOURNAL TAB */}
+          {/* 12. SPEAKING JOURNAL TAB */}
           {/* ========================================================================= */}
           {activeTab === 'journal' && (
             <div className="space-y-6">
@@ -2109,7 +2544,7 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 12. PROGRESS OVERVIEW TAB */}
+          {/* 13. PROGRESS OVERVIEW TAB */}
           {/* ========================================================================= */}
           {activeTab === 'progress' && (
             <div className="space-y-8">
@@ -2222,4 +2657,3 @@ export default function EnglishCareerTrainerPage() {
     </React.Suspense>
   );
 }
-
