@@ -93,6 +93,29 @@ export interface CompletedDailyLessonRecord {
   journalSummary?: string;
 }
 
+export type MistakeCategory =
+  | 'tense'
+  | 'articles'
+  | 'prepositions'
+  | 'sentence_structure'
+  | 'vocabulary'
+  | 'word_order'
+  | 'pronunciation_notes'
+  | 'filler_words';
+
+export interface TrackedMistakeRecord {
+  id: string;
+  category: MistakeCategory;
+  categoryLabel?: string;
+  originalSnippet: string;
+  correctedSnippet: string;
+  explanation: string;
+  occurrenceCount: number;
+  lastSeenAt: string;
+  firstSeenAt: string;
+  resolved?: boolean;
+}
+
 export interface EnglishCareerUserState {
   userId: string;
   email: string;
@@ -102,6 +125,7 @@ export interface EnglishCareerUserState {
   bookmarkedIds: string[];
   notes: Record<string, { topicId: string; noteText: string; updatedAt: string }>;
   journalEntries: SpeakingJournalEntry[];
+  trackedMistakes?: TrackedMistakeRecord[];
   assessmentHistory: AssessmentResultRecord[];
   dailyTrainingLogs: Record<string, DailyTrainingLog>; // dateStr -> Log
   activeDailySession?: DailyTrainingSessionState;
@@ -150,6 +174,7 @@ export function createEmptyEnglishCareerState(email: string): EnglishCareerUserS
     bookmarkedIds: [],
     notes: {},
     journalEntries: [],
+    trackedMistakes: [],
     assessmentHistory: [],
     dailyTrainingLogs: {},
     activeDailySession: undefined,
@@ -727,4 +752,107 @@ export async function completeDailyTrainingDay(
   await saveEnglishCareerState(nextState);
   return nextState;
 }
+
+/**
+ * Record or increment occurrence count for detected mistakes.
+ */
+export async function recordDetectedMistakes(
+  currentState: EnglishCareerUserState,
+  detectedList: Array<{
+    category: MistakeCategory;
+    categoryLabel?: string;
+    originalSnippet: string;
+    correctedSnippet: string;
+    explanation: string;
+  }>
+): Promise<EnglishCareerUserState> {
+  const existing = [...(currentState.trackedMistakes || [])];
+  const now = new Date().toISOString();
+
+  for (const item of detectedList) {
+    const cleanOrig = item.originalSnippet.trim().toLowerCase();
+    const foundIdx = existing.findIndex(
+      (m) =>
+        m.category === item.category &&
+        (m.originalSnippet.trim().toLowerCase() === cleanOrig || m.explanation === item.explanation)
+    );
+
+    if (foundIdx >= 0) {
+      existing[foundIdx] = {
+        ...existing[foundIdx],
+        occurrenceCount: existing[foundIdx].occurrenceCount + 1,
+        lastSeenAt: now,
+        correctedSnippet: item.correctedSnippet,
+        resolved: false,
+      };
+    } else {
+      existing.unshift({
+        id: `mstk_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        category: item.category,
+        categoryLabel: item.categoryLabel,
+        originalSnippet: item.originalSnippet,
+        correctedSnippet: item.correctedSnippet,
+        explanation: item.explanation,
+        occurrenceCount: 1,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        resolved: false,
+      });
+    }
+  }
+
+  const nextState: EnglishCareerUserState = {
+    ...currentState,
+    trackedMistakes: existing,
+    updatedAt: now,
+  };
+
+  await saveEnglishCareerState(nextState);
+  return nextState;
+}
+
+/**
+ * Toggle resolved status of a tracked mistake.
+ */
+export async function toggleMistakeResolved(
+  currentState: EnglishCareerUserState,
+  mistakeId: string
+): Promise<EnglishCareerUserState> {
+  const existing = [...(currentState.trackedMistakes || [])];
+  const idx = existing.findIndex((m) => m.id === mistakeId);
+  if (idx >= 0) {
+    existing[idx] = {
+      ...existing[idx],
+      resolved: !existing[idx].resolved,
+    };
+  }
+
+  const nextState: EnglishCareerUserState = {
+    ...currentState,
+    trackedMistakes: existing,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveEnglishCareerState(nextState);
+  return nextState;
+}
+
+/**
+ * Delete a tracked mistake record.
+ */
+export async function deleteTrackedMistake(
+  currentState: EnglishCareerUserState,
+  mistakeId: string
+): Promise<EnglishCareerUserState> {
+  const existing = (currentState.trackedMistakes || []).filter((m) => m.id !== mistakeId);
+  const nextState: EnglishCareerUserState = {
+    ...currentState,
+    trackedMistakes: existing,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveEnglishCareerState(nextState);
+  return nextState;
+}
+
 

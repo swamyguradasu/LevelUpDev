@@ -53,6 +53,11 @@ import {
   createEmptyEnglishCareerState,
   SpeakingJournalEntry,
   deleteSpeakingJournalEntry,
+  recordDetectedMistakes,
+  toggleMistakeResolved,
+  deleteTrackedMistake,
+  TrackedMistakeRecord,
+  MistakeCategory,
 } from '@/lib/englishCareerStorage';
 import {
   DailyTrainingPlan,
@@ -68,6 +73,13 @@ import {
   getSpeakingExercisesByMode,
   getRandomSpeakingExercise,
 } from '@/data/englishSpeakingTrainerData';
+import {
+  analyzeAndCorrectEnglish,
+  EnglishCorrectionResult,
+  MISTAKE_CATEGORIES_CONFIG,
+  PRESET_CORRECTION_EXAMPLES,
+  DetectedMistake,
+} from '@/data/englishCorrectionEngine';
 import {
   Mic,
   MicOff,
@@ -225,6 +237,15 @@ function EnglishCareerContent() {
   // Journal Filter State
   const [journalFilterMode, setJournalFilterMode] = useState<string>('all');
   const [journalSearchQuery, setJournalSearchQuery] = useState<string>('');
+
+  // Speaking Journal Sub-Tabs & English Correction Interface State
+  const [journalSubTab, setJournalSubTab] = useState<'archive' | 'correction' | 'mistakes'>('archive');
+  const [correctionInputText, setCorrectionInputText] = useState<string>(
+    'Yesterday I go college and I discuss about my project with my friend.'
+  );
+  const [correctionResult, setCorrectionResult] = useState<EnglishCorrectionResult | null>(null);
+  const [isAnalyzingCorrection, setIsAnalyzingCorrection] = useState<boolean>(false);
+  const [mistakesCategoryFilter, setMistakesCategoryFilter] = useState<string>('all');
 
   // Quiz & Assessment Interactive State
   const [quizSelections, setQuizSelections] = useState<Record<string, number>>({});
@@ -816,6 +837,53 @@ function EnglishCareerContent() {
       showNotification('Journal entry deleted.');
     } catch (err) {
       console.error('Error deleting journal entry:', err);
+    }
+  };
+
+  // =========================================================================
+  // ENGLISH CORRECTION & MISTAKES TRACKER HANDLERS
+  // =========================================================================
+  const handleAnalyzeCorrection = async (textToAnalyze?: string) => {
+    const text = textToAnalyze !== undefined ? textToAnalyze : correctionInputText;
+    if (!text.trim()) {
+      showNotification('Please enter a sentence to analyze.');
+      return;
+    }
+    setIsAnalyzingCorrection(true);
+    try {
+      const result = analyzeAndCorrectEnglish(text);
+      setCorrectionResult(result);
+      if (userState && result.detectedMistakes.length > 0) {
+        const updated = await recordDetectedMistakes(userState, result.detectedMistakes);
+        setUserState(updated);
+      }
+      showNotification('✨ Sentence analyzed! Generated Correct, Why, Natural & Professional versions.');
+    } catch (e) {
+      console.error('Error analyzing sentence:', e);
+    } finally {
+      setIsAnalyzingCorrection(false);
+    }
+  };
+
+  const handleToggleMistakeResolved = async (mistakeId: string) => {
+    if (!userState) return;
+    try {
+      const updated = await toggleMistakeResolved(userState, mistakeId);
+      setUserState(updated);
+      showNotification('Mistake status updated.');
+    } catch (e) {
+      console.error('Error toggling mistake status:', e);
+    }
+  };
+
+  const handleDeleteMistake = async (mistakeId: string) => {
+    if (!userState) return;
+    try {
+      const updated = await deleteTrackedMistake(userState, mistakeId);
+      setUserState(updated);
+      showNotification('Removed mistake from tracking.');
+    } catch (e) {
+      console.error('Error deleting mistake:', e);
     }
   };
 
@@ -4390,10 +4458,12 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 12. SPEAKING JOURNAL TAB */}
+          {/* 12. SPEAKING JOURNAL, CORRECTION STUDIO & COMMON MISTAKES TAB */}
           {/* ========================================================================= */}
           {activeTab === 'journal' && (() => {
             const allEntries = userState?.journalEntries || [];
+            const allMistakes = userState?.trackedMistakes || [];
+
             const filteredEntries = allEntries.filter((entry) => {
               const matchesMode =
                 journalFilterMode === 'all' ||
@@ -4409,13 +4479,35 @@ function EnglishCareerContent() {
               return matchesMode && matchesQuery;
             });
 
+            const filteredMistakes = allMistakes.filter((m) => {
+              if (mistakesCategoryFilter === 'all') return true;
+              if (mistakesCategoryFilter === 'unresolved') return !m.resolved;
+              if (mistakesCategoryFilter === 'resolved') return !!m.resolved;
+              return m.category === mistakesCategoryFilter;
+            });
+
+            // Calculate category frequency counts
+            const mistakeCategoryCounts: Record<string, number> = {};
+            MISTAKE_CATEGORIES_CONFIG.forEach((c) => {
+              mistakeCategoryCounts[c.category] = 0;
+            });
+            allMistakes.forEach((m) => {
+              mistakeCategoryCounts[m.category] = (mistakeCategoryCounts[m.category] || 0) + m.occurrenceCount;
+            });
+
+            // Sort categories by frequency to prioritize top repeated mistakes
+            const prioritizedCategories = [...MISTAKE_CATEGORIES_CONFIG].sort((a, b) => {
+              const countA = mistakeCategoryCounts[a.category] || 0;
+              const countB = mistakeCategoryCounts[b.category] || 0;
+              return countB - countA;
+            });
+
             const avgConfidence = allEntries.length > 0
               ? (allEntries.reduce((acc, curr) => acc + (curr.confidenceScore || curr.selfRating || 4), 0) / allEntries.length).toFixed(1)
               : '0.0';
             const totalMinutes = Math.round(
               allEntries.reduce((acc, curr) => acc + (curr.durationSeconds || 60), 0) / 60
             );
-            const totalFillers = allEntries.reduce((acc, curr) => acc + (curr.fillerWordCount || 0), 0);
             const allNewWords = Array.from(
               new Set(
                 allEntries.flatMap((e) =>
@@ -4426,290 +4518,756 @@ function EnglishCareerContent() {
 
             return (
               <div className="space-y-6">
-                {/* Header */}
+                {/* Header with Sub-Navigation Tabs */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                   <div>
                     <h2 className="text-2xl font-bold font-display text-white flex items-center gap-2">
                       <MessageSquare className="w-6 h-6 text-blue-400" />
-                      <span>Speaking Journal &amp; Self-Reflection Archive</span>
+                      <span>Speaking Journal &amp; English Correction Studio</span>
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                      Review past speech recordings, track struggles, catalog new words, and observe filler word reductions over time.
+                      Log your speech sessions, analyze sentences with instant explanations, and target your repeated mistakes.
                     </p>
                   </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      onClick={() => handleTabChange('speaking')}
+                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-mono text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                    >
+                      <Mic className="w-4 h-4" />
+                      <span>Speaking Studio</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sub-Navigation Tabs Strip */}
+                <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800">
                   <button
-                    onClick={() => handleTabChange('speaking')}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-mono text-xs font-bold rounded-xl transition flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-blue-500/20"
+                    type="button"
+                    onClick={() => setJournalSubTab('archive')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 ${
+                      journalSubTab === 'archive'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
                   >
-                    <Mic className="w-4 h-4" />
-                    <span>New Speaking Session</span>
+                    <FileText className="w-4 h-4" />
+                    <span>Speech Logs ({allEntries.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setJournalSubTab('correction')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 ${
+                      journalSubTab === 'correction'
+                        ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/25'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4 text-cyan-300" />
+                    <span>AI English Correction Interface</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setJournalSubTab('mistakes')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 ${
+                      journalSubTab === 'mistakes'
+                        ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-500/25'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <AlertCircle className="w-4 h-4 text-amber-300" />
+                    <span>My Common Mistakes ({allMistakes.length})</span>
                   </button>
                 </div>
 
-                {/* Metrics Summary Strip */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-                    <span className="text-[10px] font-mono text-blue-400 uppercase font-bold">
-                      TOTAL SESSIONS
-                    </span>
-                    <div className="text-2xl font-bold font-display text-white">
-                      {allEntries.length}
+                {/* ========================================================================= */}
+                {/* SUB-TAB 1: AI ENGLISH CORRECTION INTERFACE */}
+                {/* ========================================================================= */}
+                {journalSubTab === 'correction' && (
+                  <div className="space-y-6">
+                    {/* Supportive Philosophy Banner */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-cyan-950/30 to-slate-900 border border-blue-500/30 flex items-start gap-3">
+                      <Sparkles className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1 text-xs">
+                        <span className="font-mono font-bold text-white uppercase">
+                          Supportive &amp; Practical Speech Refinement
+                        </span>
+                        <p className="text-slate-300 leading-relaxed">
+                          Type or paste what you tried to say during practice. The engine analyzes tense consistency, preposition drops, and generates natural conversational and executive workplace versions.
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-slate-400">Speech logs recorded</p>
-                  </div>
 
-                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-                    <span className="text-[10px] font-mono text-amber-400 uppercase font-bold">
-                      AVG CONFIDENCE
-                    </span>
-                    <div className="text-2xl font-bold font-display text-amber-400 flex items-center gap-1.5">
-                      <span>{avgConfidence}</span>
-                      <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                    </div>
-                    <p className="text-[11px] text-slate-400">Out of 5.0 rating scale</p>
-                  </div>
+                    {/* Correction Input Studio */}
+                    <div className="p-6 sm:p-7 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-xl">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <label className="text-xs font-mono font-bold text-slate-300 uppercase flex items-center gap-2">
+                          <span>Enter What You Tried to Say:</span>
+                        </label>
+                        <span className="text-[11px] font-mono text-slate-500">
+                          {correctionInputText.length} characters
+                        </span>
+                      </div>
 
-                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-                    <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">
-                      SPEAKING TIME
-                    </span>
-                    <div className="text-2xl font-bold font-display text-cyan-400">
-                      {totalMinutes}m
-                    </div>
-                    <p className="text-[11px] text-slate-400">Total verbal delivery</p>
-                  </div>
+                      {/* Textarea */}
+                      <textarea
+                        rows={3}
+                        value={correctionInputText}
+                        onChange={(e) => setCorrectionInputText(e.target.value)}
+                        placeholder="e.g. Yesterday I go college and I discuss about my project with my friend."
+                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-sm font-sans text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none leading-relaxed"
+                      />
 
-                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-                    <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold">
-                      WORDS CATALOGED
-                    </span>
-                    <div className="text-2xl font-bold font-display text-emerald-400">
-                      {allNewWords.length}
-                    </div>
-                    <p className="text-[11px] text-slate-400">New active vocabulary</p>
-                  </div>
-                </div>
+                      {/* Preset Try-Out Examples */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold block">
+                          Try Common Practice Examples:
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {PRESET_CORRECTION_EXAMPLES.map((ex, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setCorrectionInputText(ex.sentence);
+                                handleAnalyzeCorrection(ex.sentence);
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-mono transition text-left"
+                            >
+                              💡 {ex.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                {/* Filter & Search Toolbar */}
-                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  {/* Mode Filter Pills */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setJournalFilterMode('all')}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition ${
-                        journalFilterMode === 'all'
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                      }`}
-                    >
-                      All Modes ({allEntries.length})
-                    </button>
-                    {SPEAKING_MODES_CONFIG.map((m) => {
-                      const count = allEntries.filter((e) => e.modeId === m.id).length;
-                      return (
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
                         <button
-                          key={m.id}
                           type="button"
-                          onClick={() => setJournalFilterMode(m.id)}
+                          onClick={() => {
+                            setCorrectionInputText('');
+                            setCorrectionResult(null);
+                          }}
+                          className="px-4 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-400 hover:text-white transition"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAnalyzeCorrection()}
+                          disabled={isAnalyzingCorrection || !correctionInputText.trim()}
+                          className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-sans font-bold rounded-xl text-xs transition flex items-center gap-2 shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          <span>{isAnalyzingCorrection ? 'Analyzing...' : 'Analyze & Refine English'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Correction Results Display Card */}
+                    {correctionResult && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-blue-500/30 space-y-6 shadow-2xl"
+                      >
+                        {/* 1. CORRECT VERSION */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-mono text-emerald-400 font-bold uppercase flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>CORRECT VERSION:</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(correctionResult.correctedText, 'corr_correct')}
+                              className="text-xs font-mono text-slate-400 hover:text-white flex items-center gap-1 bg-slate-950 border border-slate-800 px-2.5 py-1 rounded-lg"
+                            >
+                              {copiedId === 'corr_correct' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedId === 'corr_correct' ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                          <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/40 text-sm sm:text-base font-semibold text-emerald-200 leading-relaxed">
+                            &ldquo;{correctionResult.correctedText}&rdquo;
+                          </div>
+                        </div>
+
+                        {/* 2. WHY (Detailed Rule Reasoning) */}
+                        <div className="space-y-2">
+                          <span className="text-xs font-mono text-cyan-400 font-bold uppercase flex items-center gap-2">
+                            <HelpCircle className="w-4 h-4" />
+                            <span>WHY (Grammar &amp; Usage Explanations):</span>
+                          </span>
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                            <ul className="space-y-2 text-xs sm:text-sm text-slate-200">
+                              {correctionResult.whyExplanations.map((exp, idx) => (
+                                <li key={idx} className="flex items-start gap-2.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0 mt-2" />
+                                  <span className="leading-relaxed">{exp}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+
+                        {/* 3. NATURAL & PROFESSIONAL VERSIONS (2-Column Grid) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                          {/* Natural Version */}
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-blue-800/40 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-mono text-blue-400 uppercase font-bold flex items-center gap-1.5">
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>NATURAL CONVERSATIONAL:</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(correctionResult.naturalVersion, 'corr_nat')}
+                                className="text-[10px] font-mono text-slate-400 hover:text-white"
+                              >
+                                {copiedId === 'corr_nat' ? '✓ Copied' : 'Copy'}
+                              </button>
+                            </div>
+                            <p className="text-xs sm:text-sm text-slate-200 italic leading-relaxed">
+                              &ldquo;{correctionResult.naturalVersion}&rdquo;
+                            </p>
+                          </div>
+
+                          {/* Professional Version */}
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-indigo-800/40 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-mono text-indigo-400 uppercase font-bold flex items-center gap-1.5">
+                                <Briefcase className="w-3.5 h-3.5" />
+                                <span>PROFESSIONAL / EXECUTIVE:</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(correctionResult.professionalVersion, 'corr_prof')}
+                                className="text-[10px] font-mono text-slate-400 hover:text-white"
+                              >
+                                {copiedId === 'corr_prof' ? '✓ Copied' : 'Copy'}
+                              </button>
+                            </div>
+                            <p className="text-xs sm:text-sm text-slate-200 italic leading-relaxed">
+                              &ldquo;{correctionResult.professionalVersion}&rdquo;
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 4. Detected Mistakes & Tracking Pill */}
+                        {correctionResult.detectedMistakes.length > 0 && (
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono text-amber-400 uppercase font-bold flex items-center gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span>Tracked Mistakes in this sentence:</span>
+                              </span>
+                              <span className="text-[10px] font-mono text-emerald-400">
+                                ✓ Auto-saved to &ldquo;My Common Mistakes&rdquo;
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {correctionResult.detectedMistakes.map((dm) => (
+                                <div
+                                  key={dm.id}
+                                  className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-1"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-mono text-[10px] uppercase font-bold text-cyan-400">
+                                      {dm.categoryLabel}
+                                    </span>
+                                    <span className="text-rose-400 line-through text-[11px]">
+                                      {dm.originalSnippet}
+                                    </span>
+                                  </div>
+                                  <div className="text-emerald-300 font-bold text-xs">
+                                    → {dm.correctedSnippet}
+                                  </div>
+                                  <p className="text-[11px] text-slate-400 pt-0.5">
+                                    {dm.supportiveTip}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Encouragement Note */}
+                        <div className="p-3.5 rounded-2xl bg-blue-950/20 border border-blue-800/30 text-xs font-sans text-blue-300 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+                          <span>{correctionResult.encouragementNote}</span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* SUB-TAB 2: MY COMMON MISTAKES (PRIORITIZED FOCUS) */}
+                {/* ========================================================================= */}
+                {journalSubTab === 'mistakes' && (
+                  <div className="space-y-6">
+                    {/* Tone & Philosophy Card */}
+                    <div className="p-5 rounded-3xl bg-gradient-to-r from-amber-950/30 via-slate-900 to-slate-900 border border-amber-500/30 space-y-2">
+                      <div className="flex items-center gap-2 text-white font-bold font-display text-base">
+                        <AlertCircle className="w-5 h-5 text-amber-400" />
+                        <span>Supportive Error Analytics: Focus on High-Frequency Habits</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        Rather than studying random grammar textbooks, this system pinpoints your personal speech habits (such as tense shifts or extra prepositions like &ldquo;discuss about&rdquo;). Master these patterns one by one to elevate your speaking confidence.
+                      </p>
+                    </div>
+
+                    {/* 8 Mistake Categories Tally Grid (Ordered by Priority) */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono text-slate-400 uppercase font-bold tracking-wider">
+                          Recurring Mistake Patterns (Prioritized by Occurrence)
+                        </span>
+                        <span className="text-[11px] font-mono text-cyan-400">
+                          {allMistakes.reduce((acc, m) => acc + m.occurrenceCount, 0)} Total Occurrences
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {prioritizedCategories.map((catMeta) => {
+                          const count = mistakeCategoryCounts[catMeta.category] || 0;
+                          const isTop = count > 0 && count === Math.max(...Object.values(mistakeCategoryCounts));
+
+                          return (
+                            <div
+                              key={catMeta.category}
+                              className={`p-4 rounded-2xl border text-left transition space-y-2 ${
+                                count > 0
+                                  ? 'bg-slate-900/90 border-slate-800'
+                                  : 'bg-slate-950/60 border-slate-900 opacity-60'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-mono uppercase font-bold text-slate-400">
+                                  {catMeta.category.replace('_', ' ')}
+                                </span>
+                                {isTop && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-mono font-bold">
+                                    TOP FOCUS
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="text-2xl font-bold font-display text-white">
+                                {count} <span className="text-xs text-slate-500 font-normal">times</span>
+                              </div>
+
+                              <p className="text-[11px] text-slate-400 line-clamp-2 leading-tight">
+                                {catMeta.shortDesc}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Filter toolbar for Mistakes Feed */}
+                    <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {['all', 'unresolved', 'resolved', 'tense', 'prepositions', 'articles', 'vocabulary', 'sentence_structure'].map((filterKey) => (
+                          <button
+                            key={filterKey}
+                            type="button"
+                            onClick={() => setMistakesCategoryFilter(filterKey)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition capitalize ${
+                              mistakesCategoryFilter === filterKey
+                                ? 'bg-amber-600 text-white shadow-md'
+                                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                            }`}
+                          >
+                            {filterKey.replace('_', ' ')}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setJournalSubTab('correction')}
+                        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                      >
+                        <span>+ Test Sentence in Correction Studio</span>
+                      </button>
+                    </div>
+
+                    {/* Tracked Mistakes List */}
+                    {filteredMistakes.length === 0 ? (
+                      <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-4">
+                        <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+                        <div className="space-y-1">
+                          <h3 className="text-base font-bold text-white">
+                            {allMistakes.length === 0 ? 'No Common Mistakes Logged Yet' : 'No Mistakes Matching Filter'}
+                          </h3>
+                          <p className="text-xs text-slate-400 max-w-md mx-auto">
+                            {allMistakes.length === 0
+                              ? 'Enter sentences into the AI English Correction Studio. Detected grammar slips will automatically be cataloged here to build personalized drills.'
+                              : 'Adjust your filter to view all tracked mistakes.'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setJournalSubTab('correction')}
+                          className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-xs font-mono font-bold"
+                        >
+                          Open Correction Studio
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {filteredMistakes.map((mistake) => (
+                          <div
+                            key={mistake.id}
+                            className={`p-6 rounded-3xl border transition space-y-3 ${
+                              mistake.resolved
+                                ? 'bg-slate-950/60 border-slate-900 opacity-60'
+                                : 'bg-slate-900/90 border-slate-800'
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-mono uppercase font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  {mistake.category.replace('_', ' ')}
+                                </span>
+                                <span className="text-xs font-mono text-slate-400">
+                                  Seen {mistake.occurrenceCount} {mistake.occurrenceCount === 1 ? 'time' : 'times'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleMistakeResolved(mistake.id)}
+                                  className={`px-3 py-1 rounded-xl text-xs font-mono font-bold transition flex items-center gap-1.5 border ${
+                                    mistake.resolved
+                                      ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                  }`}
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>{mistake.resolved ? 'Mastered ✓' : 'Mark Mastered'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMistake(mistake.id)}
+                                  title="Delete mistake"
+                                  className="p-1.5 text-slate-500 hover:text-rose-400 transition"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Comparison */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                              <div className="p-3 rounded-xl bg-rose-500/5 border border-rose-500/20 space-y-1">
+                                <span className="text-[10px] font-mono text-rose-400 uppercase font-bold">
+                                  Identified Slip:
+                                </span>
+                                <p className="text-rose-300 font-mono font-semibold">
+                                  &ldquo;{mistake.originalSnippet}&rdquo;
+                                </p>
+                              </div>
+
+                              <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-1">
+                                <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold">
+                                  Recommended Form:
+                                </span>
+                                <p className="text-emerald-300 font-mono font-bold">
+                                  &ldquo;{mistake.correctedSnippet}&rdquo;
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Explanation */}
+                            <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                              <b className="text-slate-200">Why: </b>{mistake.explanation}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* SUB-TAB 3: SPEECH SESSIONS ARCHIVE */}
+                {/* ========================================================================= */}
+                {journalSubTab === 'archive' && (
+                  <div className="space-y-6">
+                    {/* Metrics Summary Strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <span className="text-[10px] font-mono text-blue-400 uppercase font-bold">
+                          TOTAL SESSIONS
+                        </span>
+                        <div className="text-2xl font-bold font-display text-white">
+                          {allEntries.length}
+                        </div>
+                        <p className="text-[11px] text-slate-400">Speech logs recorded</p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <span className="text-[10px] font-mono text-amber-400 uppercase font-bold">
+                          AVG CONFIDENCE
+                        </span>
+                        <div className="text-2xl font-bold font-display text-amber-400 flex items-center gap-1.5">
+                          <span>{avgConfidence}</span>
+                          <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                        </div>
+                        <p className="text-[11px] text-slate-400">Out of 5.0 rating scale</p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">
+                          SPEAKING TIME
+                        </span>
+                        <div className="text-2xl font-bold font-display text-cyan-400">
+                          {totalMinutes}m
+                        </div>
+                        <p className="text-[11px] text-slate-400">Total verbal delivery</p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold">
+                          WORDS CATALOGED
+                        </span>
+                        <div className="text-2xl font-bold font-display text-emerald-400">
+                          {allNewWords.length}
+                        </div>
+                        <p className="text-[11px] text-slate-400">New active vocabulary</p>
+                      </div>
+                    </div>
+
+                    {/* Filter & Search Toolbar */}
+                    <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      {/* Mode Filter Pills */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setJournalFilterMode('all')}
                           className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition ${
-                            journalFilterMode === m.id
+                            journalFilterMode === 'all'
                               ? 'bg-blue-600 text-white shadow-md'
                               : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
                           }`}
                         >
-                          {m.title.replace(/^\d+\.\s*/, '')} ({count})
+                          All Modes ({allEntries.length})
                         </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Search box */}
-                  <div className="relative w-full md:w-64">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="text"
-                      placeholder="Search reflections, words..."
-                      value={journalSearchQuery}
-                      onChange={(e) => setJournalSearchQuery(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Journal Entries List */}
-                {filteredEntries.length === 0 ? (
-                  <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-4">
-                    <Mic className="w-12 h-12 text-slate-600 mx-auto" />
-                    <div className="space-y-1">
-                      <h3 className="text-base font-bold text-white">
-                        {allEntries.length === 0 ? 'No Speaking Sessions Recorded Yet' : 'No Matching Journal Entries'}
-                      </h3>
-                      <p className="text-xs text-slate-400 max-w-md mx-auto">
-                        {allEntries.length === 0
-                          ? 'Select one of the 8 practice modes in the Speaking Studio, run your timed drill, and log your reflection.'
-                          : 'Try adjusting your mode filter or search query.'}
-                      </p>
+                        {SPEAKING_MODES_CONFIG.map((m) => {
+                          const count = allEntries.filter((e) => e.modeId === m.id).length;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setJournalFilterMode(m.id)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition ${
+                                journalFilterMode === m.id
+                              ? 'bg-blue-600 text-white shadow-md'
+                              : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                            }`}
+                          >
+                            {m.title.replace(/^\d+\.\s*/, '')} ({count})
+                          </button>
+                        );
+                      })}
                     </div>
-                    <button
-                      onClick={() => handleTabChange('speaking')}
-                      className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-mono font-bold shadow-lg shadow-blue-500/20"
-                    >
-                      Open Speaking Studio
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-5">
-                    {filteredEntries.map((entry) => {
-                      const modeConfig = SPEAKING_MODES_CONFIG.find((m) => m.id === entry.modeId);
-                      const rating = entry.confidenceScore || entry.selfRating || 4;
 
-                      return (
-                        <div
-                          key={entry.id}
-                          className="p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 hover:border-slate-700 transition"
-                        >
-                          {/* Entry Header */}
-                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-mono uppercase font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                                  {modeConfig?.title || entry.promptCategory || 'Speaking Practice'}
-                                </span>
-                                <span className="text-[10px] font-mono text-slate-400">
-                                  {entry.dateStr}
-                                </span>
+                    {/* Search box */}
+                    <div className="relative w-full md:w-64">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="Search reflections, words..."
+                        value={journalSearchQuery}
+                        onChange={(e) => setJournalSearchQuery(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Journal Entries List */}
+                  {filteredEntries.length === 0 ? (
+                    <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-4">
+                      <Mic className="w-12 h-12 text-slate-600 mx-auto" />
+                      <div className="space-y-1">
+                        <h3 className="text-base font-bold text-white">
+                          {allEntries.length === 0 ? 'No Speaking Sessions Recorded Yet' : 'No Matching Journal Entries'}
+                        </h3>
+                        <p className="text-xs text-slate-400 max-w-md mx-auto">
+                          {allEntries.length === 0
+                            ? 'Select one of the 8 practice modes in the Speaking Studio, run your timed drill, and log your reflection.'
+                            : 'Try adjusting your mode filter or search query.'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleTabChange('speaking')}
+                        className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-mono font-bold shadow-lg shadow-blue-500/20"
+                      >
+                        Open Speaking Studio
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {filteredEntries.map((entry) => {
+                        const modeConfig = SPEAKING_MODES_CONFIG.find((m) => m.id === entry.modeId);
+                        const rating = entry.confidenceScore || entry.selfRating || 4;
+
+                        return (
+                          <div
+                            key={entry.id}
+                            className="p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 hover:border-slate-700 transition"
+                          >
+                            {/* Entry Header */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-mono uppercase font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                    {modeConfig?.title || entry.promptCategory || 'Speaking Practice'}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    {entry.dateStr}
+                                  </span>
+                                </div>
+                                <h4 className="text-lg font-bold font-display text-white">
+                                  {entry.title}
+                                </h4>
                               </div>
-                              <h4 className="text-lg font-bold font-display text-white">
-                                {entry.title}
-                              </h4>
+
+                              {/* Badges & Actions */}
+                              <div className="flex items-center gap-3">
+                                {/* Confidence Score */}
+                                <div className="flex items-center gap-1 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                                  <span className="text-[10px] font-mono text-slate-400 mr-1">CONFIDENCE:</span>
+                                  <div className="flex items-center gap-0.5">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <Star
+                                        key={star}
+                                        className={`w-3.5 h-3.5 ${rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-700'}`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <span className="text-xs font-mono font-bold text-amber-400 ml-1">
+                                    {rating}/5
+                                  </span>
+                                </div>
+
+                                {/* Duration Badge */}
+                                <div className="hidden sm:flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 font-mono text-xs text-slate-300">
+                                  <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>{entry.durationSeconds || 60}s</span>
+                                </div>
+
+                                {/* Fillers Count */}
+                                {entry.fillerWordCount !== undefined && (
+                                  <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 font-mono text-xs text-rose-400">
+                                    {entry.fillerWordCount} Fillers
+                                  </div>
+                                )}
+
+                                {/* Delete button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteJournalEntry(entry.id)}
+                                  title="Delete this journal entry"
+                                  className="p-2 bg-slate-950 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-500/40 rounded-xl text-slate-500 hover:text-rose-400 transition"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
 
-                            {/* Badges & Actions */}
-                            <div className="flex items-center gap-3">
-                              {/* Confidence Score */}
-                              <div className="flex items-center gap-1 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-                                <span className="text-[10px] font-mono text-slate-400 mr-1">CONFIDENCE:</span>
-                                <div className="flex items-center gap-0.5">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <Star
-                                      key={star}
-                                      className={`w-3.5 h-3.5 ${rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-700'}`}
-                                    />
-                                  ))}
-                                </div>
-                                <span className="text-xs font-mono font-bold text-amber-400 ml-1">
-                                  {rating}/5
+                            {/* 1. What I Said */}
+                            {entry.whatISaid ? (
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">
+                                  What I Said / Key Delivery:
                                 </span>
+                                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80">
+                                  {entry.whatISaid}
+                                </p>
                               </div>
-
-                              {/* Duration Badge */}
-                              <div className="hidden sm:flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 font-mono text-xs text-slate-300">
-                                <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                                <span>{entry.durationSeconds || 60}s</span>
+                            ) : (
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">
+                                  Reflection Note:
+                                </span>
+                                <p className="text-xs text-slate-300 leading-relaxed italic bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80">
+                                  &ldquo;{entry.reflectionNotes}&rdquo;
+                                </p>
                               </div>
+                            )}
 
-                              {/* Fillers Count */}
-                              {entry.fillerWordCount !== undefined && (
-                                <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 font-mono text-xs text-rose-400">
-                                  {entry.fillerWordCount} Fillers
+                            {/* 2. What I Struggled With & Mistakes Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {entry.whatIStruggledWith && (
+                                <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-1">
+                                  <span className="text-[10px] font-mono text-amber-400 uppercase font-bold flex items-center gap-1.5">
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    <span>What I Struggled With:</span>
+                                  </span>
+                                  <p className="text-xs text-slate-300 leading-relaxed">
+                                    {entry.whatIStruggledWith}
+                                  </p>
                                 </div>
                               )}
 
-                              {/* Delete button */}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteJournalEntry(entry.id)}
-                                title="Delete this journal entry"
-                                className="p-2 bg-slate-950 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-500/40 rounded-xl text-slate-500 hover:text-rose-400 transition"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* 1. What I Said */}
-                          {entry.whatISaid ? (
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">
-                                What I Said / Key Delivery:
-                              </span>
-                              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80">
-                                {entry.whatISaid}
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">
-                                Reflection Note:
-                              </span>
-                              <p className="text-xs text-slate-300 leading-relaxed italic bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80">
-                                &ldquo;{entry.reflectionNotes}&rdquo;
-                              </p>
-                            </div>
-                          )}
-
-                          {/* 2. What I Struggled With & Mistakes Grid */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {entry.whatIStruggledWith && (
-                              <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-1">
-                                <span className="text-[10px] font-mono text-amber-400 uppercase font-bold flex items-center gap-1.5">
-                                  <AlertCircle className="w-3.5 h-3.5" />
-                                  <span>What I Struggled With:</span>
-                                </span>
-                                <p className="text-xs text-slate-300 leading-relaxed">
-                                  {entry.whatIStruggledWith}
-                                </p>
-                              </div>
-                            )}
-
-                            {entry.mistakesNoticed && (
-                              <div className="p-3.5 rounded-2xl bg-rose-500/5 border border-rose-500/20 space-y-1">
-                                <span className="text-[10px] font-mono text-rose-400 uppercase font-bold flex items-center gap-1.5">
-                                  <AlertCircle className="w-3.5 h-3.5" />
-                                  <span>Mistakes Noticed:</span>
-                                </span>
-                                <p className="text-xs text-slate-300 leading-relaxed">
-                                  {entry.mistakesNoticed}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* 3. New Words Used */}
-                          {entry.newWordsUsed && (
-                            <div className="flex flex-wrap items-center gap-2 pt-1">
-                              <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">
-                                New Words:
-                              </span>
-                              {entry.newWordsUsed
-                                .split(',')
-                                .map((w) => w.trim())
-                                .filter(Boolean)
-                                .map((word, wIdx) => (
-                                  <span
-                                    key={wIdx}
-                                    className="px-2.5 py-0.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-xs font-mono"
-                                  >
-                                    {word}
+                              {entry.mistakesNoticed && (
+                                <div className="p-3.5 rounded-2xl bg-rose-500/5 border border-rose-500/20 space-y-1">
+                                  <span className="text-[10px] font-mono text-rose-400 uppercase font-bold flex items-center gap-1.5">
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    <span>Mistakes Noticed:</span>
                                   </span>
-                                ))}
+                                  <p className="text-xs text-slate-300 leading-relaxed">
+                                    {entry.mistakesNoticed}
+                                  </p>
+                                </div>
+                              )}
                             </div>
-                          )}
 
-                          {/* 4. Audio Playback if Available */}
-                          {entry.audioBlobUrl && (
-                            <div className="pt-2 border-t border-slate-800/60 flex items-center gap-3">
-                              <span className="text-[10px] font-mono text-blue-400 uppercase font-bold shrink-0 flex items-center gap-1">
-                                <Mic className="w-3.5 h-3.5" />
-                                <span>Voice Playback:</span>
-                              </span>
-                              <audio controls src={entry.audioBlobUrl} className="h-8 w-full sm:w-80" />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                            {/* 3. New Words Used */}
+                            {entry.newWordsUsed && (
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">
+                                  New Words:
+                                </span>
+                                {entry.newWordsUsed
+                                  .split(',')
+                                  .map((w) => w.trim())
+                                  .filter(Boolean)
+                                  .map((word, wIdx) => (
+                                    <span
+                                      key={wIdx}
+                                      className="px-2.5 py-0.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-xs font-mono"
+                                    >
+                                      {word}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
+
+                            {/* 4. Audio Playback if Available */}
+                            {entry.audioBlobUrl && (
+                              <div className="pt-2 border-t border-slate-800/60 flex items-center gap-3">
+                                <span className="text-[10px] font-mono text-blue-400 uppercase font-bold shrink-0 flex items-center gap-1">
+                                  <Mic className="w-3.5 h-3.5" />
+                                  <span>Voice Playback:</span>
+                                </span>
+                                <audio controls src={entry.audioBlobUrl} className="h-8 w-full sm:w-80" />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   </div>
                 )}
               </div>
