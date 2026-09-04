@@ -52,6 +52,7 @@ import {
   DailyPillarProgressState,
   createEmptyEnglishCareerState,
   SpeakingJournalEntry,
+  deleteSpeakingJournalEntry,
 } from '@/lib/englishCareerStorage';
 import {
   DailyTrainingPlan,
@@ -59,6 +60,14 @@ import {
   getTodayPlanForUser,
   getUpcomingTrainingPlans,
 } from '@/data/englishDailyTrainingPlan';
+import {
+  SPEAKING_MODES_CONFIG,
+  SPEAKING_EXERCISES,
+  SpeakingExercise,
+  SpeakingModeConfig,
+  getSpeakingExercisesByMode,
+  getRandomSpeakingExercise,
+} from '@/data/englishSpeakingTrainerData';
 import {
   Mic,
   MicOff,
@@ -103,6 +112,9 @@ import {
   Compass,
   Zap,
   RotateCcw,
+  Trash2,
+  PlayCircle,
+  Pause,
 } from 'lucide-react';
 
 type ActiveTab =
@@ -186,6 +198,33 @@ function EnglishCareerContent() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Dedicated Speaking Trainer (8 Modes) State
+  const [selectedSpeakingMode, setSelectedSpeakingMode] = useState<SpeakingExercise['modeId']>('daily_self_talk');
+  const [selectedSpeakingExercise, setSelectedSpeakingExercise] = useState<SpeakingExercise>(SPEAKING_EXERCISES[0]);
+  const [speakingStatus, setSpeakingStatus] = useState<'idle' | 'prepping' | 'speaking' | 'completed'>('idle');
+  const [speakingSecondsRemaining, setSpeakingSecondsRemaining] = useState<number>(SPEAKING_EXERCISES[0].timeLimitSeconds);
+  const [speakingMicEnabled, setSpeakingMicEnabled] = useState<boolean>(false);
+  const [speakingMicError, setSpeakingMicError] = useState<string | null>(null);
+  const [speakingAudioUrl, setSpeakingAudioUrl] = useState<string | null>(null);
+  const [speakingModelExpanded, setSpeakingModelExpanded] = useState<boolean>(false);
+  const [speakingPhraseCopied, setSpeakingPhraseCopied] = useState<string | null>(null);
+  const speakingRecorderRef = useRef<MediaRecorder | null>(null);
+  const speakingAudioChunksRef = useRef<Blob[]>([]);
+  const speakingTimerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Post-Practice Reflection Form / Modal State
+  const [isReflectionModalOpen, setIsReflectionModalOpen] = useState<boolean>(false);
+  const [reflectionWhatISaid, setReflectionWhatISaid] = useState<string>('');
+  const [reflectionWhatIStruggledWith, setReflectionWhatIStruggledWith] = useState<string>('');
+  const [reflectionNewWords, setReflectionNewWords] = useState<string>('');
+  const [reflectionMistakesNoticed, setReflectionMistakesNoticed] = useState<string>('');
+  const [reflectionConfidenceScore, setReflectionConfidenceScore] = useState<number>(4);
+  const [reflectionFillerCount, setReflectionFillerCount] = useState<number>(0);
+
+  // Journal Filter State
+  const [journalFilterMode, setJournalFilterMode] = useState<string>('all');
+  const [journalSearchQuery, setJournalSearchQuery] = useState<string>('');
 
   // Quiz & Assessment Interactive State
   const [quizSelections, setQuizSelections] = useState<Record<string, number>>({});
@@ -605,6 +644,181 @@ function EnglishCareerContent() {
     }
   };
 
+  // =========================================================================
+  // DEDICATED SPEAKING TRAINER HANDLERS (8 MODES)
+  // =========================================================================
+  const handleSelectSpeakingMode = (modeId: SpeakingExercise['modeId']) => {
+    setSelectedSpeakingMode(modeId);
+    const exercisesInMode = getSpeakingExercisesByMode(modeId);
+    const firstExercise = exercisesInMode[0] || SPEAKING_EXERCISES[0];
+    setSelectedSpeakingExercise(firstExercise);
+    setSpeakingSecondsRemaining(firstExercise.timeLimitSeconds);
+    setSpeakingStatus('idle');
+    setSpeakingAudioUrl(null);
+    setSpeakingMicError(null);
+    if (speakingTimerIntervalRef.current) {
+      clearInterval(speakingTimerIntervalRef.current);
+      speakingTimerIntervalRef.current = null;
+    }
+    if (speakingRecorderRef.current && speakingRecorderRef.current.state !== 'inactive') {
+      try {
+        speakingRecorderRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping speaking recorder:', e);
+      }
+    }
+  };
+
+  const handleSelectSpeakingExercise = (exercise: SpeakingExercise) => {
+    setSelectedSpeakingExercise(exercise);
+    setSelectedSpeakingMode(exercise.modeId);
+    setSpeakingSecondsRemaining(exercise.timeLimitSeconds);
+    setSpeakingStatus('idle');
+    setSpeakingAudioUrl(null);
+    setSpeakingMicError(null);
+    if (speakingTimerIntervalRef.current) {
+      clearInterval(speakingTimerIntervalRef.current);
+      speakingTimerIntervalRef.current = null;
+    }
+    if (speakingRecorderRef.current && speakingRecorderRef.current.state !== 'inactive') {
+      try {
+        speakingRecorderRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping speaking recorder:', e);
+      }
+    }
+  };
+
+  const handleShuffleSpeakingExercise = () => {
+    const randomEx = getRandomSpeakingExercise(selectedSpeakingMode);
+    handleSelectSpeakingExercise(randomEx);
+  };
+
+  const handleStartSpeakingPractice = async () => {
+    setSpeakingAudioUrl(null);
+    setSpeakingMicError(null);
+    setSpeakingSecondsRemaining(selectedSpeakingExercise.timeLimitSeconds);
+    setSpeakingStatus('speaking');
+
+    // Optional microphone recording (graceful fallback if unsupported/denied)
+    if (speakingMicEnabled && typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        speakingAudioChunksRef.current = [];
+        const recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) speakingAudioChunksRef.current.push(e.data);
+        };
+        recorder.onstop = () => {
+          const blob = new Blob(speakingAudioChunksRef.current, { type: 'audio/webm' });
+          const url = URL.createObjectURL(blob);
+          setSpeakingAudioUrl(url);
+          stream.getTracks().forEach((track) => track.stop());
+        };
+        speakingRecorderRef.current = recorder;
+        recorder.start(250);
+      } catch (err: any) {
+        console.warn('Optional microphone access could not be initialized:', err);
+        setSpeakingMicError('Microphone is optional. Timer & self-reflection practice are active!');
+      }
+    }
+
+    if (speakingTimerIntervalRef.current) clearInterval(speakingTimerIntervalRef.current);
+    speakingTimerIntervalRef.current = setInterval(() => {
+      setSpeakingSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          handleCompleteSpeakingPractice();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleCompleteSpeakingPractice = () => {
+    if (speakingTimerIntervalRef.current) {
+      clearInterval(speakingTimerIntervalRef.current);
+      speakingTimerIntervalRef.current = null;
+    }
+    if (speakingRecorderRef.current && speakingRecorderRef.current.state !== 'inactive') {
+      try {
+        speakingRecorderRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping speaking recorder on complete:', e);
+      }
+    }
+    setSpeakingStatus('completed');
+    setIsReflectionModalOpen(true);
+    // Pre-fill / reset reflection form fields
+    setReflectionWhatISaid('');
+    setReflectionWhatIStruggledWith('');
+    setReflectionNewWords('');
+    setReflectionMistakesNoticed('');
+    setReflectionConfidenceScore(4);
+    setReflectionFillerCount(0);
+  };
+
+  const handleResetSpeakingPractice = () => {
+    if (speakingTimerIntervalRef.current) {
+      clearInterval(speakingTimerIntervalRef.current);
+      speakingTimerIntervalRef.current = null;
+    }
+    if (speakingRecorderRef.current && speakingRecorderRef.current.state !== 'inactive') {
+      try {
+        speakingRecorderRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping speaking recorder on reset:', e);
+      }
+    }
+    setSpeakingStatus('idle');
+    setSpeakingSecondsRemaining(selectedSpeakingExercise.timeLimitSeconds);
+    setSpeakingAudioUrl(null);
+    setSpeakingMicError(null);
+  };
+
+  const handleSaveSpeakingReflectionToJournal = async () => {
+    if (!userState) return;
+    try {
+      const elapsed = Math.max(1, selectedSpeakingExercise.timeLimitSeconds - speakingSecondsRemaining);
+      const newEntryData: Omit<SpeakingJournalEntry, 'id'> = {
+        title: selectedSpeakingExercise.topic,
+        promptId: selectedSpeakingExercise.id,
+        promptCategory: selectedSpeakingExercise.category,
+        modeId: selectedSpeakingExercise.modeId,
+        durationSeconds: elapsed || selectedSpeakingExercise.timeLimitSeconds,
+        selfRating: reflectionConfidenceScore,
+        confidenceScore: reflectionConfidenceScore,
+        fillerWordCount: reflectionFillerCount,
+        reflectionNotes: reflectionWhatISaid || `Practiced ${selectedSpeakingExercise.topic} (${selectedSpeakingExercise.modeTitle})`,
+        whatISaid: reflectionWhatISaid,
+        whatIStruggledWith: reflectionWhatIStruggledWith,
+        newWordsUsed: reflectionNewWords.trim() || undefined,
+        mistakesNoticed: reflectionMistakesNoticed.trim() || undefined,
+        audioBlobUrl: speakingAudioUrl || undefined,
+        dateStr: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toISOString(),
+      };
+
+      const updated = await saveSpeakingJournalEntry(userState, newEntryData);
+      setUserState(updated);
+      setIsReflectionModalOpen(false);
+      showNotification('🎯 Practice logged to your Speaking Journal!');
+    } catch (err) {
+      console.error('Failed to save speaking reflection:', err);
+    }
+  };
+
+  const handleDeleteJournalEntry = async (entryId: string) => {
+    if (!userState) return;
+    try {
+      const updated = await deleteSpeakingJournalEntry(userState, entryId);
+      setUserState(updated);
+      showNotification('Journal entry deleted.');
+    } catch (err) {
+      console.error('Error deleting journal entry:', err);
+    }
+  };
+
   // Complete Daily Micro-Drill Part
   const handleCompleteDailyPart = async (part: 'speech' | 'grammar' | 'vocab') => {
     if (!userState) return;
@@ -834,6 +1048,207 @@ function EnglishCareerContent() {
                   className="px-5 py-2 bg-[#006cd2] hover:bg-blue-600 text-white rounded-xl text-xs font-mono font-bold shadow-md shadow-blue-500/20"
                 >
                   Save Note
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Post-Practice Reflection Modal */}
+      <AnimatePresence>
+        {isReflectionModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-6 shadow-2xl my-8"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold font-display text-white">
+                      Speaking Practice Reflection
+                    </h3>
+                    <p className="text-xs text-slate-400 font-mono">
+                      Log what you said, struggles, new words &amp; mistakes
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsReflectionModalOpen(false)}
+                  className="text-slate-400 hover:text-white text-xs font-mono px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              {/* Topic context pill */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-blue-400 font-bold block">
+                    {selectedSpeakingExercise.modeTitle}
+                  </span>
+                  <span className="font-semibold text-white">
+                    {selectedSpeakingExercise.topic}
+                  </span>
+                </div>
+                <span className="font-mono text-slate-400 text-[11px] shrink-0">
+                  Target: {selectedSpeakingExercise.timeLimitSeconds}s
+                </span>
+              </div>
+
+              {/* Audio player if user recorded audio */}
+              {speakingAudioUrl && (
+                <div className="p-3.5 rounded-2xl bg-blue-950/30 border border-blue-800/40 space-y-2">
+                  <span className="text-[10px] font-mono text-blue-400 uppercase font-bold flex items-center gap-1.5">
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Your Recorded Audio</span>
+                  </span>
+                  <audio controls src={speakingAudioUrl} className="w-full h-8" />
+                </div>
+              )}
+
+              {/* Form Fields */}
+              <div className="space-y-4">
+                {/* 1. What I said */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-bold text-slate-300 flex items-center justify-between">
+                    <span>1. What I Said / Key Points Covered:</span>
+                    <span className="text-slate-500 font-normal">Summary of your response</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reflectionWhatISaid}
+                    onChange={(e) => setReflectionWhatISaid(e.target.value)}
+                    placeholder="E.g., I defined the Kafka architecture, described consumer group balancing, and explained how we handled duplicate event deduplication."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                </div>
+
+                {/* 2. What I struggled with */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-bold text-amber-400 flex items-center justify-between">
+                    <span>2. What I Struggled With:</span>
+                    <span className="text-slate-500 font-normal">Hesitations, missing words, pacing</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={reflectionWhatIStruggledWith}
+                    onChange={(e) => setReflectionWhatIStruggledWith(e.target.value)}
+                    placeholder="E.g., Hesitated for 5 seconds when transitioning between problem statement and architectural solution."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 resize-none"
+                  />
+                </div>
+
+                {/* 3. New words & 4. Mistakes I noticed (Grid) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono font-bold text-cyan-400">
+                      3. New Words / Phrases Used:
+                    </label>
+                    <input
+                      type="text"
+                      value={reflectionNewWords}
+                      onChange={(e) => setReflectionNewWords(e.target.value)}
+                      placeholder="e.g. throughput, decoupled, bottleneck"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono font-bold text-rose-400">
+                      4. Mistakes I Noticed:
+                    </label>
+                    <input
+                      type="text"
+                      value={reflectionMistakesNoticed}
+                      onChange={(e) => setReflectionMistakesNoticed(e.target.value)}
+                      placeholder="e.g. said 'discussed about', used 4 'ums'"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 5. Confidence Score (1-5) & Filler Words */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+                  <div className="space-y-2">
+                    <label className="text-xs font-mono font-bold text-slate-300 block">
+                      5. Confidence Score (1–5):
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((score) => {
+                        const labels = ['1 (Hesitant)', '2 (Fair)', '3 (Clear)', '4 (Confident)', '5 (Masterful)'];
+                        return (
+                          <button
+                            key={score}
+                            type="button"
+                            onClick={() => setReflectionConfidenceScore(score)}
+                            title={labels[score - 1]}
+                            className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center justify-center gap-1 border ${
+                              reflectionConfidenceScore === score
+                                ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/30'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                            }`}
+                          >
+                            <Star className={`w-3.5 h-3.5 ${reflectionConfidenceScore >= score ? 'fill-amber-400 text-amber-400' : 'text-slate-600'}`} />
+                            <span>{score}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-mono font-bold text-slate-300 block">
+                      Filler Words Counted:
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {[0, 1, 2, 3, 5].map((count) => (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => setReflectionFillerCount(count)}
+                          className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold transition border ${
+                            reflectionFillerCount === count
+                              ? 'bg-rose-500/20 border-rose-500/50 text-rose-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {count === 5 ? '5+' : count}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsReflectionModalOpen(false)}
+                  className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-400 hover:text-white transition"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveSpeakingReflectionToJournal}
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-sans font-bold rounded-xl text-xs transition flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Save to Speaking Journal</span>
                 </button>
               </div>
             </motion.div>
@@ -3014,182 +3429,433 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 6. SPEAKING & PRONUNCIATION TAB */}
+          {/* 6. DEDICATED SPEAKING TRAINER TAB (8 PRACTICE MODES) */}
           {/* ========================================================================= */}
           {activeTab === 'speaking' && (
             <div className="space-y-8">
+              {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                 <div>
-                  <h2 className="text-xl font-bold font-display text-white flex items-center gap-2">
-                    <Mic className="w-5 h-5 text-blue-400" />
-                    <span>Speaking Fluency, Pacing &amp; Audio Recorder</span>
+                  <h2 className="text-2xl font-bold font-display text-white flex items-center gap-2">
+                    <Mic className="w-6 h-6 text-blue-400" />
+                    <span>Dedicated Speaking Trainer</span>
                   </h2>
-                  <p className="text-xs text-slate-400">
-                    Record voice responses to high-stakes tech scenarios, review audio, and eliminate filler words.
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                    Improve fluency, confidence, sentence formation, pronunciation awareness, and professional communication across 8 practice modes.
                   </p>
                 </div>
-                <div className="font-mono text-xs text-blue-400 bg-blue-950/40 border border-blue-800/40 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-                  {metrics.speakingConfidence}% Speaking Confidence
+                <div className="flex items-center gap-3 self-start sm:self-auto">
+                  <div className="font-mono text-xs text-blue-400 bg-blue-950/40 border border-blue-800/40 px-3 py-1.5 rounded-xl">
+                    {metrics.speakingConfidence}% Fluency Score
+                  </div>
+                  <div className="font-mono text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-3 py-1.5 rounded-xl">
+                    {userState?.journalEntries.length || 0} Sessions Logged
+                  </div>
                 </div>
               </div>
 
-              {/* Interactive Audio Recording Studio */}
+              {/* 8 Practice Modes Selector Grid */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-slate-400 uppercase font-bold tracking-wider">
+                    Select Practice Mode (8 Specialized Frameworks)
+                  </span>
+                  <span className="text-[11px] font-mono text-cyan-400">
+                    Active: {SPEAKING_MODES_CONFIG.find((m) => m.id === selectedSpeakingMode)?.title}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+                  {SPEAKING_MODES_CONFIG.map((mode, idx) => {
+                    const isSelected = selectedSpeakingMode === mode.id;
+                    const modeIcons: Record<string, any> = {
+                      daily_self_talk: MessageSquare,
+                      random_topic: Zap,
+                      two_minute_challenge: Clock,
+                      five_minute_tech: Cpu,
+                      project_explanation: Layers,
+                      interview_answer: Award,
+                      workplace_scenario: Briefcase,
+                      presentation_practice: Sliders,
+                    };
+                    const IconComponent = modeIcons[mode.id] || Mic;
+
+                    return (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => handleSelectSpeakingMode(mode.id)}
+                        className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between relative overflow-hidden group ${
+                          isSelected
+                            ? 'bg-blue-950/60 border-blue-500 shadow-lg shadow-blue-500/10'
+                            : 'bg-slate-900/70 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                        }`}
+                      >
+                        {isSelected && (
+                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-400" />
+                        )}
+                        <div className="flex items-center justify-between w-full mb-2">
+                          <span
+                            className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs ${
+                              isSelected
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-slate-800 text-slate-400 group-hover:text-white'
+                            }`}
+                          >
+                            <IconComponent className="w-3.5 h-3.5" />
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-500">
+                            #{idx + 1}
+                          </span>
+                        </div>
+                        <div>
+                          <div className={`text-xs font-bold font-display line-clamp-1 ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                            {mode.title.replace(/^\d+\.\s*/, '')}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-500 mt-0.5">
+                            {mode.targetDurationDesc}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Mode Objective & Prompts Bar */}
+              {(() => {
+                const currentModeConfig = SPEAKING_MODES_CONFIG.find((m) => m.id === selectedSpeakingMode);
+                const exercisesInCurrentMode = getSpeakingExercisesByMode(selectedSpeakingMode);
+
+                return (
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-[10px] font-mono font-bold uppercase">
+                          {currentModeConfig?.title}
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono">
+                          Focus: {currentModeConfig?.recommendedFocus}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        {currentModeConfig?.shortDesc}
+                      </p>
+                    </div>
+
+                    {/* Prompt Select & Shuffle */}
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                      <select
+                        value={selectedSpeakingExercise.id}
+                        onChange={(e) => {
+                          const found = exercisesInCurrentMode.find((ex) => ex.id === e.target.value);
+                          if (found) handleSelectSpeakingExercise(found);
+                        }}
+                        className="flex-1 md:w-64 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                      >
+                        {exercisesInCurrentMode.map((ex) => (
+                          <option key={ex.id} value={ex.id}>
+                            {ex.topic}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={handleShuffleSpeakingExercise}
+                        title="Shuffle Random Topic in this mode"
+                        className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* DEDICATED EXERCISE STUDIO CARD */}
               <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                  <div>
-                    <span className="text-xs font-mono text-blue-400 uppercase font-bold">
-                      SELECTED PROMPT
-                    </span>
-                    <h3 className="text-xl font-bold font-display text-white mt-1">
-                      {selectedSpeakingPrompt.title}
+                {/* 1. TOPIC & TIME LIMIT */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-mono uppercase font-bold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        TOPIC
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                        {selectedSpeakingExercise.category}
+                      </span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                      {selectedSpeakingExercise.topic}
                     </h3>
                   </div>
 
-                  {/* Prompt Selector Dropdown */}
-                  <select
-                    value={selectedSpeakingPrompt.id}
-                    onChange={(e) => {
-                      const found = SPEAKING_PROMPTS.find((p) => p.id === e.target.value);
-                      if (found) setSelectedSpeakingPrompt(found);
-                    }}
-                    className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 focus:outline-none focus:border-[#006cd2]"
-                  >
-                    {SPEAKING_PROMPTS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))}
-                  </select>
+                  {/* TIME LIMIT BADGE */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs">
+                      <Clock className="w-4 h-4 text-amber-400" />
+                      <div>
+                        <span className="text-[10px] text-slate-500 block leading-none">TIME LIMIT</span>
+                        <span className="font-bold text-white text-sm">
+                          {Math.floor(selectedSpeakingExercise.timeLimitSeconds / 60)}m {selectedSpeakingExercise.timeLimitSeconds % 60 > 0 ? `${selectedSpeakingExercise.timeLimitSeconds % 60}s` : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Scenario & Key Guidance */}
-                <div className="space-y-3">
-                  <p className="text-sm text-slate-200 leading-relaxed font-sans">
-                    <b className="text-white">Scenario: </b>{selectedSpeakingPrompt.scenario}
+                {/* 2. OBJECTIVE */}
+                <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-1.5">
+                  <div className="flex items-center gap-2 font-mono text-xs text-blue-400 font-bold uppercase">
+                    <Target className="w-4 h-4 text-blue-400" />
+                    <span>OBJECTIVE</span>
+                  </div>
+                  <p className="text-sm text-slate-200 leading-relaxed font-sans pl-6">
+                    {selectedSpeakingExercise.objective}
                   </p>
+                </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                    <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-2">
-                      <div className="font-mono text-xs text-cyan-400 font-bold uppercase">
-                        Points to Cover:
-                      </div>
-                      <ul className="list-disc list-inside text-xs text-slate-300 space-y-1">
-                        {selectedSpeakingPrompt.bulletPointsToCover.map((pt, idx) => (
-                          <li key={idx}>{pt}</li>
-                        ))}
-                      </ul>
-                    </div>
+                {/* 3. STRUCTURE */}
+                <div className="space-y-3">
+                  <div className="font-mono text-xs text-cyan-400 font-bold uppercase flex items-center gap-2">
+                    <Layers className="w-4 h-4" />
+                    <span>STRUCTURE (Step-by-Step Delivery Framework):</span>
+                  </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-2">
-                      <div className="font-mono text-xs text-rose-400 font-bold uppercase">
-                        Filler Words Watchlist:
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {selectedSpeakingExercise.structure.map((step, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-start gap-2.5"
+                      >
+                        <span className="w-5 h-5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-xs font-mono font-bold shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span className="text-xs text-slate-300 leading-snug">
+                          {step}
+                        </span>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedSpeakingPrompt.fillerWordWatchlist.map((w, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 text-xs font-mono"
-                          >
-                            &ldquo;{w}&rdquo;
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Recorder Control Bar */}
-                <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={isRecording ? stopAudioRecording : startAudioRecording}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center transition shadow-lg ${
-                        isRecording
-                          ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
-                          : 'bg-blue-600 hover:bg-blue-500 text-white'
-                      }`}
-                    >
-                      {isRecording ? <Square className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-                    </button>
-
-                    <div>
-                      <div className="font-display font-bold text-white text-base">
-                        {isRecording ? 'Recording in progress...' : 'Ready to record speech'}
-                      </div>
-                      <div className="font-mono text-xs text-slate-400">
-                        {isRecording ? `Timer: ${recordDuration}s / ${selectedSpeakingPrompt.timeLimitSeconds}s` : 'Press mic to begin speaking'}
-                      </div>
+                {/* 4. USEFUL PHRASES */}
+                <div className="space-y-3">
+                  <div className="font-mono text-xs text-emerald-400 font-bold uppercase flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      <span>USEFUL PHRASES (Click phrase to copy):</span>
                     </div>
+                    {speakingPhraseCopied && (
+                      <span className="text-[10px] text-emerald-400 font-mono">
+                        ✓ Copied phrase!
+                      </span>
+                    )}
                   </div>
 
-                  {/* Audio Playback Player if Recorded */}
-                  {audioUrl && !isRecording && (
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
-                      <audio controls src={audioUrl} className="h-9 w-full sm:w-64" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {selectedSpeakingExercise.usefulPhrases.map((phrase, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(phrase);
+                          setSpeakingPhraseCopied(phrase);
+                          setTimeout(() => setSpeakingPhraseCopied(null), 2000);
+                        }}
+                        className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-emerald-500/40 hover:bg-emerald-950/10 text-left transition flex items-start justify-between gap-3 group"
+                      >
+                        <span className="text-xs text-slate-200 group-hover:text-white leading-relaxed italic">
+                          &ldquo;{phrase}&rdquo;
+                        </span>
+                        <Copy className="w-3.5 h-3.5 text-slate-600 group-hover:text-emerald-400 shrink-0 mt-0.5 transition" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Collapsible Model Spoken Answer & Pro Tips */}
+                <div className="border border-slate-800 rounded-2xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setSpeakingModelExpanded(!speakingModelExpanded)}
+                    className="w-full p-4 bg-slate-950/60 hover:bg-slate-950 flex items-center justify-between text-left transition text-xs font-mono font-bold text-slate-300"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-400" />
+                      <span>EXPERT SPOKEN MODEL &amp; PRO TIPS</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${speakingModelExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {speakingModelExpanded && (
+                    <div className="p-5 bg-slate-950/90 border-t border-slate-800 space-y-4 text-xs">
+                      <div className="space-y-1.5">
+                        <span className="font-mono text-[10px] text-blue-400 uppercase font-bold block">
+                          Golden Standard Spoken Script:
+                        </span>
+                        <p className="text-slate-300 leading-relaxed italic bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+                          &ldquo;{selectedSpeakingExercise.sampleSpokenModel}&rdquo;
+                        </p>
+                      </div>
+
+                      {selectedSpeakingExercise.proTips && selectedSpeakingExercise.proTips.length > 0 && (
+                        <div className="space-y-1.5">
+                          <span className="font-mono text-[10px] text-amber-400 uppercase font-bold block">
+                            Key Delivery Pro Tips:
+                          </span>
+                          <ul className="list-disc list-inside text-slate-300 space-y-1">
+                            {selectedSpeakingExercise.proTips.map((tip, idx) => (
+                              <li key={idx}>{tip}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
 
-                {/* Self-Reflection & Journal Save Drawer */}
-                {audioUrl && !isRecording && (
-                  <div className="p-5 rounded-2xl bg-slate-950/90 border border-blue-500/30 space-y-4">
-                    <div className="font-mono text-xs text-blue-400 font-bold uppercase">
-                      SELF-EVALUATION &amp; JOURNAL LOGGING
-                    </div>
+                {/* MIC & GRACEFUL FALLBACK NOTICE */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSpeakingMicEnabled(!speakingMicEnabled)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-bold flex items-center gap-2 transition ${
+                        speakingMicEnabled
+                          ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+                          : 'bg-slate-900 border-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {speakingMicEnabled ? <Mic className="w-3.5 h-3.5 text-blue-400" /> : <MicOff className="w-3.5 h-3.5 text-slate-500" />}
+                      <span>{speakingMicEnabled ? 'Microphone Enabled (Optional)' : 'Microphone Off (Practice with Timer Only)'}</span>
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    Microphone is 100% optional. No permissions required to complete speaking drills.
+                  </span>
+                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-mono text-slate-400">Self-Rating (Fluency &amp; Clarity):</label>
-                        <div className="flex items-center gap-2">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              type="button"
-                              onClick={() => setJournalSelfRating(star)}
-                              className="text-amber-400"
-                            >
-                              <Star className={`w-5 h-5 ${journalSelfRating >= star ? 'fill-amber-400' : 'text-slate-600'}`} />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                {speakingMicError && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{speakingMicError}</span>
+                  </div>
+                )}
 
-                      <div className="space-y-1">
-                        <label className="text-xs font-mono text-slate-400">Filler Words Counted (um/like/actually):</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={journalFillerCount}
-                          onChange={(e) => setJournalFillerCount(Number(e.target.value))}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-200"
-                        />
-                      </div>
+                {/* 5. LIVE STUDIO ACTION BAR (START BUTTON, LIVE TIMER, COMPLETED BUTTON) */}
+                <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col lg:flex-row items-center justify-between gap-6">
+                  {/* Timer & Waveform Status */}
+                  <div className="flex items-center gap-4 w-full lg:w-auto">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center font-mono">
+                      <span className="text-[10px] text-slate-500 uppercase">TIMER</span>
+                      <span className={`text-base font-bold ${speakingStatus === 'speaking' ? 'text-cyan-400 animate-pulse' : 'text-white'}`}>
+                        {Math.floor(speakingSecondsRemaining / 60)}:{(speakingSecondsRemaining % 60).toString().padStart(2, '0')}
+                      </span>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-mono text-slate-400">Reflection Notes:</label>
-                      <input
-                        type="text"
-                        value={journalReflection}
-                        onChange={(e) => setJournalReflection(e.target.value)}
-                        placeholder="What went well? Where did you hesitate?"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
-                      />
+                      <div className="font-display font-bold text-white text-base flex items-center gap-2">
+                        {speakingStatus === 'speaking' && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                        )}
+                        <span>
+                          {speakingStatus === 'speaking'
+                            ? 'Speaking Practice in Progress...'
+                            : speakingStatus === 'completed'
+                            ? 'Practice Session Completed!'
+                            : 'Ready to Practice'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        {speakingStatus === 'speaking'
+                          ? 'Deliver your response aloud following the numbered framework.'
+                          : 'Press START to start the timer, then click COMPLETED to log your reflection.'}
+                      </p>
                     </div>
+                  </div>
 
+                  {/* Audio visualizer effect if speaking */}
+                  {speakingStatus === 'speaking' && (
+                    <div className="flex items-center gap-1.5 h-8 px-4 py-1 rounded-xl bg-slate-900/80 border border-slate-800">
+                      {[12, 24, 18, 28, 16, 22, 32, 14, 26, 18, 30, 20].map((h, i) => (
+                        <span
+                          key={i}
+                          style={{ height: `${(h * (1 + (i % 3) * 0.2)).toFixed(0)}px` }}
+                          className="w-1 bg-cyan-400 rounded-full animate-pulse"
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Action Buttons: START, COMPLETED, RESET */}
+                  <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+                    {speakingStatus === 'speaking' ? (
+                      <button
+                        type="button"
+                        onClick={handleCompleteSpeakingPractice}
+                        className="px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-sans font-bold rounded-2xl text-xs transition flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>COMPLETED (LOG REFLECTION)</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleStartSpeakingPractice}
+                        className="px-7 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-sans font-bold rounded-2xl text-xs transition flex items-center gap-2 shadow-lg shadow-blue-500/25 group"
+                      >
+                        <Play className="w-4 h-4 fill-white group-hover:scale-110 transition" />
+                        <span>START BUTTON</span>
+                      </button>
+                    )}
+
+                    {/* Manual Completed button available anytime */}
+                    {speakingStatus !== 'speaking' && (
+                      <button
+                        type="button"
+                        onClick={handleCompleteSpeakingPractice}
+                        className="px-5 py-3.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-2xl text-xs font-mono text-slate-300 hover:text-white transition flex items-center gap-2"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>COMPLETED BUTTON</span>
+                      </button>
+                    )}
+
+                    {/* Reset button */}
                     <button
-                      onClick={saveCurrentRecordingToJournal}
-                      className="w-full py-3 bg-[#006cd2] hover:bg-blue-600 text-white font-sans font-bold rounded-xl text-xs transition flex items-center justify-center gap-2"
+                      type="button"
+                      onClick={handleResetSpeakingPractice}
+                      title="Reset timer"
+                      className="p-3.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-2xl text-slate-400 hover:text-white transition"
                     >
-                      <SaveJournalIcon className="w-4 h-4" />
-                      <span>Save Practice to Speaking Journal</span>
+                      <RotateCcw className="w-4 h-4" />
                     </button>
+                  </div>
+                </div>
+
+                {/* Optional Recorded Audio Playback */}
+                {speakingAudioUrl && (
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <Mic className="w-5 h-5 text-blue-400" />
+                      <div>
+                        <div className="font-mono text-xs text-white font-bold">
+                          Session Audio Recording Available
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          Re-listen to analyze pacing and pronunciation before logging notes.
+                        </div>
+                      </div>
+                    </div>
+                    <audio controls src={speakingAudioUrl} className="h-8 w-full sm:w-64" />
                   </div>
                 )}
               </div>
 
               {/* Pronunciation & Phonetics Directory */}
-              <div className="space-y-4">
+              <div className="space-y-4 pt-4">
                 <h3 className="text-lg font-bold font-display text-white flex items-center gap-2">
                   <Volume2 className="w-4 h-4 text-emerald-400" />
                   <span>Tech Pronunciation &amp; Syllable Stress Guides</span>
@@ -3726,81 +4392,329 @@ function EnglishCareerContent() {
           {/* ========================================================================= */}
           {/* 12. SPEAKING JOURNAL TAB */}
           {/* ========================================================================= */}
-          {activeTab === 'journal' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                <div>
-                  <h2 className="text-xl font-bold font-display text-white flex items-center gap-2">
-                    <MessageSquare className="w-5 h-5 text-blue-400" />
-                    <span>Speaking Journal &amp; Self-Reflection Archive</span>
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    Review past speech recordings, self-evaluation scores, and filler word reductions.
-                  </p>
-                </div>
-                <div className="font-mono text-xs text-blue-400 bg-blue-950/40 border border-blue-800/40 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-                  {userState?.journalEntries.length || 0} Recorded Sessions
-                </div>
-              </div>
+          {activeTab === 'journal' && (() => {
+            const allEntries = userState?.journalEntries || [];
+            const filteredEntries = allEntries.filter((entry) => {
+              const matchesMode =
+                journalFilterMode === 'all' ||
+                entry.modeId === journalFilterMode ||
+                (!entry.modeId && journalFilterMode === 'all');
+              const matchesQuery =
+                !journalSearchQuery ||
+                entry.title.toLowerCase().includes(journalSearchQuery.toLowerCase()) ||
+                (entry.reflectionNotes && entry.reflectionNotes.toLowerCase().includes(journalSearchQuery.toLowerCase())) ||
+                (entry.whatISaid && entry.whatISaid.toLowerCase().includes(journalSearchQuery.toLowerCase())) ||
+                (entry.whatIStruggledWith && entry.whatIStruggledWith.toLowerCase().includes(journalSearchQuery.toLowerCase())) ||
+                (entry.newWordsUsed && entry.newWordsUsed.toLowerCase().includes(journalSearchQuery.toLowerCase()));
+              return matchesMode && matchesQuery;
+            });
 
-              {userState?.journalEntries.length === 0 ? (
-                <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-4">
-                  <Mic className="w-10 h-10 text-slate-600 mx-auto" />
-                  <div className="space-y-1">
-                    <h3 className="text-base font-bold text-white">No Speaking Sessions Yet</h3>
-                    <p className="text-xs text-slate-400">
-                      Head over to the Speaking tab to record your first 60-second architecture pitch!
+            const avgConfidence = allEntries.length > 0
+              ? (allEntries.reduce((acc, curr) => acc + (curr.confidenceScore || curr.selfRating || 4), 0) / allEntries.length).toFixed(1)
+              : '0.0';
+            const totalMinutes = Math.round(
+              allEntries.reduce((acc, curr) => acc + (curr.durationSeconds || 60), 0) / 60
+            );
+            const totalFillers = allEntries.reduce((acc, curr) => acc + (curr.fillerWordCount || 0), 0);
+            const allNewWords = Array.from(
+              new Set(
+                allEntries.flatMap((e) =>
+                  e.newWordsUsed ? e.newWordsUsed.split(',').map((w) => w.trim()).filter(Boolean) : []
+                )
+              )
+            );
+
+            return (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold font-display text-white flex items-center gap-2">
+                      <MessageSquare className="w-6 h-6 text-blue-400" />
+                      <span>Speaking Journal &amp; Self-Reflection Archive</span>
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                      Review past speech recordings, track struggles, catalog new words, and observe filler word reductions over time.
                     </p>
                   </div>
                   <button
                     onClick={() => handleTabChange('speaking')}
-                    className="px-5 py-2.5 bg-[#006cd2] text-white rounded-xl text-xs font-mono font-bold"
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-mono text-xs font-bold rounded-xl transition flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-blue-500/20"
                   >
-                    Go to Speaking Studio
+                    <Mic className="w-4 h-4" />
+                    <span>New Speaking Session</span>
                   </button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {userState?.journalEntries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-3"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/60 pb-3">
-                        <div>
-                          <span className="text-[10px] font-mono text-blue-400 uppercase font-bold">
-                            {entry.promptCategory || 'Impromptu Speech'}
-                          </span>
-                          <h4 className="text-base font-bold font-display text-white">
-                            {entry.title}
-                          </h4>
-                        </div>
 
-                        <div className="flex items-center gap-3 font-mono text-xs">
-                          <span className="text-slate-400">{entry.dateStr}</span>
-                          <span className="text-amber-400 flex items-center gap-1">
-                            <Star className="w-3.5 h-3.5 fill-amber-400" />
-                            {entry.selfRating}/5 Stars
-                          </span>
-                          <span className="text-rose-400">
-                            {entry.fillerWordCount} Fillers
-                          </span>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-slate-300 italic">
-                        Reflection: &ldquo;{entry.reflectionNotes}&rdquo;
-                      </p>
-
-                      {entry.audioBlobUrl && (
-                        <audio controls src={entry.audioBlobUrl} className="h-8 w-full sm:w-72 mt-2" />
-                      )}
+                {/* Metrics Summary Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-mono text-blue-400 uppercase font-bold">
+                      TOTAL SESSIONS
+                    </span>
+                    <div className="text-2xl font-bold font-display text-white">
+                      {allEntries.length}
                     </div>
-                  ))}
+                    <p className="text-[11px] text-slate-400">Speech logs recorded</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-mono text-amber-400 uppercase font-bold">
+                      AVG CONFIDENCE
+                    </span>
+                    <div className="text-2xl font-bold font-display text-amber-400 flex items-center gap-1.5">
+                      <span>{avgConfidence}</span>
+                      <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                    </div>
+                    <p className="text-[11px] text-slate-400">Out of 5.0 rating scale</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">
+                      SPEAKING TIME
+                    </span>
+                    <div className="text-2xl font-bold font-display text-cyan-400">
+                      {totalMinutes}m
+                    </div>
+                    <p className="text-[11px] text-slate-400">Total verbal delivery</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold">
+                      WORDS CATALOGED
+                    </span>
+                    <div className="text-2xl font-bold font-display text-emerald-400">
+                      {allNewWords.length}
+                    </div>
+                    <p className="text-[11px] text-slate-400">New active vocabulary</p>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* Filter & Search Toolbar */}
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  {/* Mode Filter Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setJournalFilterMode('all')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition ${
+                        journalFilterMode === 'all'
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      All Modes ({allEntries.length})
+                    </button>
+                    {SPEAKING_MODES_CONFIG.map((m) => {
+                      const count = allEntries.filter((e) => e.modeId === m.id).length;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setJournalFilterMode(m.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition ${
+                            journalFilterMode === m.id
+                              ? 'bg-blue-600 text-white shadow-md'
+                              : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                          }`}
+                        >
+                          {m.title.replace(/^\d+\.\s*/, '')} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Search box */}
+                  <div className="relative w-full md:w-64">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Search reflections, words..."
+                      value={journalSearchQuery}
+                      onChange={(e) => setJournalSearchQuery(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Journal Entries List */}
+                {filteredEntries.length === 0 ? (
+                  <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-4">
+                    <Mic className="w-12 h-12 text-slate-600 mx-auto" />
+                    <div className="space-y-1">
+                      <h3 className="text-base font-bold text-white">
+                        {allEntries.length === 0 ? 'No Speaking Sessions Recorded Yet' : 'No Matching Journal Entries'}
+                      </h3>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        {allEntries.length === 0
+                          ? 'Select one of the 8 practice modes in the Speaking Studio, run your timed drill, and log your reflection.'
+                          : 'Try adjusting your mode filter or search query.'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleTabChange('speaking')}
+                      className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-mono font-bold shadow-lg shadow-blue-500/20"
+                    >
+                      Open Speaking Studio
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {filteredEntries.map((entry) => {
+                      const modeConfig = SPEAKING_MODES_CONFIG.find((m) => m.id === entry.modeId);
+                      const rating = entry.confidenceScore || entry.selfRating || 4;
+
+                      return (
+                        <div
+                          key={entry.id}
+                          className="p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 hover:border-slate-700 transition"
+                        >
+                          {/* Entry Header */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-mono uppercase font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                  {modeConfig?.title || entry.promptCategory || 'Speaking Practice'}
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  {entry.dateStr}
+                                </span>
+                              </div>
+                              <h4 className="text-lg font-bold font-display text-white">
+                                {entry.title}
+                              </h4>
+                            </div>
+
+                            {/* Badges & Actions */}
+                            <div className="flex items-center gap-3">
+                              {/* Confidence Score */}
+                              <div className="flex items-center gap-1 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                                <span className="text-[10px] font-mono text-slate-400 mr-1">CONFIDENCE:</span>
+                                <div className="flex items-center gap-0.5">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <Star
+                                      key={star}
+                                      className={`w-3.5 h-3.5 ${rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-700'}`}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-xs font-mono font-bold text-amber-400 ml-1">
+                                  {rating}/5
+                                </span>
+                              </div>
+
+                              {/* Duration Badge */}
+                              <div className="hidden sm:flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 font-mono text-xs text-slate-300">
+                                <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>{entry.durationSeconds || 60}s</span>
+                              </div>
+
+                              {/* Fillers Count */}
+                              {entry.fillerWordCount !== undefined && (
+                                <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 font-mono text-xs text-rose-400">
+                                  {entry.fillerWordCount} Fillers
+                                </div>
+                              )}
+
+                              {/* Delete button */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteJournalEntry(entry.id)}
+                                title="Delete this journal entry"
+                                className="p-2 bg-slate-950 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-500/40 rounded-xl text-slate-500 hover:text-rose-400 transition"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 1. What I Said */}
+                          {entry.whatISaid ? (
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">
+                                What I Said / Key Delivery:
+                              </span>
+                              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80">
+                                {entry.whatISaid}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">
+                                Reflection Note:
+                              </span>
+                              <p className="text-xs text-slate-300 leading-relaxed italic bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80">
+                                &ldquo;{entry.reflectionNotes}&rdquo;
+                              </p>
+                            </div>
+                          )}
+
+                          {/* 2. What I Struggled With & Mistakes Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {entry.whatIStruggledWith && (
+                              <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-1">
+                                <span className="text-[10px] font-mono text-amber-400 uppercase font-bold flex items-center gap-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <span>What I Struggled With:</span>
+                                </span>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                  {entry.whatIStruggledWith}
+                                </p>
+                              </div>
+                            )}
+
+                            {entry.mistakesNoticed && (
+                              <div className="p-3.5 rounded-2xl bg-rose-500/5 border border-rose-500/20 space-y-1">
+                                <span className="text-[10px] font-mono text-rose-400 uppercase font-bold flex items-center gap-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <span>Mistakes Noticed:</span>
+                                </span>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                  {entry.mistakesNoticed}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. New Words Used */}
+                          {entry.newWordsUsed && (
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                              <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">
+                                New Words:
+                              </span>
+                              {entry.newWordsUsed
+                                .split(',')
+                                .map((w) => w.trim())
+                                .filter(Boolean)
+                                .map((word, wIdx) => (
+                                  <span
+                                    key={wIdx}
+                                    className="px-2.5 py-0.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-xs font-mono"
+                                  >
+                                    {word}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
+
+                          {/* 4. Audio Playback if Available */}
+                          {entry.audioBlobUrl && (
+                            <div className="pt-2 border-t border-slate-800/60 flex items-center gap-3">
+                              <span className="text-[10px] font-mono text-blue-400 uppercase font-bold shrink-0 flex items-center gap-1">
+                                <Mic className="w-3.5 h-3.5" />
+                                <span>Voice Playback:</span>
+                              </span>
+                              <audio controls src={entry.audioBlobUrl} className="h-8 w-full sm:w-80" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ========================================================================= */}
           {/* 13. PROGRESS OVERVIEW TAB */}

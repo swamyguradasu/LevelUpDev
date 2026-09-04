@@ -16,12 +16,18 @@ import {
 export interface SpeakingJournalEntry {
   id: string;
   title: string;
+  modeId?: string;
   promptId?: string;
   promptCategory?: string;
   durationSeconds: number;
   selfRating: number; // 1-5
+  confidenceScore?: number; // 1-5
   fillerWordCount: number;
   reflectionNotes: string;
+  whatISaid?: string;
+  whatIStruggledWith?: string;
+  newWordsUsed?: string;
+  mistakesNoticed?: string;
   audioBlobUrl?: string;
   dateStr: string;
   timestamp: string;
@@ -495,6 +501,24 @@ export async function saveSpeakingJournalEntry(
       ...currentState.dailyTrainingLogs,
       [dateKey]: updatedLog,
     },
+  };
+
+  await saveEnglishCareerState(nextState);
+  return nextState;
+}
+
+/**
+ * Delete a speaking journal entry.
+ */
+export async function deleteSpeakingJournalEntry(
+  currentState: EnglishCareerUserState,
+  entryId: string
+): Promise<EnglishCareerUserState> {
+  const nextJournal = currentState.journalEntries.filter((j) => j.id !== entryId);
+
+  const nextState: EnglishCareerUserState = {
+    ...currentState,
+    journalEntries: nextJournal,
   };
 
   await saveEnglishCareerState(nextState);
