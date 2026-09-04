@@ -47,6 +47,9 @@ import {
   completeDailyTrainingDay,
   EnglishCareerUserState,
   EnglishCareerMetrics,
+  SkillDimensionItem,
+  NextBestActionRecommendation,
+  WeeklyCategoryProgress,
   DailyTrainingSessionState,
   CompletedDailyLessonRecord,
   DailyPillarProgressState,
@@ -608,6 +611,66 @@ function EnglishCareerContent() {
     const url = new URL(window.location.href);
     url.searchParams.set('tab', tab);
     window.history.pushState({}, '', url.toString());
+  };
+
+  // Next Best Action Dispatcher
+  const handleExecuteNextBestAction = (action: NextBestActionRecommendation) => {
+    if (action.targetTab === 'interview') {
+      if (action.actionParam) {
+        setSelectedInterviewQuestionId(action.actionParam);
+      }
+      setInterviewSubTab('studio');
+      handleTabChange('interview');
+    } else if (action.targetTab === 'speaking') {
+      if (action.actionParam) {
+        setSelectedSpeakingMode(action.actionParam as any);
+        const ex = SPEAKING_EXERCISES.find((e) => e.modeId === action.actionParam) || SPEAKING_EXERCISES[0];
+        setSelectedSpeakingExercise(ex);
+      }
+      handleTabChange('speaking');
+    } else if (action.targetTab === 'grammar') {
+      handleTabChange('grammar');
+    } else if (action.targetTab === 'vocabulary') {
+      handleTabChange('vocabulary');
+    } else if (action.targetTab === 'listening') {
+      handleTabChange('listening');
+    } else if (action.targetTab === 'technical') {
+      handleTabChange('technical');
+    } else if (action.targetTab === 'professional') {
+      handleTabChange('professional');
+    } else if (action.targetTab === 'daily') {
+      handleTabChange('daily');
+    } else {
+      handleTabChange(action.targetTab as ActiveTab);
+    }
+  };
+
+  // Icon Renderer Helper
+  const renderDimensionIcon = (iconName: string, className = 'w-4 h-4') => {
+    switch (iconName) {
+      case 'Layers':
+        return <Layers className={className} />;
+      case 'Mic':
+        return <Mic className={className} />;
+      case 'CheckCircle2':
+        return <CheckCircle2 className={className} />;
+      case 'BookOpen':
+        return <BookOpen className={className} />;
+      case 'Headphones':
+        return <Headphones className={className} />;
+      case 'Cpu':
+        return <Cpu className={className} />;
+      case 'Briefcase':
+        return <Briefcase className={className} />;
+      case 'Award':
+        return <Award className={className} />;
+      case 'Sparkles':
+        return <Sparkles className={className} />;
+      case 'Flame':
+        return <Flame className={className} />;
+      default:
+        return <Target className={className} />;
+    }
   };
 
   // Copy to Clipboard
@@ -1789,15 +1852,17 @@ function EnglishCareerContent() {
           {/* ========================================================================= */}
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
-              {/* Hero Banner */}
+              {/* ========================================================================= */}
+              {/* HERO & OVERALL COMMUNICATION READINESS */}
+              {/* ========================================================================= */}
               <section className="relative overflow-hidden bg-gradient-to-b from-slate-900/90 to-slate-900/50 border border-slate-800 rounded-3xl p-6 sm:p-10 backdrop-blur-xl shadow-2xl">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#006cd2] via-cyan-400 to-emerald-400" />
 
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                   <div className="space-y-3 max-w-2xl">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-400 text-xs font-mono font-bold tracking-wide">
                       <ShieldCheck className="w-3.5 h-3.5 text-[#006cd2]" />
-                      <span>PERSONAL CAREER COMMUNICATION PORTAL</span>
+                      <span>PRIVATE ENGLISH &amp; CAREER COMMUNICATION TRAINER</span>
                     </div>
 
                     <h1 className="text-2xl sm:text-4xl font-display font-extrabold text-white tracking-tight leading-tight">
@@ -1808,189 +1873,520 @@ function EnglishCareerContent() {
                     </h1>
 
                     <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-                      Structured daily training for tech interviews, system architecture articulation,
-                      constructive code reviews, and executive corporate presence.
+                      Real-time communication readiness index computed deterministically from your actual speech recordings, grammar drills, mock interview evaluations, and daily training milestones.
                     </p>
                   </div>
 
-                  {/* Readiness Metric Circle Card */}
-                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 w-full lg:w-80 space-y-3 text-center shadow-inner">
-                    <div className="text-xs font-mono text-slate-400 uppercase font-semibold">
-                      Career Communication Readiness
-                    </div>
-                    <div className="font-display text-4xl font-black text-white flex items-center justify-center gap-2">
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">
-                        {metrics.overallReadiness}%
+                  {/* Overall Readiness Card */}
+                  <div className="bg-slate-950/90 border border-slate-800/90 rounded-3xl p-6 w-full lg:w-88 space-y-4 text-center shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+                    <div className="flex items-center justify-between text-xs font-mono text-slate-400 uppercase font-semibold">
+                      <span className="flex items-center gap-1.5">
+                        <Award className="w-3.5 h-3.5 text-cyan-400" />
+                        OVERALL READINESS
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-bold">
+                        {metrics.currentLevel}
                       </span>
                     </div>
-                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-[#006cd2] to-emerald-400 h-full rounded-full transition-all duration-700"
-                        style={{ width: `${Math.max(5, metrics.overallReadiness)}%` }}
-                      />
+
+                    <div className="py-1">
+                      <div className="font-display text-5xl font-black text-white flex items-center justify-center gap-2 tracking-tight">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-emerald-400">
+                          {metrics.overallReadiness}%
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-mono text-slate-400 block mt-1">
+                        Communication Readiness Score
+                      </span>
                     </div>
-                    <div className="flex justify-between text-[11px] font-mono text-slate-400">
-                      <span>Level: <b className="text-white">{metrics.currentLevel}</b></span>
-                      <span>Streak: <b className="text-orange-400">{metrics.trainingStreak}d</b></span>
+
+                    <div className="space-y-1.5">
+                      <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden p-0.5 border border-slate-800">
+                        <div
+                          className="bg-gradient-to-r from-[#006cd2] via-cyan-400 to-emerald-400 h-full rounded-full transition-all duration-700 shadow-sm"
+                          style={{ width: `${Math.max(5, metrics.overallReadiness)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[11px] font-mono text-slate-400 pt-1">
+                        <span>Streak: <b className="text-orange-400 font-bold">{metrics.trainingStreak} Days 🔥</b></span>
+                        <span>Completed: <b className="text-white font-bold">{metrics.trainingDaysCompleted} Days</b></span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* Core Skill Progress Grid (8 Metrics) */}
+              {/* ========================================================================= */}
+              {/* NEXT BEST ACTION (AI RECOMMENDATION ENGINE) */}
+              {/* ========================================================================= */}
+              <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900/95 via-slate-900/80 to-amber-950/20 border border-amber-500/30 p-6 sm:p-7 backdrop-blur-xl shadow-xl">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-amber-400 via-orange-500 to-amber-600" />
+
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div className="space-y-2.5 max-w-3xl">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono font-bold tracking-wide">
+                        <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        <span>NEXT BEST ACTION</span>
+                      </div>
+
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 text-[11px] font-mono">
+                        <span>Weakest Skill:</span>
+                        <span className="text-amber-400 font-bold">{metrics.weakestSkill.name}</span>
+                        <span className="text-slate-400">({metrics.weakestSkill.score}%)</span>
+                      </div>
+
+                      <div className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-400">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        <span>~{metrics.nextBestAction.estimatedMinutes} min</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
+                        {metrics.nextBestAction.activityTitle}
+                      </h2>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mt-1">
+                        {metrics.nextBestAction.activityDescription}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button
+                      onClick={() => handleExecuteNextBestAction(metrics.nextBestAction)}
+                      className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-sans font-extrabold rounded-2xl transition-all duration-300 text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 hover:scale-[1.02]"
+                    >
+                      <span>Start Practice</span>
+                      <ArrowRight className="w-4 h-4 text-slate-950" />
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* ========================================================================= */}
+              {/* THIS WEEK PROGRESS (7-DAY GOAL TRACKER) */}
+              {/* ========================================================================= */}
               <section className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-bold font-display text-white flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-[#006cd2]" />
-                    <span>Communication Dimensions &amp; Progress</span>
-                  </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-orange-400" />
+                    <h2 className="text-base sm:text-lg font-bold font-display text-white">
+                      THIS WEEK PROGRESS
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-300 text-[10px] font-mono font-bold">
+                      Past 7 Days
+                    </span>
+                  </div>
                   <span className="text-xs font-mono text-slate-400">
-                    Calculated from completed drills &amp; assessments
+                    Actual stored completions vs weekly targets
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Metric 1: Speaking Confidence */}
-                  <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                  {/* Grammar This Week */}
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 space-y-2.5">
                     <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <Mic className="w-3.5 h-3.5 text-blue-400" /> Speaking Confidence
+                      <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Grammar
                       </span>
-                      <span className="text-blue-400 font-bold">{metrics.speakingConfidence}%</span>
+                      <span className="text-emerald-400 font-bold">
+                        {metrics.thisWeek.grammar.completed}/{metrics.thisWeek.grammar.target}
+                      </span>
                     </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2">
+                    <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden">
                       <div
-                        className="bg-blue-500 h-full rounded-full transition-all"
-                        style={{ width: `${metrics.speakingConfidence}%` }}
+                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${metrics.thisWeek.grammar.percent}%` }}
                       />
                     </div>
-                    <p className="text-[11px] text-slate-400">Pacing, rhythm, and filler word control</p>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>{metrics.thisWeek.grammar.isMet ? '✅ Goal Met' : `${metrics.thisWeek.grammar.target - metrics.thisWeek.grammar.completed} more left`}</span>
+                      <span>{metrics.thisWeek.grammar.percent}%</span>
+                    </div>
                   </div>
 
-                  {/* Metric 2: Grammar Progress */}
-                  <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                  {/* Speaking This Week */}
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 space-y-2.5">
                     <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Technical Grammar
+                      <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                        <Mic className="w-3.5 h-3.5 text-cyan-400" /> Speaking
                       </span>
-                      <span className="text-emerald-400 font-bold">{metrics.grammarProgress}%</span>
+                      <span className="text-cyan-400 font-bold">
+                        {metrics.thisWeek.speaking.completed}/{metrics.thisWeek.speaking.target}
+                      </span>
                     </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2">
+                    <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden">
                       <div
-                        className="bg-emerald-500 h-full rounded-full transition-all"
-                        style={{ width: `${metrics.grammarProgress}%` }}
+                        className="bg-gradient-to-r from-cyan-500 to-blue-400 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${metrics.thisWeek.speaking.percent}%` }}
                       />
                     </div>
-                    <p className="text-[11px] text-slate-400">Conditionals, active voice &amp; RFC 2119</p>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>{metrics.thisWeek.speaking.isMet ? '✅ Goal Met' : `${metrics.thisWeek.speaking.target - metrics.thisWeek.speaking.completed} more left`}</span>
+                      <span>{metrics.thisWeek.speaking.percent}%</span>
+                    </div>
                   </div>
 
-                  {/* Metric 3: Vocabulary Progress */}
-                  <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                  {/* Listening This Week */}
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 space-y-2.5">
                     <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <BookOpen className="w-3.5 h-3.5 text-amber-400" /> Executive Vocabulary
+                      <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                        <Headphones className="w-3.5 h-3.5 text-indigo-400" /> Listening
                       </span>
-                      <span className="text-amber-400 font-bold">{metrics.vocabularyProgress}%</span>
+                      <span className="text-indigo-400 font-bold">
+                        {metrics.thisWeek.listening.completed}/{metrics.thisWeek.listening.target}
+                      </span>
                     </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2">
+                    <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden">
                       <div
-                        className="bg-amber-500 h-full rounded-full transition-all"
-                        style={{ width: `${metrics.vocabularyProgress}%` }}
+                        className="bg-gradient-to-r from-indigo-500 to-purple-400 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${metrics.thisWeek.listening.percent}%` }}
                       />
                     </div>
-                    <p className="text-[11px] text-slate-400">100+ high-impact corporate collocations</p>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>{metrics.thisWeek.listening.isMet ? '✅ Goal Met' : `${metrics.thisWeek.listening.target - metrics.thisWeek.listening.completed} more left`}</span>
+                      <span>{metrics.thisWeek.listening.percent}%</span>
+                    </div>
                   </div>
 
-                  {/* Metric 4: Listening Progress */}
-                  <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                  {/* Technical This Week */}
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 space-y-2.5">
                     <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <Headphones className="w-3.5 h-3.5 text-indigo-400" /> Stakeholder Listening
+                      <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                        <Cpu className="w-3.5 h-3.5 text-sky-400" /> Technical
                       </span>
-                      <span className="text-indigo-400 font-bold">{metrics.listeningProgress}%</span>
+                      <span className="text-sky-400 font-bold">
+                        {metrics.thisWeek.technical.completed}/{metrics.thisWeek.technical.target}
+                      </span>
                     </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2">
+                    <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden">
                       <div
-                        className="bg-indigo-500 h-full rounded-full transition-all"
-                        style={{ width: `${metrics.listeningProgress}%` }}
+                        className="bg-gradient-to-r from-sky-500 to-cyan-400 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${metrics.thisWeek.technical.percent}%` }}
                       />
                     </div>
-                    <p className="text-[11px] text-slate-400">Fast-paced global stakeholder briefs</p>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>{metrics.thisWeek.technical.isMet ? '✅ Goal Met' : `${metrics.thisWeek.technical.target - metrics.thisWeek.technical.completed} more left`}</span>
+                      <span>{metrics.thisWeek.technical.percent}%</span>
+                    </div>
                   </div>
 
-                  {/* Metric 5: Technical English */}
-                  <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                  {/* Interview This Week */}
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 space-y-2.5">
                     <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <Cpu className="w-3.5 h-3.5 text-cyan-400" /> Technical English
+                      <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                        <Award className="w-3.5 h-3.5 text-purple-400" /> Interview
                       </span>
-                      <span className="text-cyan-400 font-bold">{metrics.technicalProgress}%</span>
+                      <span className="text-purple-400 font-bold">
+                        {metrics.thisWeek.interview.completed}/{metrics.thisWeek.interview.target}
+                      </span>
                     </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2">
+                    <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden">
                       <div
-                        className="bg-cyan-500 h-full rounded-full transition-all"
-                        style={{ width: `${metrics.technicalProgress}%` }}
+                        className="bg-gradient-to-r from-purple-500 to-pink-400 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${metrics.thisWeek.interview.percent}%` }}
                       />
                     </div>
-                    <p className="text-[11px] text-slate-400">Code reviews &amp; architecture defense</p>
-                  </div>
-
-                  {/* Metric 6: Interview English */}
-                  <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
-                    <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <Award className="w-3.5 h-3.5 text-purple-400" /> Interview English (STAR)
-                      </span>
-                      <span className="text-purple-400 font-bold">{metrics.interviewProgress}%</span>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>{metrics.thisWeek.interview.isMet ? '✅ Goal Met' : `${metrics.thisWeek.interview.target - metrics.thisWeek.interview.completed} more left`}</span>
+                      <span>{metrics.thisWeek.interview.percent}%</span>
                     </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2">
-                      <div
-                        className="bg-purple-500 h-full rounded-full transition-all"
-                        style={{ width: `${metrics.interviewProgress}%` }}
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-400">Behavioral stories &amp; live coding narration</p>
-                  </div>
-
-                  {/* Metric 7: Professional Communication */}
-                  <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
-                    <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <Briefcase className="w-3.5 h-3.5 text-teal-400" /> Executive Presence
-                      </span>
-                      <span className="text-teal-400 font-bold">{metrics.professionalProgress}%</span>
-                    </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2">
-                      <div
-                        className="bg-teal-500 h-full rounded-full transition-all"
-                        style={{ width: `${metrics.professionalProgress}%` }}
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-400">Email memos, diplomacy &amp; standups</p>
-                  </div>
-
-                  {/* Metric 8: Weekly Completion */}
-                  <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
-                    <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-orange-400" /> Weekly Consistency
-                      </span>
-                      <span className="text-orange-400 font-bold">
-                        {metrics.weeklyCompletion.completedDays}/7 Days
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2">
-                      <div
-                        className="bg-orange-500 h-full rounded-full transition-all"
-                        style={{ width: `${metrics.weeklyCompletion.percent}%` }}
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-400">Active speech drills over past 7 days</p>
                   </div>
                 </div>
               </section>
 
-              {/* Quick Jump Modules Cards */}
+              {/* ========================================================================= */}
+              {/* KEY PERFORMANCE STATISTICS & DRILL METRICS */}
+              {/* ========================================================================= */}
+              <section className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <BarChart2 className="w-4 h-4 text-[#006cd2]" />
+                    <h2 className="text-base sm:text-lg font-bold font-display text-white">
+                      PERFORMANCE STATISTICS &amp; REPOSITORY MILESTONES
+                    </h2>
+                  </div>
+                  <span className="text-xs font-mono text-slate-400">
+                    Real state counters
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                  {/* Current Level */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Current Level
+                    </div>
+                    <div className="text-xs sm:text-sm font-bold font-display text-white truncate" title={metrics.currentLevel}>
+                      {metrics.currentLevel}
+                    </div>
+                    <div className="text-[10px] font-mono text-cyan-400 font-semibold">
+                      {metrics.overallReadiness}% Readiness
+                    </div>
+                  </div>
+
+                  {/* Training Days Completed */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Training Days
+                    </div>
+                    <div className="text-lg sm:text-xl font-bold font-display text-white">
+                      {metrics.trainingDaysCompleted}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Daily Lessons Done
+                    </div>
+                  </div>
+
+                  {/* Current Streak */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Current Streak
+                    </div>
+                    <div className="text-lg sm:text-xl font-bold font-display text-orange-400 flex items-center gap-1">
+                      <Flame className="w-4 h-4 fill-orange-400" />
+                      <span>{metrics.trainingStreak} Days</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Consecutive Active
+                    </div>
+                  </div>
+
+                  {/* Total Speaking Sessions */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Speaking Sessions
+                    </div>
+                    <div className="text-lg sm:text-xl font-bold font-display text-cyan-400">
+                      {metrics.totalSpeakingSessions}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Recorded Journal Drills
+                    </div>
+                  </div>
+
+                  {/* Technical Explanations */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Tech Explanations
+                    </div>
+                    <div className="text-lg sm:text-xl font-bold font-display text-sky-400">
+                      {metrics.technicalExplanationsCompleted}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Architecture &amp; Code Drills
+                    </div>
+                  </div>
+
+                  {/* Mock Interviews */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Mock Interviews
+                    </div>
+                    <div className="text-lg sm:text-xl font-bold font-display text-purple-400">
+                      {metrics.mockInterviewsCompleted}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Completed Sessions
+                    </div>
+                  </div>
+
+                  {/* Grammar Accuracy */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Grammar Accuracy
+                    </div>
+                    <div className="text-lg sm:text-xl font-bold font-display text-emerald-400">
+                      {metrics.grammarAccuracy}%
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Assessments &amp; Precision
+                    </div>
+                  </div>
+
+                  {/* Vocabulary Learned */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Vocab Learned
+                    </div>
+                    <div className="text-lg sm:text-xl font-bold font-display text-amber-400">
+                      {metrics.vocabularyLearned}
+                      <span className="text-xs text-slate-500 font-normal"> / {metrics.totalVocabulary}</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Mastered Terms
+                    </div>
+                  </div>
+
+                  {/* Common Mistakes */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Common Mistakes
+                    </div>
+                    <div className="text-base sm:text-lg font-bold font-display text-rose-400">
+                      {metrics.commonMistakesCount} Unresolved
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 truncate" title={metrics.topMistakeCategory}>
+                      Top: <b className="text-slate-300">{metrics.topMistakeCategory}</b>
+                    </div>
+                  </div>
+
+                  {/* Weakest Skill */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Weakest Skill
+                    </div>
+                    <div className="text-xs sm:text-sm font-bold font-display text-amber-400 truncate" title={metrics.weakestSkill.name}>
+                      {metrics.weakestSkill.name}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Score: <b className="text-amber-400">{metrics.weakestSkill.score}%</b>
+                    </div>
+                  </div>
+
+                  {/* Strongest Skill */}
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1 sm:col-span-2 lg:col-span-2">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                      Strongest Skill
+                    </div>
+                    <div className="text-xs sm:text-sm font-bold font-display text-emerald-400 truncate" title={metrics.strongestSkill.name}>
+                      {metrics.strongestSkill.name}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Proficiency: <b className="text-emerald-400">{metrics.strongestSkill.score}%</b> ({metrics.strongestSkill.badge})
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ========================================================================= */}
+              {/* OVERALL COMMUNICATION READINESS — 10 SKILL DIMENSIONS BREAKDOWN */}
+              {/* ========================================================================= */}
+              <section className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-[#006cd2]" />
+                    <h2 className="text-base sm:text-lg font-bold font-display text-white">
+                      OVERALL COMMUNICATION READINESS BREAKDOWN
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[10px] font-mono font-bold">
+                      10 Dimensions
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-slate-400">
+                    Live aggregate scoring based on curriculum mastery &amp; evaluation logs
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.values(metrics.tenDimensions).map((dimension) => {
+                    const isWeakest = dimension.id === metrics.weakestSkill.id;
+                    const isStrongest = dimension.id === metrics.strongestSkill.id;
+
+                    return (
+                      <div
+                        key={dimension.id}
+                        className={`p-5 rounded-2xl bg-slate-900/80 border transition-all duration-300 space-y-3.5 flex flex-col justify-between ${
+                          isWeakest
+                            ? 'border-amber-500/40 bg-gradient-to-b from-amber-950/10 to-slate-900/90 shadow-lg shadow-amber-500/5'
+                            : isStrongest
+                            ? 'border-emerald-500/40 bg-gradient-to-b from-emerald-950/10 to-slate-900/90'
+                            : 'border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="p-2 rounded-xl bg-slate-800/80 text-cyan-400 border border-slate-700/60">
+                                {renderDimensionIcon(dimension.iconName, 'w-4 h-4')}
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-bold font-display text-white">
+                                  {dimension.name}
+                                </h3>
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  {dimension.category}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <span className="text-base font-bold font-display text-white block">
+                                {dimension.score}%
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
+                                  isWeakest
+                                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                    : isStrongest
+                                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                    : dimension.score >= 80
+                                    ? 'bg-emerald-500/10 text-emerald-400'
+                                    : dimension.score >= 40
+                                    ? 'bg-blue-500/10 text-blue-400'
+                                    : 'bg-slate-800 text-slate-400'
+                                }`}
+                              >
+                                {isWeakest ? 'Needs Focus' : dimension.badge}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800/80">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                isWeakest
+                                  ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                                  : isStrongest
+                                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                                  : dimension.score >= 80
+                                  ? 'bg-gradient-to-r from-cyan-500 to-emerald-400'
+                                  : dimension.score >= 40
+                                  ? 'bg-gradient-to-r from-blue-500 to-cyan-400'
+                                  : 'bg-gradient-to-r from-slate-600 to-slate-500'
+                              }`}
+                              style={{ width: `${Math.max(5, dimension.score)}%` }}
+                            />
+                          </div>
+
+                          <p className="text-xs text-slate-300 leading-relaxed min-h-[32px]">
+                            {dimension.description}
+                          </p>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono">
+                          <span className="text-slate-400">
+                            {dimension.totalCompleted} Completed
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (dimension.targetTab === 'grammar') handleTabChange('grammar');
+                              else if (dimension.targetTab === 'vocabulary') handleTabChange('vocabulary');
+                              else if (dimension.targetTab === 'speaking') handleTabChange('speaking');
+                              else if (dimension.targetTab === 'listening') handleTabChange('listening');
+                              else if (dimension.targetTab === 'technical') handleTabChange('technical');
+                              else if (dimension.targetTab === 'interview') handleTabChange('interview');
+                              else if (dimension.targetTab === 'professional') handleTabChange('professional');
+                              else handleTabChange('daily');
+                            }}
+                            className="text-cyan-400 hover:text-cyan-300 font-bold inline-flex items-center gap-1 transition"
+                          >
+                            <span>Practice</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* ========================================================================= */}
+              {/* QUICK JUMP TRAINING MODULES */}
+              {/* ========================================================================= */}
               <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Card 1: 10-Level Curriculum */}
                 <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4 flex flex-col justify-between">
@@ -6882,66 +7278,181 @@ function EnglishCareerContent() {
                 <div>
                   <h2 className="text-xl font-bold font-display text-white flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-cyan-400" />
-                    <span>Holistic Communication Mastery Breakdown</span>
+                    <span>Holistic Communication Mastery &amp; Progress</span>
                   </h2>
                   <p className="text-xs text-slate-400">
-                    Cross-track completion across all 8 specialized career communication tracks.
+                    Comprehensive 10-dimension proficiency breakdown, next best actions, and specialized track completion.
                   </p>
                 </div>
-                <div className="font-mono text-xs text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-                  {metrics.overallReadiness}% Overall Index
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-3 py-1.5 rounded-xl font-bold">
+                    {metrics.currentLevel}
+                  </span>
+                  <div className="font-mono text-xs text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-3 py-1.5 rounded-xl font-bold">
+                    {metrics.overallReadiness}% Overall Index
+                  </div>
                 </div>
               </div>
 
-              {/* Tracks Curriculum Directory */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {TRAINING_TRACKS.map((track) => (
-                  <div
-                    key={track.id}
-                    className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 flex flex-col justify-between"
+              {/* NEXT BEST ACTION CARD */}
+              <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900/95 via-slate-900/80 to-amber-950/20 border border-amber-500/30 p-6 backdrop-blur-xl shadow-xl">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-amber-400 via-orange-500 to-amber-600" />
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div className="space-y-2 max-w-3xl">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono font-bold">
+                        <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        <span>RECOMMENDED NEXT BEST ACTION</span>
+                      </div>
+                      <span className="text-xs font-mono text-slate-400">
+                        Weakest: <b className="text-amber-400">{metrics.weakestSkill.name}</b> ({metrics.weakestSkill.score}%)
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold font-display text-white">
+                      {metrics.nextBestAction.activityTitle}
+                    </h3>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      {metrics.nextBestAction.activityDescription}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleExecuteNextBestAction(metrics.nextBestAction)}
+                    className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 hover:scale-[1.02] transition"
                   >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">
-                          {track.category} TRACK
-                        </span>
-                        <span className="text-xs font-mono text-slate-500">
-                          ~{track.estimatedHours} Hours
-                        </span>
+                    <span>Start Activity</span>
+                    <ArrowRight className="w-4 h-4 text-slate-950" />
+                  </button>
+                </div>
+              </section>
+
+              {/* 10-DIMENSION SKILL GRID */}
+              <section className="space-y-4">
+                <h3 className="text-base font-bold font-display text-white flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-cyan-400" />
+                  <span>10 Communication Readiness Dimensions</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.values(metrics.tenDimensions).map((dimension) => (
+                    <div
+                      key={dimension.id}
+                      className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 flex flex-col justify-between"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-xl bg-slate-800 text-cyan-400 border border-slate-700/60">
+                              {renderDimensionIcon(dimension.iconName, 'w-4 h-4')}
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold font-display text-white">
+                                {dimension.name}
+                              </h4>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {dimension.category}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-bold font-display text-white block">
+                              {dimension.score}%
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {dimension.badge}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                          <div
+                            className="h-full bg-gradient-to-r from-[#006cd2] to-cyan-400 rounded-full transition-all"
+                            style={{ width: `${Math.max(5, dimension.score)}%` }}
+                          />
+                        </div>
+
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {dimension.description}
+                        </p>
                       </div>
 
-                      <h3 className="text-lg font-bold font-display text-white">
-                        {track.title}
-                      </h3>
-
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        {track.shortDescription}
-                      </p>
+                      <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono">
+                        <span className="text-slate-400">{dimension.totalCompleted} Completed</span>
+                        <button
+                          onClick={() => {
+                            if (dimension.targetTab === 'grammar') handleTabChange('grammar');
+                            else if (dimension.targetTab === 'vocabulary') handleTabChange('vocabulary');
+                            else if (dimension.targetTab === 'speaking') handleTabChange('speaking');
+                            else if (dimension.targetTab === 'listening') handleTabChange('listening');
+                            else if (dimension.targetTab === 'technical') handleTabChange('technical');
+                            else if (dimension.targetTab === 'interview') handleTabChange('interview');
+                            else if (dimension.targetTab === 'professional') handleTabChange('professional');
+                            else handleTabChange('daily');
+                          }}
+                          className="text-cyan-400 hover:text-cyan-300 font-bold inline-flex items-center gap-1"
+                        >
+                          <span>Practice</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              </section>
 
-                    <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between">
-                      <span className="text-xs font-mono text-slate-400">
-                        {track.totalModules} Core Lessons
-                      </span>
-                      <button
-                        onClick={() => {
-                          if (track.id === 'grammar') handleTabChange('grammar');
-                          else if (track.id === 'vocabulary') handleTabChange('vocabulary');
-                          else if (track.id === 'speaking') handleTabChange('speaking');
-                          else if (track.id === 'listening') handleTabChange('listening');
-                          else if (track.id === 'technical') handleTabChange('technical');
-                          else if (track.id === 'interview') handleTabChange('interview');
-                          else if (track.id === 'professional') handleTabChange('professional');
-                          else handleTabChange('daily');
-                        }}
-                        className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-[#006cd2] text-xs font-mono text-slate-200 hover:text-white transition"
-                      >
-                        Open Track
-                      </button>
+              {/* Tracks Curriculum Directory */}
+              <section className="space-y-4">
+                <h3 className="text-base font-bold font-display text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-blue-400" />
+                  <span>Communication Curriculum Tracks</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {TRAINING_TRACKS.map((track) => (
+                    <div
+                      key={track.id}
+                      className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 flex flex-col justify-between"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">
+                            {track.category} TRACK
+                          </span>
+                          <span className="text-xs font-mono text-slate-500">
+                            ~{track.estimatedHours} Hours
+                          </span>
+                        </div>
+
+                        <h3 className="text-lg font-bold font-display text-white">
+                          {track.title}
+                        </h3>
+
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {track.shortDescription}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between">
+                        <span className="text-xs font-mono text-slate-400">
+                          {track.totalModules} Core Lessons
+                        </span>
+                        <button
+                          onClick={() => {
+                            if (track.id === 'grammar') handleTabChange('grammar');
+                            else if (track.id === 'vocabulary') handleTabChange('vocabulary');
+                            else if (track.id === 'speaking') handleTabChange('speaking');
+                            else if (track.id === 'listening') handleTabChange('listening');
+                            else if (track.id === 'technical') handleTabChange('technical');
+                            else if (track.id === 'interview') handleTabChange('interview');
+                            else if (track.id === 'professional') handleTabChange('professional');
+                            else handleTabChange('daily');
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-[#006cd2] text-xs font-mono text-slate-200 hover:text-white transition"
+                        >
+                          Open Track
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </section>
             </div>
           )}
         </main>

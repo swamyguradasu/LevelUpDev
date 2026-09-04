@@ -187,9 +187,81 @@ export interface EnglishCareerUserState {
   updatedAt: string;
 }
 
+export interface SkillDimensionItem {
+  id: string;
+  name: string;
+  score: number; // 0 - 100
+  totalCompleted: number;
+  totalTarget: number;
+  description: string;
+  category: string;
+  targetTab: string;
+  iconName: string;
+  badge: string;
+}
+
+export interface NextBestActionRecommendation {
+  skillId: string;
+  skillName: string;
+  score: number;
+  activityTitle: string;
+  activityDescription: string;
+  targetTab: string;
+  actionParam?: string;
+  estimatedMinutes: number;
+  badgeText: string;
+}
+
+export interface WeeklyCategoryProgress {
+  category: string;
+  completed: number;
+  target: number;
+  percent: number;
+  isMet: boolean;
+}
+
 export interface EnglishCareerMetrics {
-  currentLevel: string;
+  currentLevel: 'B2 Upper Intermediate' | 'C1 Advanced Professional' | 'C2 Executive Fluency' | string;
   overallReadiness: number;
+  trainingStreak: number;
+  trainingDaysCompleted: number;
+  totalSpeakingSessions: number;
+  technicalExplanationsCompleted: number;
+  mockInterviewsCompleted: number;
+  grammarAccuracy: number;
+  vocabularyLearned: number;
+  totalVocabulary: number;
+  commonMistakesCount: number;
+  topMistakeCategory: string;
+
+  // 10 Dimensions Breakdown
+  tenDimensions: {
+    englishFoundation: SkillDimensionItem;
+    speaking: SkillDimensionItem;
+    grammar: SkillDimensionItem;
+    vocabulary: SkillDimensionItem;
+    listening: SkillDimensionItem;
+    technicalComm: SkillDimensionItem;
+    professionalComm: SkillDimensionItem;
+    interviewComm: SkillDimensionItem;
+    presentation: SkillDimensionItem;
+    confidence: SkillDimensionItem;
+  };
+
+  weakestSkill: SkillDimensionItem;
+  strongestSkill: SkillDimensionItem;
+  nextBestAction: NextBestActionRecommendation;
+
+  // Weekly Progress (THIS WEEK)
+  thisWeek: {
+    grammar: WeeklyCategoryProgress;
+    speaking: WeeklyCategoryProgress;
+    listening: WeeklyCategoryProgress;
+    technical: WeeklyCategoryProgress;
+    interview: WeeklyCategoryProgress;
+  };
+
+  // Backward compatibility fields
   speakingConfidence: number;
   grammarProgress: number;
   vocabularyProgress: number;
@@ -197,7 +269,6 @@ export interface EnglishCareerMetrics {
   technicalProgress: number;
   interviewProgress: number;
   professionalProgress: number;
-  trainingStreak: number;
   weeklyCompletion: {
     totalDays: number;
     completedDays: number;
@@ -393,108 +464,588 @@ export function calculateEnglishStreak(
   return currentStreak;
 }
 
-/**
- * Computes all dashboard metrics dynamically.
- */
 export function calculateEnglishCareerMetrics(state: EnglishCareerUserState): EnglishCareerMetrics {
   const completedLessons = state.completedDailyLessons || [];
-  const totalGrammar = GRAMMAR_TOPICS.length;
-  const completedGrammar = GRAMMAR_TOPICS.filter((g) => state.completedTopicIds.includes(g.id)).length;
-  const grammarProgress = totalGrammar > 0 ? Math.round((completedGrammar / totalGrammar) * 100) : 0;
+  const journalEntries = state.journalEntries || [];
+  const trackedMistakes = state.trackedMistakes || [];
+  const mockInterviews = state.mockInterviewHistory || [];
+  const questionPractices = state.questionPracticeHistory || [];
+  const assessments = state.assessmentHistory || [];
+  const completedTopicIds = state.completedTopicIds || [];
+  const masteredVocabIds = state.masteredVocabIds || [];
 
-  const totalVocab = VOCABULARY_LIST.length;
-  const completedVocab = state.masteredVocabIds.length;
-  const vocabularyProgress = totalVocab > 0 ? Math.min(100, Math.round((completedVocab / totalVocab) * 100)) : 0;
+  // =========================================================================
+  // 1. 10 INDEPENDENT SKILL DIMENSIONS (0 - 100%)
+  // =========================================================================
 
-  const totalListening = LISTENING_SCENARIOS.length;
-  const completedListening = LISTENING_SCENARIOS.filter((l) => state.completedTopicIds.includes(l.id)).length;
-  const listeningProgress = totalListening > 0 ? Math.round((completedListening / totalListening) * 100) : 0;
+  // Dimension 1: English Foundation (Core sentence structure & grammar rules)
+  const foundationCompleted = completedTopicIds.filter((id) =>
+    id.startsWith('mod_1') ||
+    id.startsWith('mod_2') ||
+    id.startsWith('mod_3') ||
+    id.startsWith('l1_') ||
+    id.startsWith('l2_') ||
+    id.startsWith('g_') ||
+    id.includes('foundation')
+  ).length;
+  const foundationTarget = 15;
+  const foundationScore = Math.min(100, Math.round((foundationCompleted / foundationTarget) * 100));
 
-  const totalTech = TECHNICAL_ENGLISH_LESSONS.length;
-  const completedTech = TECHNICAL_ENGLISH_LESSONS.filter((t) => state.completedTopicIds.includes(t.id)).length;
-  const technicalProgress = totalTech > 0 ? Math.round((completedTech / totalTech) * 100) : 0;
-
-  const totalInterview = INTERVIEW_ENGLISH_LESSONS.length;
-  const completedInterview = INTERVIEW_ENGLISH_LESSONS.filter((i) => state.completedTopicIds.includes(i.id)).length;
-  const interviewProgress = totalInterview > 0 ? Math.round((completedInterview / totalInterview) * 100) : 0;
-
-  const totalProf = PROFESSIONAL_EMAIL_TEMPLATES.length;
-  const completedProf = PROFESSIONAL_EMAIL_TEMPLATES.filter((p) => state.completedTopicIds.includes(p.id)).length;
-  const professionalProgress = totalProf > 0 ? Math.round((completedProf / totalProf) * 100) : 0;
-
-  // Speaking confidence based on completed speaking prompts, completed daily lessons, and journal ratings
+  // Dimension 2: Speaking (Spontaneous speaking, journal entries, fluency)
   const totalSpeakingPrompts = SPEAKING_PROMPTS.length;
-  const completedSpeaking = SPEAKING_PROMPTS.filter((s) => state.completedTopicIds.includes(s.id)).length;
-  const journalCount = state.journalEntries.length;
-  const speakingConfidence = Math.min(
+  const completedSpeakingPrompts = SPEAKING_PROMPTS.filter((s) => completedTopicIds.includes(s.id)).length;
+  const totalSpeakingSessions = journalEntries.length;
+  const speakingCompleted = completedSpeakingPrompts + totalSpeakingSessions;
+  const speakingTarget = totalSpeakingPrompts + 5;
+  const speakingScore = Math.min(100, Math.round((speakingCompleted / speakingTarget) * 100));
+
+  // Dimension 3: Technical Grammar
+  const totalGrammar = GRAMMAR_TOPICS.length;
+  const completedGrammar = GRAMMAR_TOPICS.filter((g) => completedTopicIds.includes(g.id)).length;
+  const grammarScore = totalGrammar > 0 ? Math.min(100, Math.round((completedGrammar / totalGrammar) * 100)) : 0;
+
+  // Dimension 4: Executive Vocabulary
+  const totalVocab = VOCABULARY_LIST.length;
+  const vocabularyLearned = masteredVocabIds.length;
+  const vocabularyScore = totalVocab > 0 ? Math.min(100, Math.round((vocabularyLearned / totalVocab) * 100)) : 0;
+
+  // Dimension 5: Stakeholder Listening & Shadowing
+  const totalListening = LISTENING_SCENARIOS.length;
+  const completedListening = LISTENING_SCENARIOS.filter((l) => completedTopicIds.includes(l.id)).length;
+  const listeningScore = totalListening > 0 ? Math.min(100, Math.round((completedListening / totalListening) * 100)) : 0;
+
+  // Dimension 6: Technical Communication (Architecture, code reviews, technical explanations)
+  const completedTechLessons = TECHNICAL_ENGLISH_LESSONS.filter((t) => completedTopicIds.includes(t.id)).length;
+  const techQuestionPractices = questionPractices.filter((q) =>
+    ['technical', 'dsa', 'aiml', 'project'].includes(q.category?.toLowerCase() || '')
+  ).length;
+  const techJournalPractices = journalEntries.filter((j) =>
+    ['five_minute_tech', 'project_explanation'].includes(j.modeId || '')
+  ).length;
+  const technicalExplanationsCompleted = completedTechLessons + techQuestionPractices + techJournalPractices;
+  const technicalTarget = TECHNICAL_ENGLISH_LESSONS.length + 8;
+  const technicalScore = Math.min(100, Math.round((technicalExplanationsCompleted / technicalTarget) * 100));
+
+  // Dimension 7: Professional Communication (Email memos, diplomacy, standups)
+  const completedProfEmails = PROFESSIONAL_EMAIL_TEMPLATES.filter((p) => completedTopicIds.includes(p.id)).length;
+  const profQuestionPractices = questionPractices.filter((q) =>
+    ['workplace', 'situational', 'recruiter'].includes(q.category?.toLowerCase() || '')
+  ).length;
+  const profJournalPractices = journalEntries.filter((j) =>
+    j.modeId === 'workplace_scenario'
+  ).length;
+  const professionalCompleted = completedProfEmails + profQuestionPractices + profJournalPractices;
+  const professionalTarget = PROFESSIONAL_EMAIL_TEMPLATES.length + 5;
+  const professionalScore = Math.min(100, Math.round((professionalCompleted / professionalTarget) * 100));
+
+  // Dimension 8: Interview Communication (STAR behavioral, system design, mock interviews)
+  const completedInterviewLessons = INTERVIEW_ENGLISH_LESSONS.filter((i) => completedTopicIds.includes(i.id)).length;
+  const mockInterviewsCompleted = mockInterviews.length;
+  const interviewQuestionsDone = questionPractices.length;
+  const interviewCompleted = completedInterviewLessons + mockInterviewsCompleted * 2 + interviewQuestionsDone;
+  const interviewTarget = INTERVIEW_ENGLISH_LESSONS.length + 10;
+  const interviewScore = Math.min(100, Math.round((interviewCompleted / interviewTarget) * 100));
+
+  // Dimension 9: Presentation & Tech Talks
+  const presentationJournal = journalEntries.filter((j) =>
+    ['presentation_practice', 'five_minute_tech', 'project_explanation'].includes(j.modeId || '')
+  ).length;
+  const presentationLessons = completedTopicIds.filter((id) => id.includes('presentation') || id.includes('mod_8') || id.includes('mod_9')).length;
+  const presentationCompleted = presentationJournal + presentationLessons;
+  const presentationTarget = 6;
+  const presentationScore = Math.min(100, Math.round((presentationCompleted / presentationTarget) * 100));
+
+  // Dimension 10: Delivery & Confidence
+  let confidenceScore = 0;
+  if (journalEntries.length > 0 || mockInterviews.length > 0) {
+    const journalConfidenceRatings = journalEntries.map((j) => (j.confidenceScore || j.selfRating || 4) * 20);
+    const mockConfidenceRatings = mockInterviews.map((m) => (m.dimensionScores?.confidence || 75));
+    const allRatings = [...journalConfidenceRatings, ...mockConfidenceRatings];
+    const avgRating = allRatings.reduce((acc, v) => acc + v, 0) / (allRatings.length || 1);
+    const totalFillers = journalEntries.reduce((acc, j) => acc + (j.fillerWordCount || 0), 0);
+    const avgFillers = journalEntries.length > 0 ? totalFillers / journalEntries.length : 0;
+    const fillerPenalty = Math.min(20, Math.round(avgFillers * 3));
+    confidenceScore = Math.min(100, Math.max(10, Math.round(avgRating - fillerPenalty)));
+  } else if (completedLessons.length > 0) {
+    confidenceScore = Math.min(80, 30 + completedLessons.length * 8);
+  } else {
+    confidenceScore = 0;
+  }
+
+  // Build 10 dimensions map
+  const tenDimensions = {
+    englishFoundation: {
+      id: 'englishFoundation',
+      name: 'English Foundation',
+      score: foundationScore,
+      totalCompleted: foundationCompleted,
+      totalTarget: foundationTarget,
+      description: 'Sentence structures, subject-verb agreement, and basic clauses',
+      category: 'Core Language',
+      targetTab: 'daily',
+      iconName: 'Layers',
+      badge: foundationScore >= 80 ? 'Mastered' : foundationScore >= 40 ? 'Developing' : 'Needs Practice',
+    },
+    speaking: {
+      id: 'speaking',
+      name: 'Speaking & Fluency',
+      score: speakingScore,
+      totalCompleted: speakingCompleted,
+      totalTarget: speakingTarget,
+      description: 'Spontaneous oral delivery, pacing, and filler word suppression',
+      category: 'Oral Delivery',
+      targetTab: 'speaking',
+      iconName: 'Mic',
+      badge: speakingScore >= 80 ? 'Fluent' : speakingScore >= 40 ? 'Practicing' : 'Needs Practice',
+    },
+    grammar: {
+      id: 'grammar',
+      name: 'Technical Grammar',
+      score: grammarScore,
+      totalCompleted: completedGrammar,
+      totalTarget: totalGrammar,
+      description: 'Tenses, active voice, RFC 2119 imperatives, and conditionals',
+      category: 'Accuracy',
+      targetTab: 'grammar',
+      iconName: 'CheckCircle2',
+      badge: grammarScore >= 80 ? 'Precise' : grammarScore >= 40 ? 'Developing' : 'Needs Practice',
+    },
+    vocabulary: {
+      id: 'vocabulary',
+      name: 'Executive Vocabulary',
+      score: vocabularyScore,
+      totalCompleted: vocabularyLearned,
+      totalTarget: totalVocab,
+      description: 'High-impact corporate collocations and engineering verbs',
+      category: 'Precision',
+      targetTab: 'vocabulary',
+      iconName: 'BookOpen',
+      badge: vocabularyScore >= 80 ? 'Advanced' : vocabularyScore >= 40 ? 'Expanding' : 'Needs Practice',
+    },
+    listening: {
+      id: 'listening',
+      name: 'Stakeholder Listening',
+      score: listeningScore,
+      totalCompleted: completedListening,
+      totalTarget: totalListening,
+      description: 'Active listening, speech shadowing, and stakeholder brief decoding',
+      category: 'Comprehension',
+      targetTab: 'listening',
+      iconName: 'Headphones',
+      badge: listeningScore >= 80 ? 'Attuned' : listeningScore >= 40 ? 'Active' : 'Needs Practice',
+    },
+    technicalComm: {
+      id: 'technicalComm',
+      name: 'Technical Communication',
+      score: technicalScore,
+      totalCompleted: technicalExplanationsCompleted,
+      totalTarget: technicalTarget,
+      description: 'System architecture walkthroughs, trade-off defense, and code reviews',
+      category: 'Engineering',
+      targetTab: 'technical',
+      iconName: 'Cpu',
+      badge: technicalScore >= 80 ? 'Lead Level' : technicalScore >= 40 ? 'Articulate' : 'Needs Practice',
+    },
+    professionalComm: {
+      id: 'professionalComm',
+      name: 'Professional Communication',
+      score: professionalScore,
+      totalCompleted: professionalCompleted,
+      totalTarget: professionalTarget,
+      description: 'Executive email memos, diplomatic pushback, and standup updates',
+      category: 'Workplace',
+      targetTab: 'professional',
+      iconName: 'Briefcase',
+      badge: professionalScore >= 80 ? 'Executive' : professionalScore >= 40 ? 'Diplomatic' : 'Needs Practice',
+    },
+    interviewComm: {
+      id: 'interviewComm',
+      name: 'Interview Communication',
+      score: interviewScore,
+      totalCompleted: interviewCompleted,
+      totalTarget: interviewTarget,
+      description: 'STAR behavioral answers, system design defense, and recruiter pitch',
+      category: 'Career',
+      targetTab: 'interview',
+      iconName: 'Award',
+      badge: interviewScore >= 80 ? 'Offer Ready' : interviewScore >= 40 ? 'In Training' : 'Needs Practice',
+    },
+    presentation: {
+      id: 'presentation',
+      name: 'Presentation & Tech Talks',
+      score: presentationScore,
+      totalCompleted: presentationCompleted,
+      totalTarget: presentationTarget,
+      description: 'Slide signposting, audience engagement, and vocal projection',
+      category: 'Influence',
+      targetTab: 'speaking',
+      iconName: 'Sparkles',
+      badge: presentationScore >= 80 ? 'Captivating' : presentationScore >= 40 ? 'Practicing' : 'Needs Practice',
+    },
+    confidence: {
+      id: 'confidence',
+      name: 'Delivery & Confidence',
+      score: confidenceScore,
+      totalCompleted: journalEntries.length + mockInterviews.length,
+      totalTarget: 10,
+      description: 'Self-assurance, authoritative pauses, and anxiety management',
+      category: 'Mindset',
+      targetTab: 'speaking',
+      iconName: 'Flame',
+      badge: confidenceScore >= 80 ? 'Unshakable' : confidenceScore >= 40 ? 'Steadily Rising' : 'Needs Practice',
+    },
+  };
+
+  // =========================================================================
+  // 2. WEAKEST & STRONGEST SKILL DETERMINATION
+  // =========================================================================
+  const dimensionList: SkillDimensionItem[] = Object.values(tenDimensions);
+  const sortedByScore = [...dimensionList].sort((a, b) => a.score - b.score);
+  const weakestSkill = sortedByScore[0];
+  const strongestSkill = sortedByScore[sortedByScore.length - 1];
+
+  // =========================================================================
+  // 3. NEXT BEST ACTION RECOMMENDATION ENGINE
+  // =========================================================================
+  let nextBestAction: NextBestActionRecommendation;
+  switch (weakestSkill.id) {
+    case 'interviewComm':
+      nextBestAction = {
+        skillId: 'interviewComm',
+        skillName: 'Interview Communication',
+        score: weakestSkill.score,
+        activityTitle: 'Complete: "Tell me about yourself" practice',
+        activityDescription: 'Master the 90-second elevator pitch using the 4-part formula: Current Role, Key Achievement, Tech Superpower, and Target Value.',
+        targetTab: 'interview',
+        actionParam: 'self_01',
+        estimatedMinutes: 10,
+        badgeText: 'RECOMMENDED PRACTICE',
+      };
+      break;
+    case 'speaking':
+      nextBestAction = {
+        skillId: 'speaking',
+        skillName: 'Speaking & Fluency',
+        score: weakestSkill.score,
+        activityTitle: 'Record: 2-Minute Daily Self-Talk',
+        activityDescription: 'Speak spontaneously on an unscripted engineering challenge to build oral fluency and eliminate hesitations.',
+        targetTab: 'speaking',
+        actionParam: 'daily_self_talk',
+        estimatedMinutes: 5,
+        badgeText: 'FLUENCY DRILL',
+      };
+      break;
+    case 'technicalComm':
+      nextBestAction = {
+        skillId: 'technicalComm',
+        skillName: 'Technical Communication',
+        score: weakestSkill.score,
+        activityTitle: 'Complete: 5-Minute Technical Project Walkthrough',
+        activityDescription: 'Articulate your distributed architecture, throughput bottlenecks, and scaling trade-offs with structured signposting.',
+        targetTab: 'speaking',
+        actionParam: 'five_minute_tech',
+        estimatedMinutes: 8,
+        badgeText: 'TECHNICAL DRILL',
+      };
+      break;
+    case 'grammar':
+      nextBestAction = {
+        skillId: 'grammar',
+        skillName: 'Technical Grammar',
+        score: weakestSkill.score,
+        activityTitle: 'Practice: Past vs Present Perfect Tense Rules',
+        activityDescription: 'Eliminate tense shifting when articulating past architectural decisions vs current system capabilities.',
+        targetTab: 'grammar',
+        actionParam: 'g_past_vs_perfect',
+        estimatedMinutes: 6,
+        badgeText: 'GRAMMAR ACCURACY',
+      };
+      break;
+    case 'vocabulary':
+      nextBestAction = {
+        skillId: 'vocabulary',
+        skillName: 'Executive Vocabulary',
+        score: weakestSkill.score,
+        activityTitle: 'Master: 10 High-Precision Engineering Verbs',
+        activityDescription: 'Upgrade simple verbs with executive verbs like "orchestrated", "decoupled", "benchmarked", and "streamlined".',
+        targetTab: 'vocabulary',
+        estimatedMinutes: 5,
+        badgeText: 'VOCAB EXPANSION',
+      };
+      break;
+    case 'listening':
+      nextBestAction = {
+        skillId: 'listening',
+        skillName: 'Stakeholder Listening',
+        score: weakestSkill.score,
+        activityTitle: 'Complete: Active Listening & Speech Shadowing Drill',
+        activityDescription: 'Listen to a fast-paced incident post-mortem recording and shadow native cadence and stress patterns.',
+        targetTab: 'listening',
+        estimatedMinutes: 7,
+        badgeText: 'COMPREHENSION & CADENCE',
+      };
+      break;
+    case 'professionalComm':
+      nextBestAction = {
+        skillId: 'professionalComm',
+        skillName: 'Professional Communication',
+        score: weakestSkill.score,
+        activityTitle: 'Draft: Executive Incident Post-Mortem Memo',
+        activityDescription: 'Apply the BLUF (Bottom Line Up Front) model to summarize root cause, customer impact, and remediation steps diplomatically.',
+        targetTab: 'professional',
+        estimatedMinutes: 8,
+        badgeText: 'EXECUTIVE WRITING',
+      };
+      break;
+    case 'presentation':
+      nextBestAction = {
+        skillId: 'presentation',
+        skillName: 'Presentation & Tech Talks',
+        score: weakestSkill.score,
+        activityTitle: 'Rehearse: Tech Talk Slide Signposting & Transitions',
+        activityDescription: 'Practice vocal projection, opening hooks, and slide transition phrasing for your upcoming engineering presentation.',
+        targetTab: 'speaking',
+        actionParam: 'presentation_practice',
+        estimatedMinutes: 10,
+        badgeText: 'PRESENTATION DRILL',
+      };
+      break;
+    case 'confidence':
+      nextBestAction = {
+        skillId: 'confidence',
+        skillName: 'Delivery & Confidence',
+        score: weakestSkill.score,
+        activityTitle: 'Complete: Filler Word Reduction & Pause Replacement Drill',
+        activityDescription: 'Replace verbal fillers ("um", "like", "you know") with calm 1-second pauses to command authoritative room presence.',
+        targetTab: 'speaking',
+        actionParam: 'two_minute_challenge',
+        estimatedMinutes: 5,
+        badgeText: 'CONFIDENCE & PRESENCE',
+      };
+      break;
+    default:
+      nextBestAction = {
+        skillId: 'englishFoundation',
+        skillName: 'English Foundation',
+        score: weakestSkill.score,
+        activityTitle: 'Complete: Day 1 Foundation Training Drill',
+        activityDescription: 'Solidify foundational sentence structures, compound clause connectors, and core technical phrasing.',
+        targetTab: 'daily',
+        estimatedMinutes: 15,
+        badgeText: 'FOUNDATION ESSENTIALS',
+      };
+      break;
+  }
+
+  // =========================================================================
+  // 4. ACCURACY & MISTAKES COMPUTATION
+  // =========================================================================
+  let grammarAccuracy = 100;
+  if (assessments.length > 0) {
+    const totalScore = assessments.reduce((acc, a) => acc + (a.scorePercent || 0), 0);
+    grammarAccuracy = Math.round(totalScore / assessments.length);
+  } else if (trackedMistakes.length > 0) {
+    const unresolved = trackedMistakes.filter((m) => !m.resolved).length;
+    grammarAccuracy = Math.max(65, Math.min(100, 100 - unresolved * 5));
+  } else if (completedGrammar > 0) {
+    grammarAccuracy = 95;
+  }
+
+  const unresolvedMistakes = trackedMistakes.filter((m) => !m.resolved);
+  const commonMistakesCount = unresolvedMistakes.length;
+  let topMistakeCategory = 'None Detected';
+  if (unresolvedMistakes.length > 0) {
+    const categoryCounts: Record<string, number> = {};
+    for (const m of unresolvedMistakes) {
+      const cat = m.categoryLabel || m.category || 'General';
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + (m.occurrenceCount || 1);
+    }
+    const sortedCategories = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]);
+    if (sortedCategories.length > 0) {
+      topMistakeCategory = sortedCategories[0][0];
+    }
+  }
+
+  // =========================================================================
+  // 5. THIS WEEK PROGRESS (ACTUAL 7-DAY COMPLETION)
+  // =========================================================================
+  const now = new Date();
+  const past7DaysDateKeys: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    past7DaysDateKeys.push(d.toISOString().split('T')[0]);
+  }
+
+  // Grammar done this week
+  let weekGrammarDone = 0;
+  for (const dateKey of past7DaysDateKeys) {
+    if (state.dailyTrainingLogs[dateKey]?.grammarDone) weekGrammarDone++;
+  }
+  const weekAssessments = assessments.filter((a) =>
+    past7DaysDateKeys.includes(a.dateStr || a.completedAt?.split('T')[0])
+  );
+  weekGrammarDone += weekAssessments.length;
+  const weekDailyLessons = completedLessons.filter((l) =>
+    past7DaysDateKeys.includes(l.dateStr || l.completedAt?.split('T')[0])
+  );
+
+  // Speaking done this week
+  const weekSpeakingEntries = journalEntries.filter((j) =>
+    past7DaysDateKeys.includes(j.dateStr || j.timestamp?.split('T')[0])
+  ).length;
+  let weekSpeakingLogs = 0;
+  for (const dateKey of past7DaysDateKeys) {
+    if (state.dailyTrainingLogs[dateKey]?.speechDone) weekSpeakingLogs++;
+  }
+  const weekSpeakingDone = Math.max(weekSpeakingEntries, weekSpeakingLogs);
+
+  // Listening done this week
+  let weekListeningDone = 0;
+  for (const dateKey of past7DaysDateKeys) {
+    if (state.dailyTrainingLogs[dateKey]?.completed) weekListeningDone++;
+  }
+  weekListeningDone = Math.max(weekListeningDone, weekDailyLessons.length);
+
+  // Technical done this week
+  const weekTechQuestions = questionPractices.filter((q) =>
+    past7DaysDateKeys.includes(q.completedAt?.split('T')[0]) &&
+    ['technical', 'dsa', 'aiml', 'project'].includes(q.category?.toLowerCase() || '')
+  ).length;
+  const weekTechJournal = journalEntries.filter((j) =>
+    past7DaysDateKeys.includes(j.dateStr || j.timestamp?.split('T')[0]) &&
+    ['five_minute_tech', 'project_explanation'].includes(j.modeId || '')
+  ).length;
+  const weekTechDone = weekTechQuestions + weekTechJournal + weekDailyLessons.length;
+
+  // Interview done this week
+  const weekMockInterviews = mockInterviews.filter((m) =>
+    past7DaysDateKeys.includes(m.dateStr || m.completedAt?.split('T')[0])
+  ).length;
+  const weekInterviewQuestions = questionPractices.filter((q) =>
+    past7DaysDateKeys.includes(q.completedAt?.split('T')[0]) &&
+    ['self_introduction', 'hr', 'behavioral', 'situational', 'recruiter'].includes(q.category?.toLowerCase() || '')
+  ).length;
+  const weekInterviewDone = weekMockInterviews + weekInterviewQuestions + (weekDailyLessons.length > 0 ? 1 : 0);
+
+  const thisWeek = {
+    grammar: {
+      category: 'Grammar',
+      completed: Math.min(5, weekGrammarDone),
+      target: 5,
+      percent: Math.min(100, Math.round((Math.min(5, weekGrammarDone) / 5) * 100)),
+      isMet: weekGrammarDone >= 5,
+    },
+    speaking: {
+      category: 'Speaking',
+      completed: Math.min(5, weekSpeakingDone),
+      target: 5,
+      percent: Math.min(100, Math.round((Math.min(5, weekSpeakingDone) / 5) * 100)),
+      isMet: weekSpeakingDone >= 5,
+    },
+    listening: {
+      category: 'Listening',
+      completed: Math.min(5, weekListeningDone),
+      target: 5,
+      percent: Math.min(100, Math.round((Math.min(5, weekListeningDone) / 5) * 100)),
+      isMet: weekListeningDone >= 5,
+    },
+    technical: {
+      category: 'Technical',
+      completed: Math.min(5, weekTechDone),
+      target: 5,
+      percent: Math.min(100, Math.round((Math.min(5, weekTechDone) / 5) * 100)),
+      isMet: weekTechDone >= 5,
+    },
+    interview: {
+      category: 'Interview',
+      completed: Math.min(3, weekInterviewDone),
+      target: 3,
+      percent: Math.min(100, Math.round((Math.min(3, weekInterviewDone) / 3) * 100)),
+      isMet: weekInterviewDone >= 3,
+    },
+  };
+
+  // =========================================================================
+  // 6. OVERALL READINESS & STREAK
+  // =========================================================================
+  const streak = calculateEnglishStreak(state.dailyTrainingLogs, state.journalEntries, completedLessons);
+
+  const overallReadiness = Math.min(
     100,
     Math.round(
-      (completedSpeaking / totalSpeakingPrompts) * 40 +
-      Math.min(30, journalCount * 8) +
-      Math.min(30, completedLessons.length * 6)
+      foundationScore * 0.10 +
+      speakingScore * 0.15 +
+      grammarScore * 0.10 +
+      vocabularyScore * 0.10 +
+      listeningScore * 0.05 +
+      technicalScore * 0.15 +
+      professionalScore * 0.10 +
+      interviewScore * 0.15 +
+      presentationScore * 0.05 +
+      confidenceScore * 0.05
     )
   );
 
-  // Training streak
-  const streak = calculateEnglishStreak(state.dailyTrainingLogs, state.journalEntries, completedLessons);
-
-  // Weekly completion (past 7 days)
-  const now = new Date();
-  let past7DaysCompleted = 0;
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    const dateKey = d.toISOString().split('T')[0];
-    const isCompletedLesson = completedLessons.some((l) => l.dateStr === dateKey);
-    if (isCompletedLesson || state.dailyTrainingLogs[dateKey]?.completed || state.journalEntries.some((j) => j.dateStr === dateKey)) {
-      past7DaysCompleted++;
-    }
-  }
-  const weeklyCompletion = {
-    totalDays: 7,
-    completedDays: past7DaysCompleted,
-    percent: Math.round((past7DaysCompleted / 7) * 100),
-  };
-
-  // Overall readiness index (weighted aggregate)
-  const weightedScore =
-    speakingConfidence * 0.25 +
-    interviewProgress * 0.2 +
-    technicalProgress * 0.15 +
-    professionalProgress * 0.15 +
-    vocabularyProgress * 0.1 +
-    grammarProgress * 0.1 +
-    listeningProgress * 0.05;
-
-  const overallReadiness = Math.min(100, Math.round(weightedScore));
-
-  // Determine English CEFR level
-  let currentLevel = 'C1 Advanced Professional';
+  // CEFR Level Mapping
+  let currentLevel: 'B2 Upper Intermediate' | 'C1 Advanced Professional' | 'C2 Executive Fluency' = 'C1 Advanced Professional';
   if (overallReadiness >= 85) {
     currentLevel = 'C2 Executive Fluency';
   } else if (overallReadiness < 40) {
     currentLevel = 'B2 Upper Intermediate';
   }
 
-  // Average journal rating
-  const avgRating =
-    state.journalEntries.length > 0
-      ? Number((state.journalEntries.reduce((acc, j) => acc + j.selfRating, 0) / state.journalEntries.length).toFixed(1))
+  // Weekly Completion Summary
+  let past7DaysActive = 0;
+  for (const dateKey of past7DaysDateKeys) {
+    const isCompletedLesson = completedLessons.some((l) => l.dateStr === dateKey);
+    if (
+      isCompletedLesson ||
+      state.dailyTrainingLogs[dateKey]?.completed ||
+      state.journalEntries.some((j) => j.dateStr === dateKey)
+    ) {
+      past7DaysActive++;
+    }
+  }
+
+  const weeklyCompletion = {
+    totalDays: 7,
+    completedDays: past7DaysActive,
+    percent: Math.round((past7DaysActive / 7) * 100),
+  };
+
+  const avgFluency =
+    journalEntries.length > 0
+      ? Number((journalEntries.reduce((acc, j) => acc + (j.selfRating || 4), 0) / journalEntries.length).toFixed(1))
       : 4.5;
 
   return {
     currentLevel,
     overallReadiness,
-    speakingConfidence,
-    grammarProgress,
-    vocabularyProgress,
-    listeningProgress,
-    technicalProgress,
-    interviewProgress,
-    professionalProgress,
     trainingStreak: streak,
+    trainingDaysCompleted: completedLessons.length,
+    totalSpeakingSessions,
+    technicalExplanationsCompleted,
+    mockInterviewsCompleted,
+    grammarAccuracy,
+    vocabularyLearned,
+    totalVocabulary: totalVocab,
+    commonMistakesCount,
+    topMistakeCategory,
+    tenDimensions,
+    weakestSkill,
+    strongestSkill,
+    nextBestAction,
+    thisWeek,
+    speakingConfidence: confidenceScore,
+    grammarProgress: grammarScore,
+    vocabularyProgress: vocabularyScore,
+    listeningProgress: listeningScore,
+    technicalProgress: technicalScore,
+    interviewProgress: interviewScore,
+    professionalProgress: professionalScore,
     weeklyCompletion,
-    totalJournalEntries: journalCount,
-    averageFluencyRating: avgRating,
+    totalJournalEntries: journalEntries.length,
+    averageFluencyRating: avgFluency,
   };
 }
 
