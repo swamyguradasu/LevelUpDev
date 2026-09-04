@@ -122,5 +122,12 @@ export function isPlacementPrepAllowed(email?: string | null): boolean {
   return cleanEmail === 'swamy@levelupdev.com';
 }
 
+export function isEnglishCareerAllowed(email?: string | null): boolean {
+  if (!email) return false;
+  const cleanEmail = email.trim().toLowerCase();
+  return cleanEmail === 'swamy@levelupdev.com';
+}
+
+
 
 

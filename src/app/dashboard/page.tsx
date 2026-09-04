@@ -11,6 +11,7 @@ import {
   DailyChallenge,
   isAdminEmail,
   isPlacementPrepAllowed,
+  isEnglishCareerAllowed,
 } from '@/lib/content';
 import {
   getAllFoundationLevels,
@@ -33,6 +34,7 @@ import {
   Flame,
   Layers,
   Code2,
+  Mic,
   Cpu,
   FolderGit2,
   GitBranch,
@@ -220,6 +222,15 @@ export default function StudentDashboardPage() {
               >
                 <Target className="w-3.5 h-3.5 text-amber-400" />
                 <span>Placement Prep</span>
+              </Link>
+            )}
+            {isEnglishCareerAllowed(userData?.email) && (
+              <Link
+                className="text-blue-300 font-bold hover:text-white transition flex items-center gap-1 bg-blue-500/15 px-2.5 py-0.5 rounded-full border border-blue-500/30 text-xs"
+                href="/english-career"
+              >
+                <Mic className="w-3.5 h-3.5 text-blue-400" />
+                <span>English &amp; Career</span>
               </Link>
             )}
             {isAdminEmail(userData?.email || '') && (

@@ -19,9 +19,10 @@ import {
   LogOut,
   KeyRound,
   ChevronRight,
+  Mic,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { isAdminEmail, isPlacementPrepAllowed } from '@/lib/content';
+import { isAdminEmail, isPlacementPrepAllowed, isEnglishCareerAllowed } from '@/lib/content';
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
@@ -49,6 +50,7 @@ export default function MobileBottomNav() {
   const isDailyActive = pathname.startsWith('/daily');
   const isLeaderboardActive = pathname.startsWith('/leaderboard');
   const isPlacementPrepActive = pathname.startsWith('/placement-preparation');
+  const isEnglishCareerActive = pathname.startsWith('/english-career');
   const isAdminActive = pathname.startsWith('/admin');
 
   const isMoreActive =
@@ -56,9 +58,11 @@ export default function MobileBottomNav() {
     isDailyActive ||
     isLeaderboardActive ||
     isPlacementPrepActive ||
+    isEnglishCareerActive ||
     isAdminActive;
 
   const hasPlacementAccess = isPlacementPrepAllowed(userData?.email);
+  const hasEnglishCareerAccess = isEnglishCareerAllowed(userData?.email);
   const hasAdminAccess = isAdminEmail(userData?.email || '');
 
   const primaryNavItems = [
@@ -356,6 +360,34 @@ export default function MobileBottomNav() {
                             </span>
                           </div>
                           <div className="text-xs text-slate-400">Curated questions, company rounds & mock prep</div>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-500" />
+                    </Link>
+                  )}
+
+                  {/* English & Career Communication Trainer (conditional) */}
+                  {hasEnglishCareerAccess && (
+                    <Link
+                      href="/english-career"
+                      className={`flex items-center justify-between p-3 rounded-2xl transition border ${
+                        isEnglishCareerActive
+                          ? 'bg-blue-500/15 border-blue-500/40 text-white'
+                          : 'bg-slate-900/40 border-slate-800/60 text-slate-300 hover:bg-slate-900 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                          <Mic className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold flex items-center gap-1.5">
+                            English &amp; Career
+                            <span className="text-[10px] font-mono bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full border border-blue-500/30">
+                              PRIVATE
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400">Speaking, tech interviews &amp; executive presence</div>
                         </div>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-500" />
