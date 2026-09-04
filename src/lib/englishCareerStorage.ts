@@ -33,13 +33,71 @@ export interface SpeakingJournalEntry {
   timestamp: string;
 }
 
+export type AssessmentSkillLevel = 'Foundation' | 'Developing' | 'Intermediate' | 'Professional Ready';
+
+export interface AssessmentSectionResultDetail {
+  sectionId: string;
+  sectionName: string;
+  correct: number;
+  total: number;
+  scorePercent: number;
+  level: AssessmentSkillLevel;
+  feedback: string;
+}
+
+export interface SectionDeltaItem {
+  sectionId: string;
+  sectionName: string;
+  previousLevel: AssessmentSkillLevel;
+  currentLevel: AssessmentSkillLevel;
+  previousScore: number;
+  currentScore: number;
+  scoreChange: number;
+  statusText: string;
+  deltaType: 'improved' | 'regressed' | 'stable';
+  isImproved: boolean;
+}
+
+export interface AssessmentComparisonDelta {
+  previousScorePercent: number;
+  currentScorePercent: number;
+  overallScoreChange: number;
+  scoreDeltaPercent: number;
+  previousOverallLevel: AssessmentSkillLevel;
+  currentOverallLevel: AssessmentSkillLevel;
+  sectionDeltas: SectionDeltaItem[];
+  sectionDeltasMap: Record<string, SectionDeltaItem>;
+}
+
 export interface AssessmentResultRecord {
   id: string;
+  assessmentType?: 'initial' | 'weekly';
+  weekNumber?: number;
   dateStr: string;
+  overallScorePercent?: number;
+  overallLevel?: AssessmentSkillLevel;
   scorePercent: number;
   totalQuestions: number;
   correctCount: number;
   categoryBreakdown: Record<string, { correct: number; total: number }>;
+  sectionDetails?: Record<string, AssessmentSectionResultDetail>;
+  strengths?: string[];
+  weaknesses?: string[];
+  recommendedTraining?: Array<{
+    title: string;
+    description: string;
+    targetTab: string;
+    actionParam?: string;
+  }>;
+  first7DayPlan?: Array<{
+    day: number;
+    title: string;
+    focusArea: string;
+    objective: string;
+    estimatedMinutes: number;
+    targetTab: string;
+  }>;
+  comparisonWithPrevious?: AssessmentComparisonDelta;
   completedAt: string;
 }
 
@@ -177,6 +235,7 @@ export interface EnglishCareerUserState {
   notes: Record<string, { topicId: string; noteText: string; updatedAt: string }>;
   journalEntries: SpeakingJournalEntry[];
   trackedMistakes?: TrackedMistakeRecord[];
+  initialAssessment?: AssessmentResultRecord;
   assessmentHistory: AssessmentResultRecord[];
   dailyTrainingLogs: Record<string, DailyTrainingLog>; // dateStr -> Log
   activeDailySession?: DailyTrainingSessionState;
@@ -299,6 +358,7 @@ export function createEmptyEnglishCareerState(email: string): EnglishCareerUserS
     notes: {},
     journalEntries: [],
     trackedMistakes: [],
+    initialAssessment: undefined,
     assessmentHistory: [],
     dailyTrainingLogs: {},
     activeDailySession: undefined,
@@ -1195,22 +1255,39 @@ export async function logDailyTrainingPart(
 }
 
 /**
- * Save an assessment test result.
+ * Save an assessment test result (Initial Diagnostic or Weekly Milestone).
  */
 export async function saveAssessmentResult(
   currentState: EnglishCareerUserState,
   result: Omit<AssessmentResultRecord, 'id' | 'completedAt'>
 ): Promise<EnglishCareerUserState> {
   const id = `assessment_${Date.now()}`;
+  const nowIso = new Date().toISOString();
   const record: AssessmentResultRecord = {
     ...result,
     id,
-    completedAt: new Date().toISOString(),
+    completedAt: nowIso,
   };
+
+  const isInitial = result.assessmentType === 'initial';
+  const nextHistory = [record, ...(currentState.assessmentHistory || [])];
+
+  // Adjust CEFR level if level is evaluated
+  let nextLevel = currentState.currentEnglishLevel;
+  if (result.overallLevel === 'Professional Ready') {
+    nextLevel = 'C2 Executive Fluency';
+  } else if (result.overallLevel === 'Intermediate') {
+    nextLevel = 'C1 Advanced Professional';
+  } else if (result.overallLevel === 'Foundation' || result.overallLevel === 'Developing') {
+    nextLevel = 'B2 Upper Intermediate';
+  }
 
   const nextState: EnglishCareerUserState = {
     ...currentState,
-    assessmentHistory: [record, ...currentState.assessmentHistory],
+    currentEnglishLevel: nextLevel,
+    initialAssessment: isInitial ? record : (currentState.initialAssessment || record),
+    assessmentHistory: nextHistory,
+    updatedAt: nowIso,
   };
 
   await saveEnglishCareerState(nextState);

@@ -105,6 +105,41 @@ import {
   getRandomMockQuestions,
 } from '@/data/englishInterviewTrainerData';
 import {
+  ASSESSMENT_SECTIONS,
+  INITIAL_ASSESSMENT_QUESTIONS,
+  WEEKLY_ASSESSMENT_BANK,
+  getSkillLevel,
+  getSkillLevelColor,
+  evaluateAssessmentSubmission,
+  calculateAssessmentComparisonDelta,
+  AssessmentSkillLevel,
+  AssessmentSectionConfig,
+  DiagnosticQuestion,
+  GeneratedAssessmentEvaluation,
+  AssessmentComparisonDelta,
+} from '@/data/englishAssessmentData';
+import {
+  CAREER_TRACKS_CONFIG,
+  CAREER_SCENARIOS_BANK,
+  CareerTrackId,
+  CareerTrackConfig,
+  CareerScenario,
+  getScenariosByTrack,
+  getScenarioById,
+  getAllCareerTracks,
+} from '@/data/englishCareerScenariosData';
+import {
+  PERSONALIZED_USER_PROFILE,
+  PROGRESSION_STAGES_CONFIG,
+  PERSONALIZED_SPEAKING_DRILLS,
+  CommunicationProgressionStageId,
+  ProgressionStageInfo,
+  PersonalizedSpeakingDrill,
+  getDrillsByStage,
+  getDrillsByCategory,
+  getDrillById,
+} from '@/data/englishAIMLPersonalizationData';
+import {
   Mic,
   MicOff,
   Play,
@@ -155,10 +190,13 @@ import {
   History,
   ListOrdered,
   CheckSquare,
+  Code,
 } from 'lucide-react';
 
 type ActiveTab =
   | 'dashboard'
+  | 'aiml_hub'
+  | 'scenarios'
   | 'curriculum'
   | 'daily'
   | 'grammar'
@@ -174,6 +212,8 @@ type ActiveTab =
 
 const NAVIGATION_TABS: Array<{ id: ActiveTab; label: string; icon: any }> = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
+  { id: 'aiml_hub', label: 'AIML Career Hub', icon: Sparkles },
+  { id: 'scenarios', label: 'Career Scenarios', icon: Compass },
   { id: 'curriculum', label: 'Curriculum (10 Levels)', icon: Layers },
   { id: 'daily', label: 'Daily Training', icon: Flame },
   { id: 'grammar', label: 'Grammar', icon: CheckCircle2 },
@@ -183,7 +223,7 @@ const NAVIGATION_TABS: Array<{ id: ActiveTab; label: string; icon: any }> = [
   { id: 'technical', label: 'Technical English', icon: Cpu },
   { id: 'interview', label: 'Interview English', icon: Award },
   { id: 'professional', label: 'Professional Comm', icon: Briefcase },
-  { id: 'assessment', label: 'Weekly Assessment', icon: FileText },
+  { id: 'assessment', label: 'Initial & Weekly Assessments', icon: FileText },
   { id: 'journal', label: 'Speaking Journal', icon: MessageSquare },
   { id: 'progress', label: 'Progress', icon: TrendingUp },
 ];
@@ -196,6 +236,66 @@ const DAILY_PILLARS_CONFIG = [
   { key: 'technicalComm', title: '5. Tech Comm', icon: Cpu, label: '5-Step Explanations' },
   { key: 'professionalInterview', title: '6. Executive / STAR', icon: Award, label: 'Interviews' },
 ] as const;
+
+function renderDimensionIcon(iconName: string) {
+  switch (iconName) {
+    case 'CheckCircle2':
+      return <CheckCircle2 className="w-4 h-4" />;
+    case 'BookOpen':
+      return <BookOpen className="w-4 h-4" />;
+    case 'Layers':
+      return <Layers className="w-4 h-4" />;
+    case 'FileText':
+      return <FileText className="w-4 h-4" />;
+    case 'Headphones':
+      return <Headphones className="w-4 h-4" />;
+    case 'Mic':
+      return <Mic className="w-4 h-4" />;
+    case 'Cpu':
+      return <Cpu className="w-4 h-4" />;
+    case 'Award':
+      return <Award className="w-4 h-4" />;
+    default:
+      return <Target className="w-4 h-4" />;
+  }
+}
+
+function renderTrackIcon(iconName: string) {
+  switch (iconName) {
+    case 'Cpu':
+      return <Cpu className="w-4 h-4" />;
+    case 'Code':
+      return <Code className="w-4 h-4" />;
+    case 'BarChart2':
+      return <BarChart2 className="w-4 h-4" />;
+    case 'TrendingUp':
+      return <TrendingUp className="w-4 h-4" />;
+    case 'Zap':
+      return <Zap className="w-4 h-4" />;
+    case 'Sparkles':
+      return <Sparkles className="w-4 h-4" />;
+    case 'Layers':
+      return <Layers className="w-4 h-4" />;
+    case 'BookOpen':
+      return <BookOpen className="w-4 h-4" />;
+    case 'RotateCcw':
+      return <RotateCcw className="w-4 h-4" />;
+    case 'Award':
+      return <Award className="w-4 h-4" />;
+    case 'MessageSquare':
+      return <MessageSquare className="w-4 h-4" />;
+    case 'Flame':
+      return <Flame className="w-4 h-4" />;
+    case 'Clock':
+      return <Clock className="w-4 h-4" />;
+    case 'ShieldCheck':
+      return <ShieldCheck className="w-4 h-4" />;
+    case 'FileText':
+      return <FileText className="w-4 h-4" />;
+    default:
+      return <Compass className="w-4 h-4" />;
+  }
+}
 
 function EnglishCareerContent() {
   const { userData, loading } = useAuth();
@@ -281,9 +381,60 @@ function EnglishCareerContent() {
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<string, number>>({});
   const [assessmentCompleted, setAssessmentCompleted] = useState<boolean>(false);
 
+  // Initial & Weekly Assessment Engine State
+  const [assessmentSubTab, setAssessmentSubTab] = useState<'initial' | 'weekly' | 'history'>('initial');
+  const [initialActiveSectionIdx, setInitialActiveSectionIdx] = useState<number>(0);
+  const [initialAnswers, setInitialAnswers] = useState<Record<string, number>>({});
+  const [initialEvaluationResult, setInitialEvaluationResult] = useState<GeneratedAssessmentEvaluation | null>(null);
+  const [initialIsSubmitting, setInitialIsSubmitting] = useState<boolean>(false);
+  const [initialSpeakingNotes, setInitialSpeakingNotes] = useState<string>('');
+
+  const [weeklyActiveWeek, setWeeklyActiveWeek] = useState<number>(1);
+  const [weeklyAnswers, setWeeklyAnswers] = useState<Record<string, number>>({});
+  const [weeklyEvaluationResult, setWeeklyEvaluationResult] = useState<GeneratedAssessmentEvaluation | null>(null);
+  const [weeklyComparisonDelta, setWeeklyComparisonDelta] = useState<AssessmentComparisonDelta | null>(null);
+  const [weeklyIsSubmitting, setWeeklyIsSubmitting] = useState<boolean>(false);
+
   // Notes Modal / Drawer State
   const [activeNoteTopicId, setActiveNoteTopicId] = useState<string | null>(null);
   const [currentNoteText, setCurrentNoteText] = useState<string>('');
+
+  // =========================================================================
+  // CAREER TRACKS & JOB READINESS SCENARIOS STATE
+  // =========================================================================
+  const [selectedCareerTrackFilter, setSelectedCareerTrackFilter] = useState<CareerTrackId | 'all'>('all');
+  const [selectedCareerScenarioId, setSelectedCareerScenarioId] = useState<string>(
+    CAREER_SCENARIOS_BANK[0]?.id || 'sc_swe_01'
+  );
+  const [scenarioWorkflowTab, setScenarioWorkflowTab] = useState<'framework' | 'compare' | 'practice'>('framework');
+  const [scenarioUserAnswerText, setScenarioUserAnswerText] = useState<string>('');
+  const [scenarioConfidenceRating, setScenarioConfidenceRating] = useState<number>(4);
+  const [scenarioAudioUrl, setScenarioAudioUrl] = useState<string | null>(null);
+  const [scenarioIsRecording, setScenarioIsRecording] = useState<boolean>(false);
+  const [scenarioRecordSeconds, setScenarioRecordSeconds] = useState<number>(0);
+  const scenarioRecorderRef = useRef<MediaRecorder | null>(null);
+  const scenarioAudioChunksRef = useRef<Blob[]>([]);
+  const scenarioTimerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [scenarioPracticeDone, setScenarioPracticeDone] = useState<Record<string, boolean>>({});
+
+  // =========================================================================
+  // AIML CAREER HUB (PERSONALIZED FOR SWAMY @ LEVELUPDEV) STATE
+  // =========================================================================
+  const [selectedProgressionStage, setSelectedProgressionStage] = useState<CommunicationProgressionStageId>('stage_1_simple_english');
+  const [selectedAimlDrillId, setSelectedAimlDrillId] = useState<string>(
+    PERSONALIZED_SPEAKING_DRILLS[0]?.id || 'pdrill-s1-daily-routine'
+  );
+  const [aimlCategoryFilter, setAimlCategoryFilter] = useState<string>('all');
+  const [aimlWorkflowTab, setAimlWorkflowTab] = useState<'rehearse' | 'framework' | 'terms' | 'model'>('rehearse');
+  const [aimlUserNotes, setAimlUserNotes] = useState<string>('');
+  const [aimlConfidenceRating, setAimlConfidenceRating] = useState<number>(4);
+  const [aimlAudioUrl, setAimlAudioUrl] = useState<string | null>(null);
+  const [aimlIsRecording, setAimlIsRecording] = useState<boolean>(false);
+  const [aimlRecordSeconds, setAimlRecordSeconds] = useState<number>(0);
+  const [aimlCompletedDrills, setAimlCompletedDrills] = useState<Record<string, boolean>>({});
+  const aimlRecorderRef = useRef<MediaRecorder | null>(null);
+  const aimlAudioChunksRef = useRef<Blob[]>([]);
+  const aimlTimerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // =========================================================================
   // INTERVIEW TRAINER (10 CATEGORIES + STUDIO + MOCK SIMULATOR) STATE
@@ -1045,40 +1196,97 @@ function EnglishCareerContent() {
     }
   };
 
-  // Submit Assessment
-  const handleSubmitAssessment = async () => {
+  // Submit Initial Assessment
+  const handleSubmitInitialAssessment = async () => {
     if (!userState) return;
-    let correct = 0;
-    const categoryBreakdown: Record<string, { correct: number; total: number }> = {};
-
-    ASSESSMENT_QUESTIONS.forEach((q) => {
-      if (!categoryBreakdown[q.category]) {
-        categoryBreakdown[q.category] = { correct: 0, total: 0 };
-      }
-      categoryBreakdown[q.category].total += 1;
-
-      if (assessmentAnswers[q.id] === q.correctIndex) {
-        correct++;
-        categoryBreakdown[q.category].correct += 1;
-      }
-    });
-
-    const scorePercent = Math.round((correct / ASSESSMENT_QUESTIONS.length) * 100);
-
+    setInitialIsSubmitting(true);
     try {
-      const updated = await saveAssessmentResult(userState, {
-        dateStr: new Date().toISOString().split('T')[0],
-        scorePercent,
-        totalQuestions: ASSESSMENT_QUESTIONS.length,
-        correctCount: correct,
-        categoryBreakdown,
+      const evaluation = evaluateAssessmentSubmission(initialAnswers, INITIAL_ASSESSMENT_QUESTIONS);
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const categoryBreakdown: Record<string, { correct: number; total: number }> = {};
+      Object.values(evaluation.sectionDetails).forEach((sec) => {
+        categoryBreakdown[sec.sectionName] = { correct: sec.correct, total: sec.total };
       });
+
+      const updated = await saveAssessmentResult(userState, {
+        assessmentType: 'initial',
+        dateStr: todayStr,
+        overallScorePercent: evaluation.overallScorePercent,
+        overallLevel: evaluation.overallLevel,
+        scorePercent: evaluation.overallScorePercent,
+        totalQuestions: evaluation.totalQuestions,
+        correctCount: evaluation.correctCount,
+        categoryBreakdown,
+        sectionDetails: evaluation.sectionDetails,
+        strengths: evaluation.strengths,
+        weaknesses: evaluation.weaknesses,
+        recommendedTraining: evaluation.recommendedTraining,
+        first7DayPlan: evaluation.first7DayPlan,
+      });
+
       setUserState(updated);
-      setAssessmentCompleted(true);
-      showNotification(`Weekly Assessment submitted! Score: ${scorePercent}%`);
+      setInitialEvaluationResult(evaluation);
+      showNotification(`🎉 Initial Diagnostic Complete! Current Level: ${evaluation.overallLevel}`);
     } catch (err) {
-      console.error('Error saving assessment result:', err);
+      console.error('Error submitting initial assessment:', err);
+    } finally {
+      setInitialIsSubmitting(false);
     }
+  };
+
+  // Submit Weekly Assessment
+  const handleSubmitWeeklyAssessment = async () => {
+    if (!userState) return;
+    setWeeklyIsSubmitting(true);
+    try {
+      const questions = WEEKLY_ASSESSMENT_BANK[weeklyActiveWeek] || WEEKLY_ASSESSMENT_BANK[1];
+      const evaluation = evaluateAssessmentSubmission(weeklyAnswers, questions);
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // Get previous assessment for comparison (either latest history or initial assessment)
+      const previousAssessment = userState.assessmentHistory?.[0] || userState.initialAssessment;
+      let deltaComparison: AssessmentComparisonDelta | null = null;
+      if (previousAssessment) {
+        deltaComparison = calculateAssessmentComparisonDelta(evaluation, previousAssessment);
+      }
+
+      const categoryBreakdown: Record<string, { correct: number; total: number }> = {};
+      Object.values(evaluation.sectionDetails).forEach((sec) => {
+        categoryBreakdown[sec.sectionName] = { correct: sec.correct, total: sec.total };
+      });
+
+      const updated = await saveAssessmentResult(userState, {
+        assessmentType: 'weekly',
+        weekNumber: weeklyActiveWeek,
+        dateStr: todayStr,
+        overallScorePercent: evaluation.overallScorePercent,
+        overallLevel: evaluation.overallLevel,
+        scorePercent: evaluation.overallScorePercent,
+        totalQuestions: evaluation.totalQuestions,
+        correctCount: evaluation.correctCount,
+        categoryBreakdown,
+        sectionDetails: evaluation.sectionDetails,
+        strengths: evaluation.strengths,
+        weaknesses: evaluation.weaknesses,
+        recommendedTraining: evaluation.recommendedTraining,
+        comparisonWithPrevious: deltaComparison || undefined,
+      });
+
+      setUserState(updated);
+      setWeeklyEvaluationResult(evaluation);
+      setWeeklyComparisonDelta(deltaComparison);
+      showNotification(`✅ Week ${weeklyActiveWeek} Assessment Completed! Level: ${evaluation.overallLevel}`);
+    } catch (err) {
+      console.error('Error submitting weekly assessment:', err);
+    } finally {
+      setWeeklyIsSubmitting(false);
+    }
+  };
+
+  // Legacy fallback assessment submit
+  const handleSubmitAssessment = async () => {
+    await handleSubmitWeeklyAssessment();
   };
 
   // Active Curriculum Level & Module
@@ -1122,57 +1330,7 @@ function EnglishCareerContent() {
     return userState.completedTopicIds.length;
   }, [userState]);
 
-  // =========================================================================
-  // ACCESS CONTROL SECURITY GUARD
-  // =========================================================================
-  if (loading || (hasAccess && stateLoading)) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center font-mono text-sm text-slate-400">
-        <div className="flex items-center gap-3 bg-slate-900 px-6 py-4 rounded-2xl border border-slate-800 shadow-2xl">
-          <div className="w-5 h-5 border-2 border-[#006cd2] border-t-transparent rounded-full animate-spin" />
-          <span>Verifying Communication Trainer Access &amp; Records...</span>
-        </div>
-      </div>
-    );
-  }
 
-  // Unauthorized Account Guard
-  if (!hasAccess) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 font-sans">
-        <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-slate-800 text-center space-y-6">
-          <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center mx-auto text-rose-400 shadow-inner">
-            <Lock className="w-8 h-8" />
-          </div>
-
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 text-rose-400 text-xs font-mono font-bold rounded-full uppercase tracking-wider">
-              Private Security Guard
-            </div>
-            <h1 className="text-2xl font-bold font-display text-white">
-              Restricted Portal
-            </h1>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              The English &amp; Career Communication Trainer is an exclusive private module reserved
-              for authorized personnel.
-            </p>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 font-mono text-xs text-slate-400">
-            Authenticated Account: <span className="text-white">{userData?.email || 'Guest'}</span>
-          </div>
-
-          <Link
-            href="/home"
-            className="w-full py-3.5 bg-gradient-to-r from-[#006cd2] to-blue-600 hover:from-[#005bb5] hover:to-blue-700 text-white font-sans font-bold rounded-2xl transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 text-sm"
-          >
-            <span>Return to LevelUpDev Hub</span>
-            <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   // Filtered Vocabulary Items
   const filteredVocab = VOCABULARY_LIST.filter((v) => {
@@ -1184,6 +1342,141 @@ function EnglishCareerContent() {
       v.corporateContext.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCat && matchesQuery;
   });
+
+  // =========================================================================
+  // CAREER SCENARIOS COMPUTED & HANDLER FUNCTIONS
+  // =========================================================================
+  const filteredCareerScenarios = useMemo(() => {
+    if (selectedCareerTrackFilter === 'all') return CAREER_SCENARIOS_BANK;
+    return getScenariosByTrack(selectedCareerTrackFilter);
+  }, [selectedCareerTrackFilter]);
+
+  const activeCareerScenario = useMemo(() => {
+    return (
+      CAREER_SCENARIOS_BANK.find((sc) => sc.id === selectedCareerScenarioId) ||
+      filteredCareerScenarios[0] ||
+      CAREER_SCENARIOS_BANK[0]
+    );
+  }, [selectedCareerScenarioId, filteredCareerScenarios]);
+
+  const startScenarioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      scenarioRecorderRef.current = mediaRecorder;
+      scenarioAudioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          scenarioAudioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(scenarioAudioChunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(audioBlob);
+        setScenarioAudioUrl(url);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start(250);
+      setScenarioIsRecording(true);
+      setScenarioRecordSeconds(0);
+
+      if (scenarioTimerIntervalRef.current) clearInterval(scenarioTimerIntervalRef.current);
+      scenarioTimerIntervalRef.current = setInterval(() => {
+        setScenarioRecordSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Microphone access error:', err);
+      showNotification('Microphone access is required to record scenario practice.');
+    }
+  };
+
+  const stopScenarioRecording = () => {
+    if (scenarioRecorderRef.current && scenarioIsRecording) {
+      scenarioRecorderRef.current.stop();
+      setScenarioIsRecording(false);
+      if (scenarioTimerIntervalRef.current) {
+        clearInterval(scenarioTimerIntervalRef.current);
+        scenarioTimerIntervalRef.current = null;
+      }
+    }
+  };
+
+  const handleCompleteScenarioPractice = (scenarioId: string) => {
+    setScenarioPracticeDone((prev) => ({ ...prev, [scenarioId]: true }));
+    showNotification('Scenario practice completed! Response compared with Senior Exemplar.');
+  };
+
+  // =========================================================================
+  // AIML CAREER HUB COMPUTED & HANDLER FUNCTIONS
+  // =========================================================================
+  const filteredAimlDrills = useMemo(() => {
+    return PERSONALIZED_SPEAKING_DRILLS.filter((d) => {
+      const matchStage = d.stageId === selectedProgressionStage;
+      const matchCat = aimlCategoryFilter === 'all' || d.category === aimlCategoryFilter;
+      return matchStage && matchCat;
+    });
+  }, [selectedProgressionStage, aimlCategoryFilter]);
+
+  const activeAimlDrill = useMemo(() => {
+    return (
+      PERSONALIZED_SPEAKING_DRILLS.find((d) => d.id === selectedAimlDrillId) ||
+      filteredAimlDrills[0] ||
+      PERSONALIZED_SPEAKING_DRILLS[0]
+    );
+  }, [selectedAimlDrillId, filteredAimlDrills]);
+
+  const startAimlRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      aimlRecorderRef.current = mediaRecorder;
+      aimlAudioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          aimlAudioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(aimlAudioChunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(audioBlob);
+        setAimlAudioUrl(url);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start(250);
+      setAimlIsRecording(true);
+      setAimlRecordSeconds(0);
+
+      if (aimlTimerIntervalRef.current) clearInterval(aimlTimerIntervalRef.current);
+      aimlTimerIntervalRef.current = setInterval(() => {
+        setAimlRecordSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Microphone access error:', err);
+      showNotification('Microphone access is required to record speech practice.');
+    }
+  };
+
+  const stopAimlRecording = () => {
+    if (aimlRecorderRef.current && aimlIsRecording) {
+      aimlRecorderRef.current.stop();
+      setAimlIsRecording(false);
+      if (aimlTimerIntervalRef.current) {
+        clearInterval(aimlTimerIntervalRef.current);
+        aimlTimerIntervalRef.current = null;
+      }
+    }
+  };
+
+  const handleCompleteAimlDrill = (drillId: string) => {
+    setAimlCompletedDrills((prev) => ({ ...prev, [drillId]: true }));
+    showNotification('AIML Speaking Rehearsal completed & logged to your private progress!');
+  };
 
   // =========================================================================
   // INTERVIEW TRAINER COMPUTED & HANDLER FUNCTIONS
@@ -1499,6 +1792,58 @@ function EnglishCareerContent() {
       console.error('Failed to delete mock session:', err);
     }
   };
+
+  // =========================================================================
+  // ACCESS CONTROL SECURITY GUARD
+  // =========================================================================
+  if (loading || (hasAccess && stateLoading)) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center font-mono text-sm text-slate-400">
+        <div className="flex items-center gap-3 bg-slate-900 px-6 py-4 rounded-2xl border border-slate-800 shadow-2xl">
+          <div className="w-5 h-5 border-2 border-[#006cd2] border-t-transparent rounded-full animate-spin" />
+          <span>Verifying Communication Trainer Access &amp; Records...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Unauthorized Account Guard
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 font-sans">
+        <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-slate-800 text-center space-y-6">
+          <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center mx-auto text-rose-400 shadow-inner">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 text-rose-400 text-xs font-mono font-bold rounded-full uppercase tracking-wider">
+              Private Security Guard
+            </div>
+            <h1 className="text-2xl font-bold font-display text-white">
+              Restricted Portal
+            </h1>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              The English &amp; Career Communication Trainer is an exclusive private module reserved
+              for authorized personnel.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 font-mono text-xs text-slate-400">
+            Authenticated Account: <span className="text-white">{userData?.email || 'Guest'}</span>
+          </div>
+
+          <Link
+            href="/home"
+            className="w-full py-3.5 bg-gradient-to-r from-[#006cd2] to-blue-600 hover:from-[#005bb5] hover:to-blue-700 text-white font-sans font-bold rounded-2xl transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 text-sm"
+          >
+            <span>Return to LevelUpDev Hub</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-[#006cd2] selection:text-white flex flex-col relative overflow-x-hidden">
@@ -1852,6 +2197,44 @@ function EnglishCareerContent() {
           {/* ========================================================================= */}
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
+              {/* ========================================================================= */}
+              {/* PERSONALIZED AIML STUDENT CAREER BANNER */}
+              {/* ========================================================================= */}
+              <section className="relative overflow-hidden bg-gradient-to-r from-indigo-950/80 via-slate-900/90 to-blue-950/70 border border-indigo-500/30 rounded-3xl p-6 sm:p-7 backdrop-blur-xl shadow-2xl">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-indigo-400 via-blue-500 to-purple-500" />
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-2 max-w-3xl">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-mono font-bold tracking-wide">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>PERSONALIZED TRACK: {PERSONALIZED_USER_PROFILE.name.toUpperCase()} ({PERSONALIZED_USER_PROFILE.email})</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-mono">
+                        <GraduationCap className="w-3 h-3 text-blue-400" />
+                        <span>3rd Year B.Tech AIML • AI &amp; Software Internship Preparation</span>
+                      </span>
+                    </div>
+
+                    <h2 className="text-xl sm:text-2xl font-bold font-display text-white">
+                      6-Stage Spoken Communication Evolution
+                    </h2>
+
+                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                      Gradual progression from <b>Simple English</b> → <b>Everyday Fluency</b> → <b>Technical Systems</b> → <b>Workplace Diplomacy</b> → <b>STAR Interviews</b> → <b>Job-Ready AIML Defense</b>. Practice speaking out loud every day!
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleTabChange('aiml_hub')}
+                    className="px-6 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-sans font-bold rounded-2xl transition shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 text-xs font-mono shrink-0"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Open AIML Career Hub</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </section>
+
               {/* ========================================================================= */}
               {/* HERO & OVERALL COMMUNICATION READINESS */}
               {/* ========================================================================= */}
@@ -2505,8 +2888,1106 @@ function EnglishCareerContent() {
                   </button>
                 </div>
               </section>
+
+              {/* ========================================================================= */}
+              {/* 15-PILLAR CAREER COMMUNICATION & JOB READINESS MATRIX */}
+              {/* ========================================================================= */}
+              <section className="bg-gradient-to-br from-slate-900 via-slate-900/95 to-blue-950/30 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-xl space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-400 uppercase tracking-wider mb-1.5">
+                      <Compass className="w-4 h-4" />
+                      <span>End-to-End Job Readiness Matrix</span>
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-bold font-display text-white">
+                      15 Career Communication Tracks
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                      Every English lesson connects directly to a real-world technical situation. Master communication across Software Engineering, Python, Data/AI, DSA, Projects, Git, and Executive meetings.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleTabChange('scenarios')}
+                    className="px-5 py-3 rounded-2xl bg-[#006cd2] hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 shrink-0"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    <span>Open Scenario Simulator</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
+                  {CAREER_TRACKS_CONFIG.map((track) => {
+                    const trackScenarios = getScenariosByTrack(track.id);
+
+                    return (
+                      <div
+                        key={track.id}
+                        onClick={() => {
+                          setSelectedCareerTrackFilter(track.id);
+                          if (trackScenarios[0]) setSelectedCareerScenarioId(trackScenarios[0].id);
+                          handleTabChange('scenarios');
+                        }}
+                        className="p-4 rounded-2xl bg-slate-950 border border-slate-800/90 hover:border-blue-500/50 cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-3 group hover:scale-[1.02] shadow-md"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-blue-400 group-hover:text-amber-300 transition-colors">
+                              {renderTrackIcon(track.iconName)}
+                            </div>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-400">
+                              {trackScenarios.length} Scenarios
+                            </span>
+                          </div>
+
+                          <div>
+                            <h3 className="text-xs font-bold font-display text-white group-hover:text-blue-300 transition-colors line-clamp-1">
+                              {track.title}
+                            </h3>
+                            <span className="text-[10px] font-mono text-slate-400 block truncate mt-0.5">
+                              {track.roleTag}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                            {track.description}
+                          </p>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-blue-400">
+                          <span>{track.primaryFramework.slice(0, 18)}...</span>
+                          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
           )}
+
+          {/* ========================================================================= */}
+          {/* 1.25. AIML CAREER & JOB-READINESS HUB (PERSONALIZED FOR SWAMY) */}
+          {/* ========================================================================= */}
+          {activeTab === 'aiml_hub' && (() => {
+            const currentDrill = activeAimlDrill;
+            const currentStageInfo = PROGRESSION_STAGES_CONFIG.find((s) => s.id === selectedProgressionStage) || PROGRESSION_STAGES_CONFIG[0];
+            const isCompleted = !!aimlCompletedDrills[currentDrill.id];
+
+            return (
+              <div className="space-y-8">
+                {/* ========================================================================= */}
+                {/* 1. PERSONALIZED STUDENT PROFILE & CAREER CONTEXT BANNER */}
+                {/* ========================================================================= */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-indigo-950/40 to-slate-900/90 border border-indigo-500/30 p-6 md:p-8 rounded-3xl shadow-2xl backdrop-blur-xl">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div className="space-y-3 max-w-3xl">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-mono font-bold tracking-wide">
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>PERSONALIZED FOR {PERSONALIZED_USER_PROFILE.name.toUpperCase()} ({PERSONALIZED_USER_PROFILE.email})</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-mono">
+                          <GraduationCap className="w-3 h-3 text-blue-400" />
+                          <span>3rd Year B.Tech AIML</span>
+                        </span>
+                      </div>
+
+                      <h1 className="text-2xl md:text-3xl font-display font-extrabold text-white tracking-tight">
+                        AIML Career Communication &amp;{' '}
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">
+                          Internship Readiness Hub
+                        </span>
+                      </h1>
+
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        Tailored specifically for 3rd-year AIML students preparing for software &amp; AI internships. Focuses on active vocal rehearsal across algorithm explanations, project storytelling, AI architecture defense, and high-stakes interviews.
+                      </p>
+
+                      {/* Target Priorities Badges */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold mr-1">Priorities:</span>
+                        {PERSONALIZED_USER_PROFILE.communicationPriorities.slice(0, 4).map((prio, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-md bg-slate-950/80 border border-slate-800 text-slate-300 text-[11px] font-mono"
+                          >
+                            ✓ {prio}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Quick Stats / Target Roles Card */}
+                    <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-5 space-y-3 min-w-[280px] lg:max-w-xs shadow-xl">
+                      <div className="flex items-center justify-between text-xs font-mono text-slate-400 font-semibold border-b border-slate-800 pb-2">
+                        <span className="flex items-center gap-1.5 text-indigo-400">
+                          <Target className="w-3.5 h-3.5" />
+                          TARGET INTERNSHIP ROLES
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {PERSONALIZED_USER_PROFILE.targetGoals.slice(0, 3).map((goal, gIdx) => (
+                          <div key={gIdx} className="flex items-center gap-2 text-xs font-mono text-slate-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                            <span className="truncate">{goal}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                        <span>Active Drills: <b className="text-white">{PERSONALIZED_SPEAKING_DRILLS.length}</b></span>
+                        <span>Completed: <b className="text-emerald-400">{Object.keys(aimlCompletedDrills).length}</b></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ========================================================================= */}
+                {/* 2. GRADUAL 6-STAGE PROGRESSION ROADMAP STEPPER */}
+                {/* ========================================================================= */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold font-display text-white flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-indigo-400" />
+                        <span>The 6-Stage Progressive Communication Roadmap</span>
+                      </h2>
+                      <p className="text-xs text-slate-400 font-mono">
+                        From basic spoken hesitation to executive AI architecture defense
+                      </p>
+                    </div>
+                    <span className="hidden sm:inline-flex px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-mono font-bold border border-indigo-500/20">
+                      Current Stage: {currentStageInfo.stageNumber}/6
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                    {PROGRESSION_STAGES_CONFIG.map((stage) => {
+                      const isSelected = selectedProgressionStage === stage.id;
+                      const stageDrills = getDrillsByStage(stage.id);
+                      const completedInStage = stageDrills.filter((d) => aimlCompletedDrills[d.id]).length;
+
+                      return (
+                        <button
+                          key={stage.id}
+                          onClick={() => {
+                            setSelectedProgressionStage(stage.id);
+                            const firstDrill = stageDrills[0];
+                            if (firstDrill) setSelectedAimlDrillId(firstDrill.id);
+                          }}
+                          className={`p-3.5 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between min-h-[110px] ${
+                            isSelected
+                              ? 'bg-gradient-to-b from-indigo-900/60 to-slate-900 border-indigo-500 shadow-lg shadow-indigo-500/20'
+                              : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[11px] font-mono">
+                            <span className={`font-bold ${isSelected ? 'text-indigo-300' : 'text-slate-400'}`}>
+                              STAGE {stage.stageNumber}
+                            </span>
+                            {completedInStage > 0 && (
+                              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                            )}
+                          </div>
+                          <div className="space-y-0.5">
+                            <div className="text-xs font-bold text-white line-clamp-1 font-display">
+                              {stage.title.split('&')[0]}
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-400 line-clamp-1">
+                              {stage.shortSubtitle}
+                            </div>
+                          </div>
+                          <div className="text-[10px] font-mono text-indigo-400 pt-1 border-t border-slate-800/60">
+                            {stageDrills.length} Speaking Drills
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Stage Focus Details Card */}
+                  <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-indigo-400 font-bold uppercase tracking-wider text-[11px]">
+                          Stage {currentStageInfo.stageNumber} Objective:
+                        </span>
+                        <span className="font-bold text-white font-display text-sm">
+                          {currentStageInfo.title}
+                        </span>
+                      </div>
+                      <p className="text-slate-300 leading-relaxed max-w-3xl">
+                        {currentStageInfo.tagline}
+                      </p>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 shrink-0 font-mono text-slate-400 text-[11px]">
+                      <span className="text-indigo-400 font-bold block">Milestone Goal:</span>
+                      <span className="text-white">{currentStageInfo.targetMilestone}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ========================================================================= */}
+                {/* 3. RAPID 15-MINUTE DAILY AIML SPEAKING WORKOUT */}
+                {/* ========================================================================= */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold font-mono text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                      <Flame className="w-4 h-4 fill-amber-400" />
+                      <span>The 15-Minute Daily AIML Speaking Workout (Deliberate Practice)</span>
+                    </h3>
+                    <span className="text-xs text-slate-400 font-mono">Repeat out loud daily</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {[
+                      {
+                        step: '1. Warmup (2 Min)',
+                        title: 'Daily Self-Talk Routine',
+                        drillId: 'pdrill-s1-daily-routine',
+                        stageId: 'stage_1_simple_english' as CommunicationProgressionStageId,
+                        icon: MessageSquare,
+                        color: 'text-emerald-400 border-emerald-500/30 bg-emerald-950/20',
+                      },
+                      {
+                        step: '2. DSA Narration (3 Min)',
+                        title: 'Live Coding Think-Aloud',
+                        drillId: 'pdrill-s5-dsa-think-aloud',
+                        stageId: 'stage_5_interview_english' as CommunicationProgressionStageId,
+                        icon: Code,
+                        color: 'text-cyan-400 border-cyan-500/30 bg-cyan-950/20',
+                      },
+                      {
+                        step: '3. AIML Defense (5 Min)',
+                        title: 'RAG vs Fine-Tuning Defense',
+                        drillId: 'pdrill-s6-rag-vs-finetuning',
+                        stageId: 'stage_6_job_ready_executive' as CommunicationProgressionStageId,
+                        icon: Cpu,
+                        color: 'text-indigo-400 border-indigo-500/30 bg-indigo-950/20',
+                      },
+                      {
+                        step: '4. Capstone Pitch (5 Min)',
+                        title: '8-Step LevelUpDev Story',
+                        drillId: 'pdrill-s6-capstone-8step-walkthrough',
+                        stageId: 'stage_6_job_ready_executive' as CommunicationProgressionStageId,
+                        icon: Award,
+                        color: 'text-purple-400 border-purple-500/30 bg-purple-950/20',
+                      },
+                    ].map((w, idx) => {
+                      const Icon = w.icon;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setSelectedProgressionStage(w.stageId);
+                            setSelectedAimlDrillId(w.drillId);
+                            setAimlWorkflowTab('rehearse');
+                          }}
+                          className={`p-3.5 rounded-2xl border text-left transition hover:scale-[1.02] flex items-center justify-between ${w.color}`}
+                        >
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider block opacity-80">
+                              {w.step}
+                            </span>
+                            <span className="text-xs font-bold text-white block">
+                              {w.title}
+                            </span>
+                          </div>
+                          <Icon className="w-5 h-5 shrink-0 opacity-80" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ========================================================================= */}
+                {/* 4. ACTIVE SPEAKING DRILL REHEARSAL STUDIO */}
+                {/* ========================================================================= */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                  {/* Left Column: Stage Drills Browser (4 Cols) */}
+                  <div className="lg:col-span-4 space-y-3">
+                    <div className="flex items-center justify-between font-mono text-xs text-slate-400 px-1">
+                      <span className="font-bold text-slate-300">DRILLS IN STAGE {currentStageInfo.stageNumber}</span>
+                      <span>{filteredAimlDrills.length} Available</span>
+                    </div>
+
+                    <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-1 scrollbar-thin">
+                      {filteredAimlDrills.map((drill) => {
+                        const isSelected = selectedAimlDrillId === drill.id;
+                        const isDone = !!aimlCompletedDrills[drill.id];
+
+                        return (
+                          <div
+                            key={drill.id}
+                            onClick={() => {
+                              setSelectedAimlDrillId(drill.id);
+                              setAimlAudioUrl(null);
+                            }}
+                            className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-indigo-950/40 border-indigo-500 shadow-md shadow-indigo-500/10'
+                                : 'bg-slate-900/70 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[10px] font-mono mb-1.5">
+                              <span className="px-2 py-0.5 rounded bg-slate-950 text-indigo-300 border border-indigo-500/20 font-semibold">
+                                {drill.categoryLabel}
+                              </span>
+                              <div className="flex items-center gap-1.5 text-slate-400">
+                                <Clock className="w-3 h-3" />
+                                <span>{drill.targetDurationSeconds}s</span>
+                                {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 ml-1" />}
+                              </div>
+                            </div>
+                            <h4 className="text-xs font-bold font-display text-white line-clamp-2">
+                              {drill.title}
+                            </h4>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Live Rehearsal Workbench (8 Cols) */}
+                  <div className="lg:col-span-8 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl">
+                    {/* Drill Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-mono font-bold">
+                            Stage {currentDrill.stageNumber}: {currentDrill.categoryLabel}
+                          </span>
+                          <span className="text-slate-500 font-mono text-xs">•</span>
+                          <span className="font-mono text-slate-400 text-xs flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                            Target: {currentDrill.targetDurationSeconds}s
+                          </span>
+                        </div>
+                        <h3 className="text-xl font-bold font-display text-white">
+                          {currentDrill.title}
+                        </h3>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          {currentDrill.context}
+                        </p>
+                      </div>
+
+                      {/* Complete Status Pill */}
+                      <button
+                        onClick={() => handleCompleteAimlDrill(currentDrill.id)}
+                        className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 transition shrink-0 ${
+                          isCompleted
+                            ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>{isCompleted ? 'Rehearsal Completed' : 'Mark as Done'}</span>
+                      </button>
+                    </div>
+
+                    {/* Sub-Workflow Navigation Tabs */}
+                    <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+                      {[
+                        { id: 'rehearse', label: '1. Rehearse & Record', icon: Mic },
+                        { id: 'framework', label: '2. 4-Step Blueprint', icon: Layers },
+                        { id: 'terms', label: '3. Terminology Checklist', icon: BookOpen },
+                        { id: 'model', label: '4. Golden Spoken Model', icon: Award },
+                      ].map((tab) => {
+                        const Icon = tab.icon;
+                        const isTabActive = aimlWorkflowTab === tab.id;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => setAimlWorkflowTab(tab.id as any)}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-mono text-xs transition font-semibold ${
+                              isTabActive
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                            }`}
+                          >
+                            <Icon className="w-3.5 h-3.5" />
+                            <span>{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Tab 1: Live Rehearsal & Recording Studio */}
+                    {aimlWorkflowTab === 'rehearse' && (
+                      <div className="space-y-6">
+                        {/* Audio Recording Controller */}
+                        <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-4 text-center">
+                          <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+                            <span className="flex items-center gap-1.5">
+                              <Mic className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>IN-BROWSER VOICE RECORDER</span>
+                            </span>
+                            <span className="text-indigo-400 font-bold">
+                              Timer: {aimlRecordSeconds}s / {currentDrill.targetDurationSeconds}s
+                            </span>
+                          </div>
+
+                          <div className="py-3 flex flex-col items-center justify-center gap-3">
+                            {aimlIsRecording ? (
+                              <button
+                                onClick={stopAimlRecording}
+                                className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/30 animate-pulse transition"
+                              >
+                                <Square className="w-6 h-6 fill-white" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={startAimlRecording}
+                                className="w-16 h-16 rounded-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 transition transform hover:scale-105"
+                              >
+                                <Mic className="w-7 h-7" />
+                              </button>
+                            )}
+
+                            <span className="text-xs font-mono text-slate-300">
+                              {aimlIsRecording
+                                ? 'Recording your speech... Speak out loud with conviction!'
+                                : 'Click microphone to start practicing your spoken response'}
+                            </span>
+                          </div>
+
+                          {/* Audio Player if recorded */}
+                          {aimlAudioUrl && (
+                            <div className="pt-3 border-t border-slate-800/80 space-y-2 text-left">
+                              <span className="text-[10px] font-mono text-indigo-400 uppercase font-bold flex items-center gap-1.5">
+                                <Play className="w-3 h-3" />
+                                <span>Replay Your Recorded Answer ({aimlRecordSeconds}s)</span>
+                              </span>
+                              <audio controls src={aimlAudioUrl} className="w-full h-8" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Step-by-Step Response Guidance for speaking */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-bold font-mono text-slate-300 uppercase tracking-wider">
+                            Speaking Framework Blueprints (Follow While Speaking):
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {currentDrill.responseFramework.map((step) => (
+                              <div
+                                key={step.stepNumber}
+                                className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-1.5"
+                              >
+                                <div className="flex items-center gap-2 text-xs font-mono font-bold text-indigo-300">
+                                  <span className="w-5 h-5 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-[10px]">
+                                    {step.stepNumber}
+                                  </span>
+                                  <span>{step.stepTitle}</span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 leading-relaxed">
+                                  {step.description}
+                                </p>
+                                <div className="text-[10px] font-mono text-slate-300 bg-slate-900 p-2 rounded-lg border border-slate-800 italic">
+                                  &quot;{step.starterPhrase}&quot;
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Self Reflection & Notes Input */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-mono font-bold text-slate-300 flex items-center justify-between">
+                            <span>Self-Reflection / What You Spoke:</span>
+                            <span className="text-slate-500 font-normal">Notes saved to your progress</span>
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={aimlUserNotes}
+                            onChange={(e) => setAimlUserNotes(e.target.value)}
+                            placeholder="Write a quick reflection of what went well, any fillers used, or terms to refine..."
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 resize-none"
+                          />
+                        </div>
+
+                        {/* Confidence Rating Bar & Action */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+                          <div className="flex items-center gap-2 font-mono text-xs text-slate-400">
+                            <span>Vocal Confidence:</span>
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  key={star}
+                                  type="button"
+                                  onClick={() => setAimlConfidenceRating(star)}
+                                  className={`p-1 rounded transition ${
+                                    aimlConfidenceRating >= star ? 'text-amber-400' : 'text-slate-700'
+                                  }`}
+                                >
+                                  ★
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleCompleteAimlDrill(currentDrill.id)}
+                            className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-sans font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Save Rehearsal &amp; Log Progress</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab 2: Detailed 4-Step Framework */}
+                    {aimlWorkflowTab === 'framework' && (
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-1.5 text-xs text-slate-300">
+                          <span className="font-mono text-indigo-400 font-bold uppercase">Why this blueprint works:</span>
+                          <p>{currentDrill.whyThisMatters}</p>
+                        </div>
+
+                        <div className="space-y-3">
+                          {currentDrill.responseFramework.map((step) => (
+                            <div
+                              key={step.stepNumber}
+                              className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2"
+                            >
+                              <div className="flex items-center gap-2 font-mono text-xs font-bold text-white">
+                                <span className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-xs">
+                                  {step.stepNumber}
+                                </span>
+                                <span>{step.stepTitle}</span>
+                              </div>
+                              <p className="text-xs text-slate-300 leading-relaxed">
+                                {step.description}
+                              </p>
+                              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 font-mono text-xs text-indigo-300">
+                                <b>Opening Blueprint:</b> &quot;{step.starterPhrase}&quot;
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab 3: Key Terminology Checklist */}
+                    {aimlWorkflowTab === 'terms' && (
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                          <span className="text-xs font-mono font-bold text-indigo-400 uppercase">
+                            High-Signal Technical Terminology:
+                          </span>
+                          <p className="text-xs text-slate-400">
+                            Senior engineering interviewers listen actively for these precise technical terms. Verify you incorporated them in your spoken response:
+                          </p>
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            {currentDrill.keyTerminology.map((term, idx) => (
+                              <span
+                                key={idx}
+                                className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-indigo-300 font-mono text-xs font-semibold"
+                              >
+                                ✓ {term}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Power Phrases */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                          <span className="text-xs font-mono font-bold text-cyan-400 uppercase">
+                            Executive Power Phrases:
+                          </span>
+                          <div className="space-y-2 pt-1">
+                            {currentDrill.powerPhrases.map((phrase, pIdx) => (
+                              <div
+                                key={pIdx}
+                                className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 font-mono text-xs text-slate-200"
+                              >
+                                &quot;{phrase}&quot;
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab 4: Golden Spoken Model */}
+                    {aimlWorkflowTab === 'model' && (
+                      <div className="space-y-4">
+                        <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-mono font-bold text-amber-400 uppercase flex items-center gap-1.5">
+                              <Award className="w-4 h-4" />
+                              <span>Executive-Level Model Transcript</span>
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(currentDrill.modelSpokenAnswer);
+                                showNotification('Copied model answer to clipboard!');
+                              }}
+                              className="text-[11px] font-mono text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-900 border border-slate-800 flex items-center gap-1"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>Copy</span>
+                            </button>
+                          </div>
+                          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                            &quot;{currentDrill.modelSpokenAnswer}&quot;
+                          </p>
+                        </div>
+
+                        {/* Common Pitfalls To Avoid */}
+                        <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-2">
+                          <span className="text-xs font-mono font-bold text-rose-400 uppercase flex items-center gap-1.5">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>Common Pitfalls to Avoid:</span>
+                          </span>
+                          <ul className="space-y-1.5 text-xs text-slate-300 font-mono">
+                            {currentDrill.commonPitfallsToAvoid.map((pitfall, pfIdx) => (
+                              <li key={pfIdx} className="flex items-start gap-2">
+                                <span className="text-rose-400 font-bold">✕</span>
+                                <span>{pitfall}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ========================================================================= */}
+          {/* 1.5. CAREER TRACKS & SCENARIO SIMULATOR TAB */}
+          {/* ========================================================================= */}
+          {activeTab === 'scenarios' && (() => {
+            const currentScenario = activeCareerScenario;
+
+            return (
+              <div className="space-y-8">
+                {/* Header Banner */}
+                <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+                      <Compass className="w-4 h-4" />
+                      <span>Career Simulation &amp; Job Readiness Matrix</span>
+                    </div>
+                    <h2 className="text-2xl md:text-3xl font-bold font-display text-white">
+                      Job Readiness Scenarios Studio
+                    </h2>
+                    <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
+                      Connect English practice directly with real-world engineering situations. Practice architectural trade-offs, live coding narratives, executive metric summaries, and standup blockers.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-right">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase block">
+                        Completed Drills
+                      </span>
+                      <span className="text-base font-bold font-mono text-emerald-400">
+                        {Object.keys(scenarioPracticeDone).length} / {CAREER_SCENARIOS_BANK.length} Done
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 15 Career Track Selector Pills */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-xs font-mono text-slate-400 uppercase tracking-wider font-semibold">
+                      Select Career Track ({CAREER_TRACKS_CONFIG.length} Available)
+                    </span>
+                    <button
+                      onClick={() => setSelectedCareerTrackFilter('all')}
+                      className={`text-xs font-mono transition-colors ${
+                        selectedCareerTrackFilter === 'all' ? 'text-blue-400 font-bold' : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      Show All ({CAREER_SCENARIOS_BANK.length})
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                    {CAREER_TRACKS_CONFIG.map((track) => {
+                      const isSelected = selectedCareerTrackFilter === track.id;
+
+                      return (
+                        <button
+                          key={track.id}
+                          onClick={() => {
+                            setSelectedCareerTrackFilter(track.id);
+                            const trackScenarios = getScenariosByTrack(track.id);
+                            if (trackScenarios[0]) setSelectedCareerScenarioId(trackScenarios[0].id);
+                          }}
+                          className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all border flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20'
+                              : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
+                          }`}
+                        >
+                          {renderTrackIcon(track.iconName)}
+                          <span>{track.title}</span>
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-950/80 font-mono text-slate-400">
+                            {getScenariosByTrack(track.id).length}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Main 2-Column Scenario Workbench */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                  {/* Left Column: Scenario List (4 cols) */}
+                  <div className="lg:col-span-4 space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-mono text-slate-400 uppercase font-semibold">
+                        Scenarios ({filteredCareerScenarios.length})
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5 max-h-[720px] overflow-y-auto pr-1 scrollbar-none">
+                      {filteredCareerScenarios.map((sc) => {
+                        const isSelected = selectedCareerScenarioId === sc.id;
+                        const isDone = scenarioPracticeDone[sc.id];
+
+                        return (
+                          <div
+                            key={sc.id}
+                            onClick={() => {
+                              setSelectedCareerScenarioId(sc.id);
+                              setScenarioWorkflowTab('framework');
+                              setScenarioUserAnswerText('');
+                              setScenarioAudioUrl(null);
+                            }}
+                            className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                              isSelected
+                                ? 'bg-blue-950/40 border-blue-500 shadow-lg shadow-blue-500/10'
+                                : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-xs font-bold text-white leading-snug line-clamp-2">
+                                {sc.title}
+                              </span>
+                              {isDone && (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] font-mono">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-amber-400 font-semibold">
+                                {sc.englishSkillFocus}
+                              </span>
+                              <span className="text-slate-500">
+                                {sc.difficulty} • ~{sc.timeLimitSeconds}s
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Scenario Interactive Workbench (8 cols) */}
+                  <div className="lg:col-span-8 bg-slate-900/90 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-xl space-y-6">
+                    {/* Scenario Title Header */}
+                    <div className="space-y-3 pb-5 border-b border-slate-800">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
+                            {CAREER_TRACKS_CONFIG.find((t) => t.id === currentScenario.trackId)?.title || 'Career Track'}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-slate-800 text-slate-300">
+                            {currentScenario.difficulty}
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-500" />
+                          Target: {currentScenario.timeLimitSeconds} Seconds
+                        </span>
+                      </div>
+
+                      <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                        {currentScenario.title}
+                      </h3>
+
+                      {/* Scenario Context Box */}
+                      <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-1.5">
+                        <span className="text-[10px] font-mono uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          <span>Workplace / Interview Context:</span>
+                        </span>
+                        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                          {currentScenario.scenarioContext}
+                        </p>
+                      </div>
+
+                      {/* Problem Prompt */}
+                      <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-800/40 text-xs text-blue-200 leading-relaxed font-sans">
+                        <strong className="font-mono text-blue-300">Your Communication Challenge: </strong>
+                        {currentScenario.prompt}
+                      </div>
+                    </div>
+
+                    {/* Sub-Tab Navigation inside Workbench */}
+                    <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800">
+                      <button
+                        onClick={() => setScenarioWorkflowTab('framework')}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          scenarioWorkflowTab === 'framework'
+                            ? 'bg-[#006cd2] text-white shadow-md'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <ListOrdered className="w-3.5 h-3.5" />
+                        <span>Step-by-Step Framework</span>
+                      </button>
+                      <button
+                        onClick={() => setScenarioWorkflowTab('compare')}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          scenarioWorkflowTab === 'compare'
+                            ? 'bg-[#006cd2] text-white shadow-md'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <Sliders className="w-3.5 h-3.5" />
+                        <span>Junior vs Senior Exemplar</span>
+                      </button>
+                      <button
+                        onClick={() => setScenarioWorkflowTab('practice')}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          scenarioWorkflowTab === 'practice'
+                            ? 'bg-[#006cd2] text-white shadow-md'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <Mic className="w-3.5 h-3.5" />
+                        <span>Interactive Practice Studio</span>
+                      </button>
+                    </div>
+
+                    {/* SUB-TAB 1: Step-by-Step Response Framework */}
+                    {scenarioWorkflowTab === 'framework' && (
+                      <div className="space-y-6">
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-blue-400" />
+                            <span>Recommended Response Structure</span>
+                          </h4>
+                          <div className="space-y-3">
+                            {currentScenario.stepByStepFramework.map((step) => (
+                              <div
+                                key={step.step}
+                                className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-blue-300 flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[10px] font-mono font-bold">
+                                      {step.step}
+                                    </span>
+                                    {step.name}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-slate-500">
+                                    {step.goal}
+                                  </span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/80 font-mono text-xs text-amber-300/90">
+                                  <span className="text-[10px] text-slate-500 block mb-0.5">Starter Phrase:</span>
+                                  &ldquo;{step.starterPhrase}&rdquo;
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Key Terminology Checklist */}
+                        <div className="space-y-2.5 pt-2">
+                          <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider block">
+                            Key Terminology &amp; Power Verbs Checklist:
+                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            {currentScenario.keyTerminology.map((term, idx) => (
+                              <span
+                                key={idx}
+                                className="px-3 py-1.5 rounded-xl text-xs font-mono bg-blue-500/10 border border-blue-500/20 text-blue-300"
+                              >
+                                ✓ {term}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setScenarioWorkflowTab('compare')}
+                          className="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all border border-slate-700 flex items-center justify-center gap-2"
+                        >
+                          <span>Compare Junior vs Senior Exemplar</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* SUB-TAB 2: Junior vs Senior Exemplar */}
+                    {scenarioWorkflowTab === 'compare' && (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Junior / Unpolished */}
+                          <div className="p-5 rounded-2xl bg-rose-500/5 border border-rose-500/20 space-y-3 flex flex-col justify-between">
+                            <div className="space-y-2">
+                              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 uppercase">
+                                ✕ Junior / Common Pitfall Response
+                              </span>
+                              <blockquote className="text-xs text-rose-100 italic leading-relaxed pt-1">
+                                &ldquo;{currentScenario.juniorExample.script}&rdquo;
+                              </blockquote>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-950/80 border border-rose-500/20 text-[11px] text-rose-300/90 font-mono">
+                              <strong>Why It Falls Short: </strong>
+                              {currentScenario.juniorExample.critique}
+                            </div>
+                          </div>
+
+                          {/* Senior Exemplar */}
+                          <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-3 flex flex-col justify-between">
+                            <div className="space-y-2">
+                              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 uppercase">
+                                ✓ Senior / Job-Ready Exemplar
+                              </span>
+                              <blockquote className="text-xs text-emerald-100 leading-relaxed pt-1">
+                                &ldquo;{currentScenario.seniorExemplar.script}&rdquo;
+                              </blockquote>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-950/80 border border-emerald-500/20 text-[11px] text-emerald-300/90 font-mono">
+                              <strong>Why It Wins: </strong>
+                              {currentScenario.seniorExemplar.whyItWins}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setScenarioWorkflowTab('practice')}
+                          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2"
+                        >
+                          <Mic className="w-4 h-4" />
+                          <span>Record / Submit Your Spoken Practice</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* SUB-TAB 3: Interactive Practice Studio */}
+                    {scenarioWorkflowTab === 'practice' && (
+                      <div className="space-y-6">
+                        {/* Audio Recorder Bar */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <span className="text-xs font-mono font-bold text-white flex items-center gap-2">
+                              <Mic className="w-4 h-4 text-blue-400" />
+                              <span>Speech Audio Recording</span>
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-400">
+                              {scenarioIsRecording
+                                ? `Recording in progress: ${scenarioRecordSeconds}s`
+                                : scenarioAudioUrl
+                                ? 'Audio recorded successfully.'
+                                : 'Press record to rehearse your spoken response.'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {scenarioIsRecording ? (
+                              <button
+                                onClick={stopScenarioRecording}
+                                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all flex items-center gap-2 animate-pulse"
+                              >
+                                <Square className="w-3.5 h-3.5 fill-white" />
+                                <span>Stop ({scenarioRecordSeconds}s)</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={startScenarioRecording}
+                                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                              >
+                                <Mic className="w-3.5 h-3.5" />
+                                <span>{scenarioAudioUrl ? 'Re-record' : 'Start Recording'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Audio Player if recorded */}
+                        {scenarioAudioUrl && (
+                          <div className="p-3 rounded-2xl bg-slate-950 border border-blue-500/30">
+                            <audio controls src={scenarioAudioUrl} className="w-full h-8" />
+                          </div>
+                        )}
+
+                        {/* Text input for transcript / notes */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-mono font-bold text-slate-300 flex items-center justify-between">
+                            <span>Your Answer Transcript / Outline:</span>
+                            <span className="text-slate-500 font-normal">Type or summarize your response</span>
+                          </label>
+                          <textarea
+                            rows={4}
+                            value={scenarioUserAnswerText}
+                            onChange={(e) => setScenarioUserAnswerText(e.target.value)}
+                            placeholder="Type how you would structure and deliver your response..."
+                            className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 resize-none leading-relaxed"
+                          />
+                        </div>
+
+                        {/* Confidence Rating */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+                          <span className="text-xs font-mono text-slate-300">
+                            Self Confidence Rating (1-5):
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                onClick={() => setScenarioConfidenceRating(star)}
+                                className={`w-8 h-8 rounded-xl font-mono text-xs font-bold transition-all ${
+                                  scenarioConfidenceRating >= star
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                    : 'bg-slate-900 text-slate-600 border border-slate-800'
+                                }`}
+                              >
+                                ★
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center justify-between pt-2">
+                          <button
+                            onClick={() => handleTabChange(currentScenario.targetTab)}
+                            className="text-xs font-mono text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                          >
+                            <span>Open in {currentScenario.targetTab.toUpperCase()} Trainer</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleCompleteScenarioPractice(currentScenario.id)}
+                            className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-xl shadow-emerald-500/20 flex items-center gap-2"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Mark Scenario Rehearsed</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ========================================================================= */}
           {/* 2. FULL 10-LEVEL CURRICULUM EXPLORER TAB */}
@@ -6356,101 +7837,949 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 11. WEEKLY ASSESSMENT TAB */}
+          {/* 11. INITIAL ASSESSMENT & WEEKLY ASSESSMENT TAB */}
           {/* ========================================================================= */}
-          {activeTab === 'assessment' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                <div>
-                  <h2 className="text-xl font-bold font-display text-white flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-emerald-400" />
-                    <span>Weekly Communication Diagnostic Benchmark</span>
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    Comprehensive 5-question evaluation testing technical grammar, vocabulary precision, and interview leadership.
-                  </p>
-                </div>
-                <div className="font-mono text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-                  {userState?.assessmentHistory.length || 0} Assessments Completed
-                </div>
-              </div>
+          {activeTab === 'assessment' && (() => {
+            const initialResult = initialEvaluationResult || (userState?.initialAssessment ? {
+              overallScorePercent: userState.initialAssessment.overallScorePercent || userState.initialAssessment.scorePercent,
+              overallLevel: (userState.initialAssessment.overallLevel || 'Developing') as AssessmentSkillLevel,
+              totalQuestions: userState.initialAssessment.totalQuestions,
+              correctCount: userState.initialAssessment.correctCount,
+              sectionDetails: userState.initialAssessment.sectionDetails || {},
+              strengths: userState.initialAssessment.strengths || [],
+              weaknesses: userState.initialAssessment.weaknesses || [],
+              recommendedTraining: userState.initialAssessment.recommendedTraining || [],
+              first7DayPlan: userState.initialAssessment.first7DayPlan || [],
+            } : null);
 
-              {assessmentCompleted ? (
-                <div className="p-8 rounded-3xl bg-slate-900/90 border border-emerald-500/40 space-y-6 text-center max-w-xl mx-auto shadow-2xl">
-                  <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto text-emerald-400">
-                    <CheckCircle2 className="w-8 h-8" />
-                  </div>
+            const activeInitialSection = ASSESSMENT_SECTIONS[initialActiveSectionIdx] || ASSESSMENT_SECTIONS[0];
+            const activeInitialQuestions = INITIAL_ASSESSMENT_QUESTIONS.filter((q) => q.sectionId === activeInitialSection.id);
+            const completedInitialAnswersCount = Object.keys(initialAnswers).length;
+            const totalInitialQuestionsCount = INITIAL_ASSESSMENT_QUESTIONS.length;
 
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-bold font-display text-white">
-                      Assessment Submitted!
-                    </h3>
-                    <p className="text-xs text-slate-300">
-                      Your diagnostic score has been recorded and factored into your overall Career Communication Readiness index.
+            const weeklyQuestions = (WEEKLY_ASSESSMENT_BANK as Record<number, DiagnosticQuestion[]>)[weeklyActiveWeek] || WEEKLY_ASSESSMENT_BANK[1] || [];
+            const completedWeeklyCount = Object.keys(weeklyAnswers).length;
+            const trainingDaysCount = userState?.completedDailyLessons?.length || 0;
+
+            return (
+              <div className="space-y-8">
+                {/* Header & Sub-Tab Navigation */}
+                <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-400 uppercase tracking-wider mb-2">
+                      <Target className="w-4 h-4" />
+                      <span>Skill Diagnostic &amp; Milestone Benchmark System</span>
+                    </div>
+                    <h2 className="text-2xl md:text-3xl font-bold font-display text-white">
+                      Diagnostic &amp; Weekly Assessments
+                    </h2>
+                    <p className="text-sm text-slate-400 mt-1 max-w-2xl">
+                      Establish your true baseline across 8 communication dimensions with constructive calibration. Track genuine progress every 7 completed training days with verifiable delta comparisons.
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setAssessmentCompleted(false);
-                      setAssessmentAnswers({});
-                    }}
-                    className="px-6 py-3 bg-[#006cd2] hover:bg-blue-600 text-white font-sans font-bold text-xs rounded-xl transition"
-                  >
-                    Retake Assessment
-                  </button>
+                  <div className="flex items-center gap-1.5 p-1.5 bg-slate-950 rounded-2xl border border-slate-800 self-start md:self-auto overflow-x-auto max-w-full">
+                    <button
+                      onClick={() => setAssessmentSubTab('initial')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                        assessmentSubTab === 'initial'
+                          ? 'bg-[#006cd2] text-white shadow-lg shadow-blue-500/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                      }`}
+                    >
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Initial Diagnostic</span>
+                      {userState?.initialAssessment && (
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setAssessmentSubTab('weekly')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                        assessmentSubTab === 'weekly'
+                          ? 'bg-[#006cd2] text-white shadow-lg shadow-blue-500/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                      }`}
+                    >
+                      <Flame className="w-3.5 h-3.5" />
+                      <span>Weekly Milestones</span>
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
+                        Day {trainingDaysCount}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setAssessmentSubTab('history')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                        assessmentSubTab === 'history'
+                          ? 'bg-[#006cd2] text-white shadow-lg shadow-blue-500/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                      }`}
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Assessment History ({userState?.assessmentHistory?.length || 0})</span>
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {ASSESSMENT_QUESTIONS.map((q, idx) => {
-                    const selected = assessmentAnswers[q.id];
-                    return (
-                      <div
-                        key={q.id}
-                        className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono text-emerald-400 uppercase font-bold">
-                            Question {idx + 1} of {ASSESSMENT_QUESTIONS.length} • {q.category}
+
+                {/* ================================================================= */}
+                {/* SUB-TAB 1: INITIAL ASSESSMENT */}
+                {/* ================================================================= */}
+                {assessmentSubTab === 'initial' && (
+                  <div className="space-y-8">
+                    {/* If assessment result exists and user is not retaking */}
+                    {initialResult && (
+                      <div className="space-y-8">
+                        {/* Overall Level Hero Card */}
+                        <div className="bg-gradient-to-br from-slate-900 via-slate-900/90 to-blue-950/40 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-2xl relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+                          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="space-y-3">
+                              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider">
+                                <Award className="w-3.5 h-3.5" />
+                                Diagnostic Baseline Established
+                              </div>
+                              <div>
+                                <span className="text-xs text-slate-400 font-mono uppercase tracking-wider block">
+                                  Your Current Level
+                                </span>
+                                <h3 className="text-3xl md:text-4xl font-extrabold font-display text-white tracking-tight flex items-center gap-3 mt-1">
+                                  <span>{initialResult.overallLevel}</span>
+                                  <span
+                                    className={`text-xs px-3 py-1 rounded-full font-mono font-semibold border ${getSkillLevelColor(
+                                      initialResult.overallLevel
+                                    )}`}
+                                  >
+                                    {initialResult.overallScorePercent}% Diagnostic Accuracy
+                                  </span>
+                                </h3>
+                              </div>
+                              <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
+                                Baseline calculated across Grammar, Vocabulary, Sentence Formation, Reading, Listening, Speaking, Technical Communication, and Interview Readiness.
+                              </p>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                              <button
+                                onClick={() => {
+                                  setInitialEvaluationResult(null);
+                                  setInitialAnswers({});
+                                  setInitialActiveSectionIdx(0);
+                                }}
+                                className="px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all border border-slate-700 flex items-center justify-center gap-2 shadow-lg"
+                              >
+                                <RefreshCw className="w-4 h-4 text-slate-400" />
+                                <span>Retake Diagnostic</span>
+                              </button>
+                              <button
+                                onClick={() => handleTabChange('daily')}
+                                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2"
+                              >
+                                <Sparkles className="w-4 h-4 text-amber-300" />
+                                <span>Start 7-Day Plan</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 8-Section Diagnostic Breakdown Grid */}
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                              <Layers className="w-4 h-4 text-blue-400" />
+                              <span>8-Section Communication Breakdown</span>
+                            </h4>
+                            <span className="text-xs font-mono text-slate-400">
+                              Calibrated into 4 Growth Tiers
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {ASSESSMENT_SECTIONS.map((sec) => {
+                              const detail = initialResult.sectionDetails?.[sec.id];
+                              const score = detail ? detail.scorePercent : 0;
+                              const level = detail ? detail.level : 'Developing';
+                              const correct = detail ? detail.correct : 0;
+                              const total = detail ? detail.total : 4;
+
+                              return (
+                                <div
+                                  key={sec.id}
+                                  className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-md"
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-blue-400">
+                                          {renderDimensionIcon(sec.iconName)}
+                                        </div>
+                                        <span className="text-xs font-bold text-white">
+                                          {sec.name}
+                                        </span>
+                                      </div>
+                                      <span
+                                        className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${getSkillLevelColor(
+                                          level
+                                        )}`}
+                                      >
+                                        {level}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-400 line-clamp-2">
+                                      {sec.description}
+                                    </p>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between text-xs font-mono">
+                                      <span className="text-slate-400">{correct}/{total} Verified</span>
+                                      <span className="text-white font-bold">{score}%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-700"
+                                        style={{ width: `${score}%` }}
+                                      />
+                                    </div>
+                                    {detail?.feedback && (
+                                      <p className="text-[11px] text-slate-400 italic pt-1 border-t border-slate-800/80">
+                                        {detail.feedback}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Strengths & Weaknesses (Constructive) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Strengths */}
+                          <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
+                            <div className="flex items-center gap-2 text-emerald-400 font-bold text-base">
+                              <CheckCircle2 className="w-5 h-5" />
+                              <span>Identified Strengths</span>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              Core communication assets where your responses demonstrate solid foundation and fluency:
+                            </p>
+                            <div className="space-y-2.5">
+                              {initialResult.strengths?.map((str, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-start gap-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-200"
+                                >
+                                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0 text-[11px]">
+                                    ✓
+                                  </span>
+                                  <span className="leading-relaxed">{str}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Weaknesses (Priority Growth Focus) */}
+                          <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
+                            <div className="flex items-center gap-2 text-amber-400 font-bold text-base">
+                              <Target className="w-5 h-5" />
+                              <span>Priority Growth Areas (Weaknesses)</span>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              Targeted development areas to elevate your communication to the next level:
+                            </p>
+                            <div className="space-y-2.5">
+                              {initialResult.weaknesses?.map((wk, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-200"
+                                >
+                                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold shrink-0 text-[11px]">
+                                    !
+                                  </span>
+                                  <span className="leading-relaxed">{wk}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Recommended Training Modules */}
+                        <div className="bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="flex items-center gap-2 text-xs font-mono font-bold text-blue-400 uppercase tracking-wider mb-1">
+                                <Sparkles className="w-4 h-4 text-amber-300" />
+                                Personalized Prescription
+                              </div>
+                              <h4 className="text-xl font-bold text-white">
+                                Recommended Training Modules
+                              </h4>
+                            </div>
+                            <span className="text-xs font-mono text-slate-400">
+                              Tailored to Your Baseline
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {initialResult.recommendedTraining?.map((rec, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between gap-4 hover:border-slate-700 transition-all"
+                              >
+                                <div className="space-y-1">
+                                  <span className="text-xs font-mono text-amber-400 font-semibold block">
+                                    Focus Area {idx + 1}
+                                  </span>
+                                  <h5 className="text-sm font-bold text-white">
+                                    {rec.title}
+                                  </h5>
+                                  <p className="text-xs text-slate-400">
+                                    {rec.description}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => handleTabChange(rec.targetTab as any)}
+                                  className="px-4 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white text-xs font-bold transition-all border border-blue-500/30 shrink-0 flex items-center gap-1"
+                                >
+                                  <span>Practice</span>
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* First 7-Day Plan */}
+                        <div className="bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
+                          <div>
+                            <div className="flex items-center gap-2 text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider mb-1">
+                              <Flame className="w-4 h-4 text-amber-400" />
+                              Structured Ramp-Up
+                            </div>
+                            <h4 className="text-xl font-bold text-white">
+                              Your Customized First 7-Day Plan
+                            </h4>
+                            <p className="text-xs text-slate-400 mt-1">
+                              Follow this daily roadmap to calibrate speaking, grammar, and technical explanation before your first Weekly Assessment on Day 7.
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
+                            {initialResult.first7DayPlan?.map((planDay) => (
+                              <div
+                                key={planDay.day}
+                                className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-3 hover:border-slate-700 transition-all"
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                      Day {planDay.day}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-slate-500">
+                                      {planDay.estimatedMinutes}m
+                                    </span>
+                                  </div>
+                                  <h6 className="text-xs font-bold text-white line-clamp-2">
+                                    {planDay.title}
+                                  </h6>
+                                  <p className="text-[11px] text-slate-400 mt-1 line-clamp-3">
+                                    {planDay.focusArea}
+                                  </p>
+                                </div>
+
+                                <div className="pt-2 border-t border-slate-800/80">
+                                  <span className="text-[10px] font-mono text-indigo-400 block truncate">
+                                    🎯 {planDay.objective}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Interactive Assessment Stepper & Questions */}
+                    {(!initialResult || !userState?.initialAssessment) && (
+                      <div className="space-y-6">
+                        {/* Section Stepper */}
+                        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-3xl shadow-xl">
+                          <div className="flex items-center justify-between mb-3 px-2">
+                            <span className="text-xs font-mono text-slate-400">
+                              Diagnostic Section {initialActiveSectionIdx + 1} of {ASSESSMENT_SECTIONS.length}
+                            </span>
+                            <span className="text-xs font-mono font-bold text-blue-400">
+                              {completedInitialAnswersCount} / {totalInitialQuestionsCount} Questions Answered
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                            {ASSESSMENT_SECTIONS.map((sec, idx) => {
+                              const secQuestions = INITIAL_ASSESSMENT_QUESTIONS.filter((q) => q.sectionId === sec.id);
+                              const answeredCount = secQuestions.filter((q) => initialAnswers[q.id] !== undefined).length;
+                              const isCompleted = answeredCount === secQuestions.length && secQuestions.length > 0;
+                              const isActive = initialActiveSectionIdx === idx;
+
+                              return (
+                                <button
+                                  key={sec.id}
+                                  onClick={() => setInitialActiveSectionIdx(idx)}
+                                  className={`p-3 rounded-2xl text-left transition-all border flex flex-col justify-between ${
+                                    isActive
+                                      ? 'bg-blue-600/20 border-blue-500 text-white shadow-md'
+                                      : isCompleted
+                                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] font-mono font-bold uppercase">
+                                      Sec {idx + 1}
+                                    </span>
+                                    {isCompleted && (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-bold truncate block">
+                                    {sec.name}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-slate-500 mt-1">
+                                    {answeredCount}/{secQuestions.length}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Active Section Question List */}
+                        <div className="bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shadow-inner">
+                                {renderDimensionIcon(activeInitialSection.iconName)}
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-bold font-display text-white">
+                                  {activeInitialSection.name}
+                                </h3>
+                                <p className="text-xs text-slate-400">
+                                  {activeInitialSection.description}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-slate-800 text-slate-300 border border-slate-700 self-start sm:self-auto">
+                              Target Tier: 4 Diagnostic Questions
+                            </span>
+                          </div>
+
+                          <div className="space-y-6">
+                            {activeInitialQuestions.map((q: DiagnosticQuestion, qIdx: number) => {
+                              const selectedIdx = initialAnswers[q.id];
+
+                              return (
+                                <div
+                                  key={q.id}
+                                  className="bg-slate-950 p-5 md:p-6 rounded-2xl border border-slate-800/90 space-y-4 hover:border-slate-700 transition-all"
+                                >
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-300">
+                                          Q{qIdx + 1}
+                                        </span>
+                                        <span className="text-[11px] font-mono text-slate-500 uppercase">
+                                          {q.levelTarget}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm font-bold text-white leading-snug">
+                                        {q.question}
+                                      </p>
+                                    </div>
+                                    {selectedIdx !== undefined && (
+                                      <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
+                                        Selected
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Context Snippet if present (Reading/Listening/Scenario) */}
+                                  {q.contextSnippet && (
+                                    <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs text-slate-300 leading-relaxed">
+                                      <span className="text-[10px] text-amber-400 font-bold block mb-1 uppercase tracking-wider">
+                                        Context Scenario:
+                                      </span>
+                                      {q.contextSnippet}
+                                    </div>
+                                  )}
+
+                                  {/* Options */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                                    {q.options.map((opt: string, optIdx: number) => {
+                                      const isSelected = selectedIdx === optIdx;
+
+                                      return (
+                                        <button
+                                          key={optIdx}
+                                          onClick={() => {
+                                            setInitialAnswers((prev) => ({
+                                              ...prev,
+                                              [q.id]: optIdx,
+                                            }));
+                                          }}
+                                          className={`p-3.5 rounded-xl text-left text-xs font-sans transition-all border flex items-start gap-3 ${
+                                            isSelected
+                                              ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20 font-medium'
+                                              : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+                                          }`}
+                                        >
+                                          <span
+                                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0 mt-0.5 ${
+                                              isSelected
+                                                ? 'bg-white text-blue-600'
+                                                : 'bg-slate-800 text-slate-400'
+                                            }`}
+                                          >
+                                            {String.fromCharCode(65 + optIdx)}
+                                          </span>
+                                          <span className="leading-relaxed">{opt}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Navigation Buttons between Sections */}
+                          <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                            <button
+                              disabled={initialActiveSectionIdx === 0}
+                              onClick={() => setInitialActiveSectionIdx((prev) => Math.max(0, prev - 1))}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
+                                initialActiveSectionIdx === 0
+                                  ? 'opacity-40 cursor-not-allowed border-slate-800 text-slate-500'
+                                  : 'border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
+                              }`}
+                            >
+                              ← Previous Section
+                            </button>
+
+                            {initialActiveSectionIdx < ASSESSMENT_SECTIONS.length - 1 ? (
+                              <button
+                                onClick={() => setInitialActiveSectionIdx((prev) => Math.min(ASSESSMENT_SECTIONS.length - 1, prev + 1))}
+                                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-lg shadow-blue-500/20 flex items-center gap-1.5"
+                              >
+                                <span>Next: {ASSESSMENT_SECTIONS[initialActiveSectionIdx + 1]?.name}</span>
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <button
+                                disabled={initialIsSubmitting}
+                                onClick={handleSubmitInitialAssessment}
+                                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-xl shadow-emerald-500/25 flex items-center gap-2"
+                              >
+                                {initialIsSubmitting ? (
+                                  <>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    <span>Evaluating Diagnostic...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    <span>Submit &amp; Generate Level Diagnostics ({completedInitialAnswersCount}/{totalInitialQuestionsCount})</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ================================================================= */}
+                {/* SUB-TAB 2: WEEKLY ASSESSMENT (Every 7 Days) */}
+                {/* ================================================================= */}
+                {assessmentSubTab === 'weekly' && (
+                  <div className="space-y-8">
+                    {/* Weekly Benchmark Banner */}
+                    <div className="bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+                          <Flame className="w-4 h-4" />
+                          <span>7-Day Cadence Milestone Evaluation</span>
+                        </div>
+                        <h3 className="text-2xl font-bold font-display text-white">
+                          Weekly Benchmark (Week {weeklyActiveWeek})
+                        </h3>
+                        <p className="text-sm text-slate-400 max-w-xl">
+                          Every 7 completed training days, complete this 8-question milestone drill to measure genuine progression against your baseline without manufactured numbers.
+                        </p>
+                      </div>
+
+                      {/* Week Selector */}
+                      <div className="flex items-center gap-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800 shrink-0">
+                        {[1, 2, 3, 4].map((wk) => {
+                          const isUnlocked = trainingDaysCount >= (wk - 1) * 7;
+                          const isSelected = weeklyActiveWeek === wk;
+
+                          return (
+                            <button
+                              key={wk}
+                              onClick={() => {
+                                setWeeklyActiveWeek(wk);
+                                setWeeklyAnswers({});
+                                setWeeklyEvaluationResult(null);
+                                setWeeklyComparisonDelta(null);
+                              }}
+                              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                isSelected
+                                  ? 'bg-[#006cd2] text-white shadow-lg'
+                                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                              }`}
+                            >
+                              <span>Week {wk}</span>
+                              {isUnlocked ? (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              ) : (
+                                <Lock className="w-3 h-3 text-slate-500" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Real-time Comparison Delta Display if Submitted */}
+                    {weeklyEvaluationResult && weeklyComparisonDelta && (
+                      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-2xl space-y-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+                          <div>
+                            <div className="flex items-center gap-2 text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider mb-1">
+                              <CheckCircle2 className="w-4 h-4" />
+                              Assessment Complete &amp; Delta Computed
+                            </div>
+                            <h4 className="text-2xl font-bold font-display text-white">
+                              Week {weeklyActiveWeek} Progress Comparison
+                            </h4>
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <span className="text-[10px] font-mono text-slate-400 uppercase block">
+                                Accuracy Delta
+                              </span>
+                              <span
+                                className={`text-xl font-bold font-mono ${
+                                  weeklyComparisonDelta.scoreDeltaPercent >= 0
+                                    ? 'text-emerald-400'
+                                    : 'text-amber-400'
+                                }`}
+                              >
+                                {weeklyComparisonDelta.scoreDeltaPercent >= 0 ? '+' : ''}
+                                {weeklyComparisonDelta.scoreDeltaPercent}%
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setWeeklyEvaluationResult(null);
+                                setWeeklyAnswers({});
+                              }}
+                              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all border border-slate-700"
+                            >
+                              Retake Week {weeklyActiveWeek}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Previous vs Current vs Change Table */}
+                        <div className="space-y-4">
+                          <h5 className="text-sm font-bold text-white flex items-center gap-2">
+                            <Target className="w-4 h-4 text-blue-400" />
+                            <span>Dimension-by-Dimension Delta Analysis</span>
+                          </h5>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {weeklyComparisonDelta.sectionDeltas.map((secDelta: any) => (
+                              <div
+                                key={secDelta.sectionId}
+                                className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-white">
+                                    {secDelta.sectionName}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                                      secDelta.deltaType === 'improved'
+                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                        : secDelta.deltaType === 'regressed'
+                                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                        : 'bg-slate-800 text-slate-300 border border-slate-700'
+                                    }`}
+                                  >
+                                    {secDelta.deltaType.toUpperCase()}
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1.5 text-xs font-mono">
+                                  <div className="flex justify-between text-slate-400">
+                                    <span>Previous:</span>
+                                    <span className="text-slate-300 font-semibold">{secDelta.previousLevel}</span>
+                                  </div>
+                                  <div className="flex justify-between text-slate-400">
+                                    <span>Current:</span>
+                                    <span className="text-white font-bold">{secDelta.currentLevel}</span>
+                                  </div>
+                                  <div className="pt-1.5 border-t border-slate-800 flex justify-between items-center text-[11px]">
+                                    <span className="text-slate-500">Change:</span>
+                                    <span className="text-blue-300 font-bold">
+                                      {secDelta.previousLevel} → {secDelta.currentLevel}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Strengths & Next Recommendations */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                          <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800 space-y-3">
+                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">
+                              Week {weeklyActiveWeek} Key Strengths
+                            </span>
+                            <ul className="space-y-1.5 text-xs text-slate-300">
+                              {weeklyEvaluationResult.strengths.map((str, idx) => (
+                                <li key={idx} className="flex items-center gap-2">
+                                  <span className="text-emerald-400 font-bold">✓</span>
+                                  <span>{str}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800 space-y-3">
+                            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                              Recommended Focus for Next 7 Days
+                            </span>
+                            <ul className="space-y-1.5 text-xs text-slate-300">
+                              {weeklyEvaluationResult.recommendedTraining.map((rec, idx) => (
+                                <li key={idx} className="flex items-center gap-2">
+                                  <span className="text-amber-400 font-bold">→</span>
+                                  <span>{rec.title} ({rec.description})</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Questions Form */}
+                    {!weeklyEvaluationResult && (
+                      <div className="bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
+                        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                          <div>
+                            <h4 className="text-lg font-bold text-white">
+                              Week {weeklyActiveWeek} Milestone Questions (8 Total)
+                            </h4>
+                            <p className="text-xs text-slate-400">
+                              One high-signal calibration question for each of the 8 communication dimensions.
+                            </p>
+                          </div>
+                          <span className="text-xs font-mono font-bold text-blue-400">
+                            {completedWeeklyCount} / {weeklyQuestions.length} Answered
                           </span>
                         </div>
 
-                        <p className="text-sm font-bold text-white leading-relaxed font-sans">
-                          {q.question}
-                        </p>
+                        <div className="space-y-6">
+                          {weeklyQuestions.map((q: DiagnosticQuestion, qIdx: number) => {
+                            const selectedIdx = weeklyAnswers[q.id];
 
-                        <div className="space-y-2">
-                          {q.options.map((opt, optIdx) => (
-                            <button
-                              key={optIdx}
-                              onClick={() =>
-                                setAssessmentAnswers((prev) => ({ ...prev, [q.id]: optIdx }))
-                              }
-                              className={`w-full text-left p-3.5 rounded-xl font-mono text-xs transition border flex items-center justify-between ${
-                                selected === optIdx
-                                  ? 'bg-[#006cd2]/20 border-[#006cd2] text-white'
-                                  : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
-                              }`}
-                            >
-                              <span>{opt}</span>
-                            </button>
-                          ))}
+                            return (
+                              <div
+                                key={q.id}
+                                className="bg-slate-950 p-5 md:p-6 rounded-2xl border border-slate-800/90 space-y-4 hover:border-slate-700 transition-all"
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
+                                        {q.sectionId}
+                                      </span>
+                                      <span className="text-xs font-bold text-white">
+                                        Question {qIdx + 1}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-slate-200 font-medium leading-snug">
+                                      {q.question}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {q.contextSnippet && (
+                                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs text-slate-300">
+                                    <span className="text-[10px] text-amber-400 font-bold block mb-1">
+                                      Context:
+                                    </span>
+                                    {q.contextSnippet}
+                                  </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                  {q.options.map((opt: string, optIdx: number) => {
+                                    const isSelected = selectedIdx === optIdx;
+
+                                    return (
+                                      <button
+                                        key={optIdx}
+                                        onClick={() => {
+                                          setWeeklyAnswers((prev) => ({
+                                            ...prev,
+                                            [q.id]: optIdx,
+                                          }));
+                                        }}
+                                        className={`p-3.5 rounded-xl text-left text-xs font-sans transition-all border flex items-start gap-3 ${
+                                          isSelected
+                                            ? 'bg-blue-600 text-white border-blue-500 shadow-lg font-medium'
+                                            : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+                                        }`}
+                                      >
+                                        <span
+                                          className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0 mt-0.5 ${
+                                            isSelected ? 'bg-white text-blue-600' : 'bg-slate-800 text-slate-400'
+                                          }`}
+                                        >
+                                          {String.fromCharCode(65 + optIdx)}
+                                        </span>
+                                        <span className="leading-relaxed">{opt}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex justify-end pt-4 border-t border-slate-800">
+                          <button
+                            disabled={weeklyIsSubmitting || completedWeeklyCount < weeklyQuestions.length}
+                            onClick={handleSubmitWeeklyAssessment}
+                            className={`px-6 py-3 rounded-2xl text-xs font-bold transition-all shadow-xl flex items-center gap-2 ${
+                              completedWeeklyCount < weeklyQuestions.length
+                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-800'
+                                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/25'
+                            }`}
+                          >
+                            {weeklyIsSubmitting ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Evaluating Week {weeklyActiveWeek}...</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>Submit Week {weeklyActiveWeek} Assessment ({completedWeeklyCount}/{weeklyQuestions.length})</span>
+                              </>
+                            )}
+                          </button>
                         </div>
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
+                )}
 
-                  <button
-                    onClick={handleSubmitAssessment}
-                    disabled={Object.keys(assessmentAnswers).length < ASSESSMENT_QUESTIONS.length}
-                    className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-sans font-bold text-sm rounded-2xl transition disabled:opacity-50 shadow-xl shadow-emerald-500/20"
-                  >
-                    Submit Assessment &amp; Update Readiness Index
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                {/* ================================================================= */}
+                {/* SUB-TAB 3: ASSESSMENT HISTORY LOG */}
+                {/* ================================================================= */}
+                {assessmentSubTab === 'history' && (
+                  <div className="bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                      <div>
+                        <h4 className="text-xl font-bold font-display text-white">
+                          Private Assessment History &amp; Audit Log
+                        </h4>
+                        <p className="text-xs text-slate-400">
+                          Chronological progression snapshots stored securely for account: {userData?.email}
+                        </p>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        Total Records: {userState?.assessmentHistory?.length || 0}
+                      </span>
+                    </div>
+
+                    {(!userState?.assessmentHistory || userState.assessmentHistory.length === 0) ? (
+                      <div className="text-center py-12 space-y-4">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-500 mx-auto">
+                          <Clock className="w-6 h-6" />
+                        </div>
+                        <p className="text-sm text-slate-400">
+                          No assessment history recorded yet. Complete the Initial Diagnostic to generate your baseline record.
+                        </p>
+                        <button
+                          onClick={() => setAssessmentSubTab('initial')}
+                          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-lg shadow-blue-500/20"
+                        >
+                          Take Initial Diagnostic
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {userState.assessmentHistory.map((rec, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-slate-700 transition-all"
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
+                                  {rec.assessmentType || (rec.weekNumber ? `Week ${rec.weekNumber}` : 'Diagnostic')}
+                                </span>
+                                <span className="text-xs font-mono text-slate-400">
+                                  {rec.dateStr}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <h5 className="text-base font-bold text-white">
+                                  Level: {rec.overallLevel || 'Developing'}
+                                </h5>
+                                <span
+                                  className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-bold border ${getSkillLevelColor(
+                                    (rec.overallLevel || 'Developing') as AssessmentSkillLevel
+                                  )}`}
+                                >
+                                  {rec.overallScorePercent || rec.scorePercent}% Accuracy
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Section breakdown tags */}
+                            {rec.sectionDetails && (
+                              <div className="flex flex-wrap items-center gap-1.5 max-w-md">
+                                {Object.values(rec.sectionDetails).map((sec) => (
+                                  <span
+                                    key={sec.sectionId}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-slate-900 border border-slate-800 text-slate-300"
+                                  >
+                                    {sec.sectionName.slice(0, 7)}: {sec.level}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ========================================================================= */}
           {/* 12. SPEAKING JOURNAL, CORRECTION STUDIO & COMMON MISTAKES TAB */}
