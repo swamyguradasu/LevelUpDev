@@ -18,7 +18,7 @@ export interface DailyChallenge {
   order: number;
 }
 
-export const CURRICULUM_START_DATE = '2026-09-02'; // September 2, 2026
+export const CURRICULUM_START_DATE = '2026-09-01'; // September 1, 2026
 
 export const DAILY_CHALLENGES: DailyChallenge[] = [
   // =========================================================================
@@ -4457,8 +4457,10 @@ export interface DateChallengeSelection {
 
 /**
  * Deterministically select the daily challenge for a given date in IST.
- * - Start Date: 2026-09-02 -> Problem #1 (Two Sum)
- * - 2026-09-03 -> Problem #2 (Contains Duplicate)
+ * - Start Date: 2026-09-01 -> Problem #1 (Two Sum)
+ * - 2026-09-02 -> Problem #2 (Contains Duplicate)
+ * - 2026-09-03 -> Problem #3 (Maximum Subarray)
+ * - 2026-09-04 -> Problem #4 (Best Time to Buy and Sell Stock)
  * - After 268 days: Cycle increments and completion banner is triggered.
  */
 export function getDailyChallengeByDate(targetDateStr?: string): DateChallengeSelection {

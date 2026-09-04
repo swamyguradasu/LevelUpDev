@@ -346,7 +346,7 @@ export default function DailyChallengePage() {
                   <span>DAILY DSA PROBLEM TRACKER</span>
                   {challengeData.isPreview && (
                     <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded text-[10px]">
-                      Preview Mode (Starts Sep 2)
+                      Preview Mode (Starts Sep 1)
                     </span>
                   )}
                 </div>
