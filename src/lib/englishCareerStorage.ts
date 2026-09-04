@@ -116,6 +116,57 @@ export interface TrackedMistakeRecord {
   resolved?: boolean;
 }
 
+export interface QuestionPracticeRecord {
+  id: string;
+  questionId: string;
+  category: string;
+  difficulty: string;
+  frameworkType: string;
+  userAnswer: string;
+  stepAnswers?: Record<string, string>;
+  evaluation?: {
+    clarityScore: number;
+    structureScore: number;
+    relevanceScore: number;
+    confidenceScore: number;
+    technicalAccuracyScore: number;
+    concisenessScore: number;
+    overallScore: number;
+    strengths: string[];
+    weakAreas: string[];
+    recommendations: string[];
+  };
+  completedAt: string;
+}
+
+export interface MockInterviewSessionRecord {
+  id: string;
+  dateStr: string;
+  category: string;
+  difficulty: string;
+  totalQuestions: number;
+  overallScore: number;
+  dimensionScores: {
+    clarity: number;
+    structure: number;
+    relevance: number;
+    confidence: number;
+    technicalAccuracy: number;
+    conciseness: number;
+  };
+  questionSummaries: Array<{
+    questionId: string;
+    questionText: string;
+    category: string;
+    score: number;
+    userAnswer: string;
+    feedback: string;
+  }>;
+  identifiedWeakAreas: string[];
+  recommendedDrills: string[];
+  completedAt: string;
+}
+
 export interface EnglishCareerUserState {
   userId: string;
   email: string;
@@ -130,6 +181,8 @@ export interface EnglishCareerUserState {
   dailyTrainingLogs: Record<string, DailyTrainingLog>; // dateStr -> Log
   activeDailySession?: DailyTrainingSessionState;
   completedDailyLessons?: CompletedDailyLessonRecord[];
+  mockInterviewHistory?: MockInterviewSessionRecord[];
+  questionPracticeHistory?: QuestionPracticeRecord[];
   lastActiveTab: string;
   updatedAt: string;
 }
@@ -179,6 +232,8 @@ export function createEmptyEnglishCareerState(email: string): EnglishCareerUserS
     dailyTrainingLogs: {},
     activeDailySession: undefined,
     completedDailyLessons: [],
+    mockInterviewHistory: [],
+    questionPracticeHistory: [],
     lastActiveTab: 'dashboard',
     updatedAt: nowIso,
   };
@@ -854,5 +909,72 @@ export async function deleteTrackedMistake(
   await saveEnglishCareerState(nextState);
   return nextState;
 }
+
+/**
+ * Save a completed mock interview session record.
+ */
+export async function saveMockInterviewSession(
+  currentState: EnglishCareerUserState,
+  session: MockInterviewSessionRecord
+): Promise<EnglishCareerUserState> {
+  const existing = [session, ...(currentState.mockInterviewHistory || [])];
+  // Keep up to 50 sessions
+  const trimmed = existing.slice(0, 50);
+
+  const nextState: EnglishCareerUserState = {
+    ...currentState,
+    mockInterviewHistory: trimmed,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveEnglishCareerState(nextState);
+  return nextState;
+}
+
+/**
+ * Delete a mock interview session record from history.
+ */
+export async function deleteMockInterviewSession(
+  currentState: EnglishCareerUserState,
+  sessionId: string
+): Promise<EnglishCareerUserState> {
+  const existing = (currentState.mockInterviewHistory || []).filter((s) => s.id !== sessionId);
+
+  const nextState: EnglishCareerUserState = {
+    ...currentState,
+    mockInterviewHistory: existing,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveEnglishCareerState(nextState);
+  return nextState;
+}
+
+/**
+ * Save a question practice response log.
+ */
+export async function saveQuestionPracticeLog(
+  currentState: EnglishCareerUserState,
+  practiceRecord: QuestionPracticeRecord
+): Promise<EnglishCareerUserState> {
+  const existing = [practiceRecord, ...(currentState.questionPracticeHistory || [])];
+  const trimmed = existing.slice(0, 100);
+
+  // Mark the question / topic as practiced/completed if not already present
+  const completedTopicIds = Array.from(
+    new Set([...currentState.completedTopicIds, `interview_q_${practiceRecord.questionId}`])
+  );
+
+  const nextState: EnglishCareerUserState = {
+    ...currentState,
+    completedTopicIds,
+    questionPracticeHistory: trimmed,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveEnglishCareerState(nextState);
+  return nextState;
+}
+
 
 

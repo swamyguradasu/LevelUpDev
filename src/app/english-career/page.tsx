@@ -58,6 +58,11 @@ import {
   deleteTrackedMistake,
   TrackedMistakeRecord,
   MistakeCategory,
+  saveMockInterviewSession,
+  deleteMockInterviewSession,
+  saveQuestionPracticeLog,
+  MockInterviewSessionRecord,
+  QuestionPracticeRecord,
 } from '@/lib/englishCareerStorage';
 import {
   DailyTrainingPlan,
@@ -80,6 +85,22 @@ import {
   PRESET_CORRECTION_EXAMPLES,
   DetectedMistake,
 } from '@/data/englishCorrectionEngine';
+import {
+  InterviewCategory,
+  QuestionDifficulty,
+  QuestionFrameworkType,
+  InterviewQuestion,
+  INTERVIEW_CATEGORIES_CONFIG,
+  INTERVIEW_QUESTIONS_BANK,
+  BEHAVIORAL_STAR_STEPS,
+  TECHNICAL_STEPS,
+  PROJECT_8_STEPS,
+  GENERAL_STEPS,
+  evaluateInterviewResponse,
+  InterviewEvaluationResult,
+  getQuestionsByCategory,
+  getRandomMockQuestions,
+} from '@/data/englishInterviewTrainerData';
 import {
   Mic,
   MicOff,
@@ -127,6 +148,10 @@ import {
   Trash2,
   PlayCircle,
   Pause,
+  Lightbulb,
+  History,
+  ListOrdered,
+  CheckSquare,
 } from 'lucide-react';
 
 type ActiveTab =
@@ -256,6 +281,63 @@ function EnglishCareerContent() {
   // Notes Modal / Drawer State
   const [activeNoteTopicId, setActiveNoteTopicId] = useState<string | null>(null);
   const [currentNoteText, setCurrentNoteText] = useState<string>('');
+
+  // =========================================================================
+  // INTERVIEW TRAINER (10 CATEGORIES + STUDIO + MOCK SIMULATOR) STATE
+  // =========================================================================
+  const [interviewSubTab, setInterviewSubTab] = useState<'studio' | 'mock' | 'history'>('studio');
+
+  // Studio / Question Explorer Filters & Selection
+  const [selectedInterviewCategory, setSelectedInterviewCategory] = useState<InterviewCategory | 'all'>('all');
+  const [selectedInterviewDifficulty, setSelectedInterviewDifficulty] = useState<QuestionDifficulty | 'all'>('all');
+  const [interviewSearchQuery, setInterviewSearchQuery] = useState<string>('');
+  const [selectedInterviewQuestionId, setSelectedInterviewQuestionId] = useState<string>(
+    INTERVIEW_QUESTIONS_BANK[0]?.id || 'self_01'
+  );
+
+  // Workflow Phases: Question -> Think -> Answer -> Review -> Improve
+  const [interviewWorkflowStep, setInterviewWorkflowStep] = useState<'question' | 'think' | 'answer' | 'review' | 'improve'>('question');
+  const [studioStepAnswers, setStudioStepAnswers] = useState<Record<string, string>>({});
+  const [studioFreeformAnswer, setStudioFreeformAnswer] = useState<string>('');
+  const [studioConfidenceRating, setStudioConfidenceRating] = useState<number>(4);
+  const [studioFillerCount, setStudioFillerCount] = useState<number>(0);
+  const [studioEvaluationResult, setStudioEvaluationResult] = useState<InterviewEvaluationResult | null>(null);
+  const [studioIsEvaluating, setStudioIsEvaluating] = useState<boolean>(false);
+  const [studioAudioUrl, setStudioAudioUrl] = useState<string | null>(null);
+  const [studioIsRecording, setStudioIsRecording] = useState<boolean>(false);
+  const [studioRecordSeconds, setStudioRecordSeconds] = useState<number>(0);
+  const studioRecorderRef = useRef<MediaRecorder | null>(null);
+  const studioAudioChunksRef = useRef<Blob[]>([]);
+  const studioTimerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Mock Interview Simulation Engine State
+  const [mockConfig, setMockConfig] = useState<{
+    category: InterviewCategory | 'mixed';
+    difficulty: QuestionDifficulty | 'mixed';
+    questionCount: number;
+  }>({
+    category: 'mixed',
+    difficulty: 'intermediate',
+    questionCount: 5,
+  });
+  const [mockIsRunning, setMockIsRunning] = useState<boolean>(false);
+  const [mockQuestions, setMockQuestions] = useState<InterviewQuestion[]>([]);
+  const [mockCurrentIndex, setMockCurrentIndex] = useState<number>(0);
+  const [mockStepAnswers, setMockStepAnswers] = useState<Record<string, string>>({});
+  const [mockFreeformAnswer, setMockFreeformAnswer] = useState<string>('');
+  const [mockConfidenceScore, setMockConfidenceScore] = useState<number>(4);
+  const [mockFillerCount, setMockFillerCount] = useState<number>(0);
+  const [mockAnswersHistory, setMockAnswersHistory] = useState<Array<{
+    question: InterviewQuestion;
+    userAnswer: string;
+    stepAnswers: Record<string, string>;
+    evaluation: InterviewEvaluationResult;
+  }>>([]);
+  const [mockTimerSeconds, setMockTimerSeconds] = useState<number>(0);
+  const [mockSessionCompleted, setMockSessionCompleted] = useState<boolean>(false);
+  const [mockCompletedRecord, setMockCompletedRecord] = useState<MockInterviewSessionRecord | null>(null);
+  const [mockIsSubmittingCurrent, setMockIsSubmittingCurrent] = useState<boolean>(false);
+  const mockTimerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Daily Mission Data
   const dailyMission = useMemo(() => getDailyMicroMission(), []);
@@ -1039,6 +1121,321 @@ function EnglishCareerContent() {
       v.corporateContext.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCat && matchesQuery;
   });
+
+  // =========================================================================
+  // INTERVIEW TRAINER COMPUTED & HANDLER FUNCTIONS
+  // =========================================================================
+  const filteredInterviewQuestions = useMemo(() => {
+    return INTERVIEW_QUESTIONS_BANK.filter((q) => {
+      if (selectedInterviewCategory !== 'all' && q.category !== selectedInterviewCategory) return false;
+      if (selectedInterviewDifficulty !== 'all' && q.difficulty.toLowerCase() !== selectedInterviewDifficulty.toLowerCase()) return false;
+      if (interviewSearchQuery.trim()) {
+        const query = interviewSearchQuery.toLowerCase();
+        const matchTitle = (q.title || q.categoryTitle || '').toLowerCase().includes(query);
+        const matchQuestion = q.question.toLowerCase().includes(query);
+        const keywords = q.expectedKeywords || q.thinkPhase?.keyKeywords || [];
+        const matchKeywords = keywords.some((k: string) => k.toLowerCase().includes(query));
+        if (!matchTitle && !matchQuestion && !matchKeywords) return false;
+      }
+      return true;
+    });
+  }, [selectedInterviewCategory, selectedInterviewDifficulty, interviewSearchQuery]);
+
+  const currentStudioQuestion: InterviewQuestion = useMemo(() => {
+    return (
+      INTERVIEW_QUESTIONS_BANK.find((q) => q.id === selectedInterviewQuestionId) ||
+      filteredInterviewQuestions[0] ||
+      INTERVIEW_QUESTIONS_BANK[0]
+    );
+  }, [selectedInterviewQuestionId, filteredInterviewQuestions]);
+
+  const getFrameworkStepList = (frameworkType: QuestionFrameworkType) => {
+    const norm = (frameworkType || '').toLowerCase();
+    if (norm.includes('star')) return BEHAVIORAL_STAR_STEPS;
+    if (norm.includes('tech')) return TECHNICAL_STEPS;
+    if (norm.includes('project')) return PROJECT_8_STEPS;
+    return GENERAL_STEPS;
+  };
+
+  const handleSelectInterviewQuestion = (qId: string) => {
+    setSelectedInterviewQuestionId(qId);
+    setInterviewWorkflowStep('question');
+    setStudioStepAnswers({});
+    setStudioFreeformAnswer('');
+    setStudioEvaluationResult(null);
+    setStudioAudioUrl(null);
+  };
+
+  // Studio Audio Recording
+  const startStudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      studioAudioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          studioAudioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(studioAudioChunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(audioBlob);
+        setStudioAudioUrl(url);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      studioRecorderRef.current = mediaRecorder;
+      mediaRecorder.start(250);
+      setStudioIsRecording(true);
+      setStudioRecordSeconds(0);
+
+      if (studioTimerIntervalRef.current) clearInterval(studioTimerIntervalRef.current);
+      studioTimerIntervalRef.current = setInterval(() => {
+        setStudioRecordSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Microphone access error:', err);
+      showNotification('Microphone access is required to record your spoken answer.');
+    }
+  };
+
+  const stopStudioRecording = () => {
+    if (studioRecorderRef.current && studioIsRecording) {
+      studioRecorderRef.current.stop();
+      setStudioIsRecording(false);
+      if (studioTimerIntervalRef.current) {
+        clearInterval(studioTimerIntervalRef.current);
+        studioTimerIntervalRef.current = null;
+      }
+    }
+  };
+
+  // Studio Evaluation Handler
+  const handleEvaluateStudioAnswer = async () => {
+    if (!currentStudioQuestion) return;
+    setStudioIsEvaluating(true);
+
+    const steps = getFrameworkStepList(currentStudioQuestion.frameworkType);
+    const stepAnswersList = steps.map((s) => studioStepAnswers[s.key] || '');
+    const combinedAnswer = [
+      studioFreeformAnswer,
+      ...steps.map((s) => `${s.label.toUpperCase()}: ${studioStepAnswers[s.key] || ''}`),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const result = evaluateInterviewResponse({
+      question: currentStudioQuestion,
+      freeformAnswer: combinedAnswer,
+      stepAnswers: stepAnswersList,
+      userConfidenceRating: studioConfidenceRating,
+      fillerWordCount: studioFillerCount,
+    });
+
+    setStudioEvaluationResult(result);
+    setStudioIsEvaluating(false);
+    setInterviewWorkflowStep('review');
+
+    if (userState) {
+      try {
+        const practiceRecord: QuestionPracticeRecord = {
+          id: `practice_${Date.now()}`,
+          questionId: currentStudioQuestion.id,
+          category: currentStudioQuestion.category,
+          difficulty: currentStudioQuestion.difficulty,
+          frameworkType: currentStudioQuestion.frameworkType,
+          userAnswer: combinedAnswer,
+          stepAnswers: studioStepAnswers,
+          evaluation: {
+            clarityScore: result.clarityScore,
+            structureScore: result.structureScore,
+            relevanceScore: result.relevanceScore,
+            confidenceScore: result.confidenceScore,
+            technicalAccuracyScore: result.technicalAccuracyScore,
+            concisenessScore: result.concisenessScore,
+            overallScore: result.overallScore,
+            strengths: result.strengths,
+            weakAreas: result.weakAreas,
+            recommendations: result.recommendations,
+          },
+          completedAt: new Date().toISOString(),
+        };
+        const updated = await saveQuestionPracticeLog(userState, practiceRecord);
+        setUserState(updated);
+        showNotification('Answer evaluated across 6 dimensions & saved to progress!');
+      } catch (err) {
+        console.error('Failed to save practice log:', err);
+      }
+    }
+  };
+
+  // Mock Interview Simulator Handlers
+  const handleStartMockInterview = () => {
+    const questions = getRandomMockQuestions(
+      mockConfig.category,
+      mockConfig.difficulty,
+      mockConfig.questionCount
+    );
+
+    setMockQuestions(questions);
+    setMockCurrentIndex(0);
+    setMockStepAnswers({});
+    setMockFreeformAnswer('');
+    setMockConfidenceScore(4);
+    setMockFillerCount(0);
+    setMockAnswersHistory([]);
+    setMockTimerSeconds(0);
+    setMockSessionCompleted(false);
+    setMockCompletedRecord(null);
+    setMockIsRunning(true);
+
+    if (mockTimerIntervalRef.current) clearInterval(mockTimerIntervalRef.current);
+    mockTimerIntervalRef.current = setInterval(() => {
+      setMockTimerSeconds((prev) => prev + 1);
+    }, 1000);
+  };
+
+  const handleCancelMockInterview = () => {
+    if (mockTimerIntervalRef.current) {
+      clearInterval(mockTimerIntervalRef.current);
+      mockTimerIntervalRef.current = null;
+    }
+    setMockIsRunning(false);
+  };
+
+  const handleSubmitCurrentMockAnswer = async () => {
+    if (mockQuestions.length === 0) return;
+    const currentQ = mockQuestions[mockCurrentIndex];
+    if (!currentQ) return;
+
+    setMockIsSubmittingCurrent(true);
+
+    const steps = getFrameworkStepList(currentQ.frameworkType);
+    const stepAnswersList = steps.map((s) => mockStepAnswers[s.key] || '');
+    const combinedAnswer = [
+      mockFreeformAnswer,
+      ...steps.map((s) => `${s.label.toUpperCase()}: ${mockStepAnswers[s.key] || ''}`),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const evalResult = evaluateInterviewResponse({
+      question: currentQ,
+      freeformAnswer: combinedAnswer,
+      stepAnswers: stepAnswersList,
+      userConfidenceRating: mockConfidenceScore,
+      fillerWordCount: mockFillerCount,
+    });
+
+    const updatedHistory = [
+      ...mockAnswersHistory,
+      {
+        question: currentQ,
+        userAnswer: combinedAnswer,
+        stepAnswers: { ...mockStepAnswers },
+        evaluation: evalResult,
+      },
+    ];
+    setMockAnswersHistory(updatedHistory);
+
+    const nextIndex = mockCurrentIndex + 1;
+    if (nextIndex < mockQuestions.length) {
+      // Proceed to next question
+      setMockCurrentIndex(nextIndex);
+      setMockStepAnswers({});
+      setMockFreeformAnswer('');
+      setMockConfidenceScore(4);
+      setMockFillerCount(0);
+      setMockIsSubmittingCurrent(false);
+    } else {
+      // Finalize Mock Session!
+      if (mockTimerIntervalRef.current) {
+        clearInterval(mockTimerIntervalRef.current);
+        mockTimerIntervalRef.current = null;
+      }
+
+      // Compute aggregate scores across the 6 dimensions
+      const totalQ = updatedHistory.length;
+      const sumClarity = updatedHistory.reduce((acc, h) => acc + h.evaluation.clarityScore, 0);
+      const sumStructure = updatedHistory.reduce((acc, h) => acc + h.evaluation.structureScore, 0);
+      const sumRelevance = updatedHistory.reduce((acc, h) => acc + h.evaluation.relevanceScore, 0);
+      const sumConfidence = updatedHistory.reduce((acc, h) => acc + h.evaluation.confidenceScore, 0);
+      const sumTech = updatedHistory.reduce((acc, h) => acc + h.evaluation.technicalAccuracyScore, 0);
+      const sumConcise = updatedHistory.reduce((acc, h) => acc + h.evaluation.concisenessScore, 0);
+      const sumOverall = updatedHistory.reduce((acc, h) => acc + h.evaluation.overallScore, 0);
+
+      const dimensionScores = {
+        clarity: Math.round(sumClarity / totalQ),
+        structure: Math.round(sumStructure / totalQ),
+        relevance: Math.round(sumRelevance / totalQ),
+        confidence: Math.round(sumConfidence / totalQ),
+        technicalAccuracy: Math.round(sumTech / totalQ),
+        conciseness: Math.round(sumConcise / totalQ),
+      };
+      const overallScore = Math.round(sumOverall / totalQ);
+
+      // Aggregate distinct weak areas & recommendations
+      const allWeakAreas: string[] = [];
+      const allRecs: string[] = [];
+      updatedHistory.forEach((h) => {
+        h.evaluation.weakAreas.forEach((w) => {
+          if (!allWeakAreas.includes(w)) allWeakAreas.push(w);
+        });
+        h.evaluation.recommendations.forEach((r) => {
+          if (!allRecs.includes(r)) allRecs.push(r);
+        });
+      });
+
+      const sessionRecord: MockInterviewSessionRecord = {
+        id: `mock_session_${Date.now()}`,
+        dateStr: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        category: mockConfig.category,
+        difficulty: mockConfig.difficulty,
+        totalQuestions: totalQ,
+        overallScore,
+        dimensionScores,
+        questionSummaries: updatedHistory.map((h) => ({
+          questionId: h.question.id,
+          questionText: h.question.question,
+          category: h.question.category,
+          score: h.evaluation.overallScore,
+          userAnswer: h.userAnswer,
+          feedback: h.evaluation.strengths[0] || 'Structured answer submitted.',
+        })),
+        identifiedWeakAreas: allWeakAreas.slice(0, 5),
+        recommendedDrills: allRecs.slice(0, 5),
+        completedAt: new Date().toISOString(),
+      };
+
+      setMockCompletedRecord(sessionRecord);
+      setMockSessionCompleted(true);
+      setMockIsRunning(false);
+      setMockIsSubmittingCurrent(false);
+
+      if (userState) {
+        try {
+          const updated = await saveMockInterviewSession(userState, sessionRecord);
+          setUserState(updated);
+          showNotification('Mock Interview completed! Session saved to your performance record.');
+        } catch (err) {
+          console.error('Failed to save mock interview:', err);
+        }
+      }
+    }
+  };
+
+  const handleDeleteMockSession = async (sessionId: string) => {
+    if (!userState) return;
+    try {
+      const updated = await deleteMockInterviewSession(userState, sessionId);
+      setUserState(updated);
+      showNotification('Mock session removed from history.');
+    } catch (err) {
+      console.error('Failed to delete mock session:', err);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-[#006cd2] selection:text-white flex flex-col relative overflow-x-hidden">
@@ -4188,98 +4585,1300 @@ function EnglishCareerContent() {
           )}
 
           {/* ========================================================================= */}
-          {/* 9. INTERVIEW ENGLISH TAB */}
+          {/* 9. INTERVIEW TRAINER TAB (10 CATEGORIES, 5-STEP WORKFLOW & MOCK SIMULATOR) */}
           {/* ========================================================================= */}
           {activeTab === 'interview' && (
             <div className="space-y-6">
+              {/* Header & Sub-Navigation */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                 <div>
                   <h2 className="text-xl font-bold font-display text-white flex items-center gap-2">
                     <Award className="w-5 h-5 text-purple-400" />
-                    <span>Tech Interview Communication &amp; STAR Method</span>
+                    <span>Software &amp; AI Interview Trainer</span>
                   </h2>
                   <p className="text-xs text-slate-400">
-                    Behavioral mastery, system design trade-off narratives, and thinking aloud during live coding.
+                    10 specialized tracks • Question &rarr; Think &rarr; Answer &rarr; Review &rarr; Improve • STAR &amp; Technical frameworks • 6-dimensional AI evaluation
                   </p>
                 </div>
-                <div className="font-mono text-xs text-purple-400 bg-purple-950/40 border border-purple-800/40 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-                  {metrics.interviewProgress}% Completed
+
+                {/* Sub-view mode toggles */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-2xl">
+                  <button
+                    onClick={() => setInterviewSubTab('studio')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-medium transition flex items-center gap-1.5 ${
+                      interviewSubTab === 'studio'
+                        ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Question Studio</span>
+                  </button>
+                  <button
+                    onClick={() => setInterviewSubTab('mock')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-medium transition flex items-center gap-1.5 ${
+                      interviewSubTab === 'mock'
+                        ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Mock Interview</span>
+                  </button>
+                  <button
+                    onClick={() => setInterviewSubTab('history')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-medium transition flex items-center gap-1.5 ${
+                      interviewSubTab === 'history'
+                        ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>History &amp; Drills</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="space-y-6">
-                {INTERVIEW_ENGLISH_LESSONS.map((lesson) => (
-                  <div
-                    key={lesson.id}
-                    className="p-6 sm:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-6"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                      <div>
-                        <span className="text-xs font-mono text-purple-400 uppercase font-bold">
-                          {lesson.interviewType}
-                        </span>
-                        <h3 className="text-xl font-bold font-display text-white mt-0.5">
-                          {lesson.title}
-                        </h3>
-                      </div>
-                      <span className="text-xs font-mono text-slate-400 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800">
-                        Framework: {lesson.framework}
-                      </span>
+              {/* ========================================================================= */}
+              {/* SUB-VIEW 1: QUESTION STUDIO & EXPLORER */}
+              {/* ========================================================================= */}
+              {interviewSubTab === 'studio' && (
+                <div className="space-y-6">
+                  {/* Category Pill Selector (10 Categories) */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+                      Select Interview Category (10 Specialized Tracks):
+                    </span>
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+                      <button
+                        onClick={() => setSelectedInterviewCategory('all')}
+                        className={`px-3 py-2 rounded-xl text-xs font-mono font-medium whitespace-nowrap transition border ${
+                          selectedInterviewCategory === 'all'
+                            ? 'bg-purple-600/20 border-purple-500/60 text-purple-300 shadow-sm'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        All Tracks ({INTERVIEW_QUESTIONS_BANK.length})
+                      </button>
+                      {INTERVIEW_CATEGORIES_CONFIG.map((cat) => {
+                        const count = INTERVIEW_QUESTIONS_BANK.filter((q) => q.category === cat.category).length;
+                        const isSelected = selectedInterviewCategory === cat.category;
+                        return (
+                          <button
+                            key={cat.category}
+                            onClick={() => setSelectedInterviewCategory(cat.category)}
+                            className={`px-3 py-2 rounded-xl text-xs font-mono font-medium whitespace-nowrap transition border flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-purple-600/20 border-purple-500/60 text-purple-300 shadow-sm'
+                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            <span>{cat.icon || '🎯'}</span>
+                            <span>{cat.title}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-950 text-slate-400">
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
+                  </div>
 
-                    <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/30 text-xs sm:text-sm text-purple-200">
-                      <b className="text-white">Sample Interview Question: </b>
-                      &ldquo;{lesson.sampleQuestion}&rdquo;
-                    </div>
-
-                    {/* Step-by-Step Breakdown Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                      {lesson.breakdown.map((step, idx) => (
-                        <div
-                          key={idx}
-                          className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5"
+                  {/* Difficulty Filter & Search Bar */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-slate-900/60 border border-slate-800 rounded-2xl">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-mono text-slate-400 mr-1 hidden sm:inline">Difficulty:</span>
+                      {(['all', 'beginner', 'intermediate', 'advanced'] as const).map((diff) => (
+                        <button
+                          key={diff}
+                          onClick={() => setSelectedInterviewDifficulty(diff)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium capitalize transition ${
+                            selectedInterviewDifficulty === diff
+                              ? 'bg-slate-800 text-white border border-slate-700'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
                         >
-                          <span className="font-mono text-xs font-bold text-cyan-400">
-                            {step.phase}
-                          </span>
-                          <p className="text-xs text-slate-300 leading-relaxed">
-                            {step.content}
-                          </p>
-                        </div>
+                          {diff}
+                        </button>
                       ))}
                     </div>
 
-                    {/* High-Scoring Model Response */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-mono uppercase text-slate-400 font-semibold flex items-center justify-between">
-                        <span>MODEL HIGH-SCORING RESPONSE:</span>
-                        <button
-                          onClick={() => handleCopyText(lesson.sampleHighScoringAnswer, lesson.id)}
-                          className="text-xs font-mono text-slate-400 hover:text-white flex items-center gap-1"
-                        >
-                          {copiedId === lesson.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedId === lesson.id ? 'Copied' : 'Copy'}</span>
-                        </button>
-                      </div>
-                      <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
-                        {lesson.sampleHighScoringAnswer}
-                      </div>
-                    </div>
-
-                    {/* Power Phrases */}
-                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2">
-                      <span className="text-[10px] font-mono text-amber-400 uppercase font-bold">
-                        ANCHOR POWER PHRASES:
-                      </span>
-                      <ul className="list-disc list-inside text-xs text-slate-300 space-y-1">
-                        {lesson.powerPhrases.map((phrase, pIdx) => (
-                          <li key={pIdx} className="italic">&ldquo;{phrase}&rdquo;</li>
-                        ))}
-                      </ul>
+                    <div className="relative flex-1 max-w-xs">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        value={interviewSearchQuery}
+                        onChange={(e) => setInterviewSearchQuery(e.target.value)}
+                        placeholder="Search questions or keywords..."
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-purple-500"
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  {/* Main Studio Grid: Left Sidebar (Question List) & Right Panel (5-Phase Studio) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left List of Questions */}
+                    <div className="lg:col-span-4 space-y-2 max-h-[680px] overflow-y-auto pr-1">
+                      <div className="text-xs font-mono text-slate-400 flex items-center justify-between px-1 pb-1">
+                        <span>QUESTIONS ({filteredInterviewQuestions.length})</span>
+                        <span className="text-[10px] text-slate-500">Select to practice</span>
+                      </div>
+
+                      {filteredInterviewQuestions.length === 0 ? (
+                        <div className="p-8 text-center rounded-2xl bg-slate-900/50 border border-slate-800 text-slate-500 text-xs font-mono">
+                          No interview questions found matching criteria.
+                        </div>
+                      ) : (
+                        filteredInterviewQuestions.map((q) => {
+                          const isSelected = currentStudioQuestion.id === q.id;
+                          const isCompleted = userState?.completedTopicIds.includes(`interview_q_${q.id}`);
+                          return (
+                            <div
+                              key={q.id}
+                              onClick={() => handleSelectInterviewQuestion(q.id)}
+                              className={`p-3.5 rounded-2xl border cursor-pointer transition space-y-2 ${
+                                isSelected
+                                  ? 'bg-purple-950/30 border-purple-500/60 shadow-md shadow-purple-500/10'
+                                  : 'bg-slate-900/70 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-950 text-purple-400 uppercase font-bold border border-purple-900/40">
+                                  {q.category.replace('_', ' ')}
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={`text-[9px] font-mono px-1.5 py-0.5 rounded uppercase font-bold ${
+                                      q.difficulty.toLowerCase() === 'beginner'
+                                        ? 'text-emerald-400 bg-emerald-950/40'
+                                        : q.difficulty.toLowerCase() === 'intermediate'
+                                        ? 'text-amber-400 bg-amber-950/40'
+                                        : 'text-rose-400 bg-rose-950/40'
+                                    }`}
+                                  >
+                                    {q.difficulty}
+                                  </span>
+                                  {isCompleted && (
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                  )}
+                                </div>
+                              </div>
+                              <h4 className="text-xs font-bold text-slate-200 line-clamp-2">
+                                {q.question}
+                              </h4>
+                              <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                                <span>Framework: {q.frameworkType.toUpperCase()}</span>
+                                <span>~{Math.round((q.timeLimitSeconds || q.thinkPhase?.targetDurationSec || 120) / 60)}m limit</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Right Active Question Studio: 5-Step Workflow */}
+                    <div className="lg:col-span-8 space-y-4">
+                      {/* Active Question Hero Banner */}
+                      <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-purple-400 bg-purple-950/40 border border-purple-800/40 px-2.5 py-1 rounded-lg uppercase font-bold">
+                              {currentStudioQuestion.category.replace('_', ' ')}
+                            </span>
+                            <span className="text-xs font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2.5 py-1 rounded-lg uppercase">
+                              Framework: {currentStudioQuestion.frameworkType.toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-xs font-mono text-slate-400 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            Target: {Math.round((currentStudioQuestion.timeLimitSeconds || currentStudioQuestion.thinkPhase?.targetDurationSec || 120) / 60)} min
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-[11px] font-mono text-slate-400 uppercase font-semibold">
+                            Interview Question:
+                          </span>
+                          <h3 className="text-lg sm:text-xl font-bold font-display text-white mt-1 leading-snug">
+                            &ldquo;{currentStudioQuestion.question}&rdquo;
+                          </h3>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/20 text-xs text-purple-200 flex items-start gap-2">
+                          <Target className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                          <div>
+                            <b className="text-white">Objective: </b>
+                            {currentStudioQuestion.objective || currentStudioQuestion.thinkPhase?.whatInterviewerLooksFor || currentStudioQuestion.categoryTitle}
+                          </div>
+                        </div>
+
+                        {/* 5-Step Workflow Navigation Tabs */}
+                        <div className="grid grid-cols-5 gap-1 pt-2 border-t border-slate-800">
+                          {(
+                            [
+                              { id: 'question', label: '1. Question', icon: HelpCircle },
+                              { id: 'think', label: '2. Think', icon: Lightbulb },
+                              { id: 'answer', label: '3. Answer', icon: Mic },
+                              { id: 'review', label: '4. Review', icon: CheckSquare },
+                              { id: 'improve', label: '5. Improve', icon: Sparkles },
+                            ] as const
+                          ).map((step) => {
+                            const Icon = step.icon;
+                            const isActive = interviewWorkflowStep === step.id;
+                            return (
+                              <button
+                                key={step.id}
+                                onClick={() => setInterviewWorkflowStep(step.id)}
+                                className={`py-2 px-1 rounded-xl font-mono text-[11px] font-bold transition flex flex-col sm:flex-row items-center justify-center gap-1.5 border ${
+                                  isActive
+                                    ? 'bg-purple-600 border-purple-400 text-white shadow-md shadow-purple-500/20'
+                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                <Icon className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">{step.label}</span>
+                                <span className="sm:hidden">{step.id}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* WORKFLOW PHASE 1: QUESTION DETAILS */}
+                      {interviewWorkflowStep === 'question' && (
+                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-6">
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-bold font-mono text-purple-300 uppercase flex items-center gap-2">
+                              <BookOpen className="w-4 h-4" />
+                              <span>Phase 1: Question Understanding &amp; Expected Keywords</span>
+                            </h4>
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                              Before jumping into your response, read the question carefully, recognize the underlying competencies the interviewer is probing, and keep key technical terminology ready.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <span className="text-xs font-mono text-slate-400 font-semibold block">
+                              Expected Keywords &amp; Core Concepts:
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              {(currentStudioQuestion.expectedKeywords || currentStudioQuestion.thinkPhase?.keyKeywords || []).map((kw, kwIdx) => (
+                                <span
+                                  key={kwIdx}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300"
+                                >
+                                  #{kw}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <span className="text-xs font-mono text-amber-400 uppercase font-bold block">
+                              Anchor Phrases to Anchor Your Delivery:
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {currentStudioQuestion.reviewPhase.keyPhrases.slice(0, 4).map((p, pIdx) => (
+                                <div
+                                  key={pIdx}
+                                  className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 italic flex items-center justify-between gap-2"
+                                >
+                                  <span>&ldquo;{p}&rdquo;</span>
+                                  <button
+                                    onClick={() => handleCopyText(p, `p1_${pIdx}`)}
+                                    className="text-slate-500 hover:text-white shrink-0"
+                                  >
+                                    {copiedId === `p1_${pIdx}` ? (
+                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="pt-2 flex justify-end">
+                            <button
+                              onClick={() => setInterviewWorkflowStep('think')}
+                              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-lg shadow-purple-500/20"
+                            >
+                              <span>Next: Step 2 &rarr; Think Phase</span>
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* WORKFLOW PHASE 2: THINK */}
+                      {interviewWorkflowStep === 'think' && (
+                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-6">
+                          <div className="space-y-1.5">
+                            <h4 className="text-sm font-bold font-mono text-amber-300 uppercase flex items-center gap-2">
+                              <Lightbulb className="w-4 h-4" />
+                              <span>Phase 2: Think &amp; Structure (Mental Blueprint)</span>
+                            </h4>
+                            <p className="text-xs text-slate-400">
+                              Take 15–30 seconds to mentally outline your answer before speaking. Avoid rambling or skipping context.
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* What the interviewer looks for */}
+                            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                              <span className="text-xs font-mono text-cyan-400 uppercase font-bold flex items-center gap-1.5">
+                                <Target className="w-3.5 h-3.5" />
+                                <span>What Interviewer Evaluates:</span>
+                              </span>
+                              <p className="text-xs text-slate-300 leading-relaxed">
+                                {currentStudioQuestion.thinkPhase?.whatInterviewerLooksFor || currentStudioQuestion.thinkPhase?.mentalFramework || 'Clear technical reasoning, structured delivery, and confident ownership.'}
+                              </p>
+                            </div>
+
+                            {/* Traps to avoid */}
+                            <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-2">
+                              <span className="text-xs font-mono text-rose-400 uppercase font-bold flex items-center gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span>Traps / Pitfalls to Avoid:</span>
+                              </span>
+                              <p className="text-xs text-rose-200 leading-relaxed">
+                                {currentStudioQuestion.thinkPhase?.trapsToAvoid || (currentStudioQuestion.thinkPhase?.pointsToAvoid || []).join('; ') || 'Avoid speaking without clear structure.'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Mental Outline */}
+                          <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                            <span className="text-xs font-mono text-purple-300 uppercase font-bold flex items-center gap-1.5">
+                              <ListOrdered className="w-4 h-4" />
+                              <span>Structured Mental Outline:</span>
+                            </span>
+                            <div className="space-y-2">
+                              {(currentStudioQuestion.thinkPhase?.mentalOutline || currentStudioQuestion.thinkPhase?.pointsToAvoid || [currentStudioQuestion.thinkPhase?.mentalFramework || 'Structure into clear phases']).map((point, ptIdx) => (
+                                <div
+                                  key={ptIdx}
+                                  className="flex items-start gap-2.5 text-xs text-slate-300 leading-relaxed"
+                                >
+                                  <span className="font-mono text-purple-400 font-bold shrink-0 mt-0.5">
+                                    0{ptIdx + 1}.
+                                  </span>
+                                  <span>{point}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2">
+                            <button
+                              onClick={() => setInterviewWorkflowStep('question')}
+                              className="px-4 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-400 hover:text-white"
+                            >
+                              &larr; Back to Question
+                            </button>
+                            <button
+                              onClick={() => setInterviewWorkflowStep('answer')}
+                              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-lg shadow-purple-500/20"
+                            >
+                              <span>Next: Step 3 &rarr; Answer Phase</span>
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* WORKFLOW PHASE 3: ANSWER */}
+                      {interviewWorkflowStep === 'answer' && (
+                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-6">
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-bold font-mono text-emerald-300 uppercase flex items-center gap-2">
+                              <Mic className="w-4 h-4" />
+                              <span>Phase 3: Answer Entry (Framework Inputs &amp; Voice Recording)</span>
+                            </h4>
+                            <p className="text-xs text-slate-400">
+                              Fill in the structured framework fields below or speak your answer aloud.
+                            </p>
+                          </div>
+
+                          {/* Framework Specific Inputs */}
+                          <div className="space-y-4">
+                            <span className="text-xs font-mono text-cyan-400 uppercase font-bold block">
+                              Framework Breakdown ({currentStudioQuestion.frameworkType.toUpperCase()}):
+                            </span>
+
+                            {getFrameworkStepList(currentStudioQuestion.frameworkType).map((step) => (
+                              <div key={step.key} className="space-y-1.5">
+                                <label className="text-xs font-mono font-semibold text-slate-300 flex items-center justify-between">
+                                  <span className="text-purple-300 font-bold">{step.label}</span>
+                                  <span className="text-slate-500 font-normal text-[11px]">{step.hint || step.guidance || ''}</span>
+                                </label>
+                                <textarea
+                                  rows={2}
+                                  value={studioStepAnswers[step.key] || ''}
+                                  onChange={(e) =>
+                                    setStudioStepAnswers((prev) => ({ ...prev, [step.key]: e.target.value }))
+                                  }
+                                  placeholder={step.placeholder}
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 resize-none"
+                                />
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Freeform Answer / Spoken Transcript */}
+                          <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                            <label className="text-xs font-mono font-semibold text-slate-300 flex items-center justify-between">
+                              <span>Full Spoken Response / Freeform Draft:</span>
+                              <span className="text-slate-500 font-normal text-[11px]">Optional continuous answer</span>
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={studioFreeformAnswer}
+                              onChange={(e) => setStudioFreeformAnswer(e.target.value)}
+                              placeholder="Write or paste your continuous speech transcript here..."
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 resize-none"
+                            />
+                          </div>
+
+                          {/* Audio Recording Section */}
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={studioIsRecording ? stopStudioRecording : startStudioRecording}
+                                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition shadow-lg ${
+                                  studioIsRecording
+                                    ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse shadow-rose-500/30'
+                                    : 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-500/30'
+                                }`}
+                              >
+                                {studioIsRecording ? <Square className="w-5 h-5 fill-white" /> : <Mic className="w-5 h-5" />}
+                              </button>
+                              <div>
+                                <div className="text-xs font-mono font-bold text-white">
+                                  {studioIsRecording ? 'Recording Speech...' : studioAudioUrl ? 'Audio Recorded' : 'Record Your Spoken Answer'}
+                                </div>
+                                <div className="text-[11px] font-mono text-slate-400">
+                                  {studioIsRecording
+                                    ? `Elapsed: ${studioRecordSeconds}s`
+                                    : 'Speak naturally to practice your delivery and pacing.'}
+                                </div>
+                              </div>
+                            </div>
+
+                            {studioAudioUrl && (
+                              <audio controls src={studioAudioUrl} className="h-8 max-w-[220px]" />
+                            )}
+                          </div>
+
+                          {/* Confidence Rating & Filler Words */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-mono font-bold text-slate-300 block">
+                                Self-Confidence Rating (1-5):
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                {[1, 2, 3, 4, 5].map((rating) => (
+                                  <button
+                                    key={rating}
+                                    type="button"
+                                    onClick={() => setStudioConfidenceRating(rating)}
+                                    className={`flex-1 py-1.5 rounded-xl text-xs font-mono font-bold border transition ${
+                                      studioConfidenceRating === rating
+                                        ? 'bg-purple-600 border-purple-400 text-white shadow'
+                                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                    }`}
+                                  >
+                                    {rating}★
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-mono font-bold text-slate-300 block">
+                                Filler Word Count (uh, um, like):
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                {[0, 1, 2, 3, 5].map((cnt) => (
+                                  <button
+                                    key={cnt}
+                                    type="button"
+                                    onClick={() => setStudioFillerCount(cnt)}
+                                    className={`flex-1 py-1.5 rounded-xl text-xs font-mono font-bold border transition ${
+                                      studioFillerCount === cnt
+                                        ? 'bg-rose-600/30 border-rose-500 text-rose-300'
+                                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                    }`}
+                                  >
+                                    {cnt === 5 ? '5+' : cnt}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center justify-between pt-2">
+                            <button
+                              onClick={() => setInterviewWorkflowStep('think')}
+                              className="px-4 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-400 hover:text-white"
+                            >
+                              &larr; Back to Think
+                            </button>
+
+                            <button
+                              disabled={studioIsEvaluating}
+                              onClick={handleEvaluateStudioAnswer}
+                              className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                            >
+                              {studioIsEvaluating ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span>Evaluating 6 Dimensions...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CheckSquare className="w-4 h-4" />
+                                  <span>Evaluate &amp; Review Answer</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* WORKFLOW PHASE 4: REVIEW */}
+                      {interviewWorkflowStep === 'review' && (
+                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-6">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                            <div>
+                              <h4 className="text-sm font-bold font-mono text-cyan-300 uppercase flex items-center gap-2">
+                                <CheckSquare className="w-4 h-4" />
+                                <span>Phase 4: Multi-Dimensional Evaluation &amp; Golden Benchmark</span>
+                              </h4>
+                              <p className="text-xs text-slate-400">
+                                Evaluated on Clarity, Structure, Relevance, Confidence, Technical Accuracy, and Conciseness.
+                              </p>
+                            </div>
+
+                            {studioEvaluationResult && (
+                              <div className="px-3.5 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/40 text-xs font-mono font-bold text-purple-300">
+                                Overall Score: {studioEvaluationResult.overallScore}/100
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 6 Dimensions Score Breakdown */}
+                          {studioEvaluationResult && (
+                            <div className="space-y-3">
+                              <span className="text-xs font-mono text-slate-400 font-semibold block">
+                                6-DIMENSIONAL COMMUNICATION EVALUATION:
+                              </span>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {[
+                                  { label: 'Clarity', score: studioEvaluationResult.clarityScore, color: 'text-blue-400' },
+                                  { label: 'Structure', score: studioEvaluationResult.structureScore, color: 'text-indigo-400' },
+                                  { label: 'Relevance', score: studioEvaluationResult.relevanceScore, color: 'text-emerald-400' },
+                                  { label: 'Confidence', score: studioEvaluationResult.confidenceScore, color: 'text-amber-400' },
+                                  { label: 'Tech Accuracy', score: studioEvaluationResult.technicalAccuracyScore, color: 'text-purple-400' },
+                                  { label: 'Conciseness', score: studioEvaluationResult.concisenessScore, color: 'text-cyan-400' },
+                                ].map((dim, dIdx) => (
+                                  <div
+                                    key={dIdx}
+                                    className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5"
+                                  >
+                                    <div className="flex items-center justify-between text-xs font-mono">
+                                      <span className="text-slate-400">{dim.label}</span>
+                                      <span className={`font-bold ${dim.color}`}>{dim.score}%</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full"
+                                        style={{ width: `${dim.score}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Strengths & Weak Areas */}
+                          {studioEvaluationResult && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 space-y-2">
+                                <span className="text-xs font-mono text-emerald-400 uppercase font-bold flex items-center gap-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Identified Strengths:</span>
+                                </span>
+                                <ul className="space-y-1 text-xs text-emerald-200">
+                                  {studioEvaluationResult.strengths.map((s, sIdx) => (
+                                    <li key={sIdx}>• {s}</li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/30 space-y-2">
+                                <span className="text-xs font-mono text-amber-400 uppercase font-bold flex items-center gap-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <span>Areas for Improvement:</span>
+                                </span>
+                                <ul className="space-y-1 text-xs text-amber-200">
+                                  {studioEvaluationResult.weakAreas.map((w, wIdx) => (
+                                    <li key={wIdx}>• {w}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Golden Model Response */}
+                          <div className="space-y-2">
+                            <div className="text-xs font-mono uppercase text-slate-400 font-semibold flex items-center justify-between">
+                              <span className="text-purple-300">BENCHMARK GOLDEN / MODEL RESPONSE:</span>
+                              <button
+                                onClick={() => handleCopyText(currentStudioQuestion.reviewPhase.goldenAnswer || currentStudioQuestion.reviewPhase.goldenModelAnswer || '', 'golden_ans')}
+                                className="text-xs font-mono text-slate-400 hover:text-white flex items-center gap-1"
+                              >
+                                {copiedId === 'golden_ans' ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                                <span>{copiedId === 'golden_ans' ? 'Copied' : 'Copy Response'}</span>
+                              </button>
+                            </div>
+                            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line font-mono">
+                              {currentStudioQuestion.reviewPhase.goldenAnswer || currentStudioQuestion.reviewPhase.goldenModelAnswer}
+                            </div>
+                          </div>
+
+                          {/* Action Navigation */}
+                          <div className="flex items-center justify-between pt-2">
+                            <button
+                              onClick={() => setInterviewWorkflowStep('answer')}
+                              className="px-4 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-400 hover:text-white"
+                            >
+                              &larr; Refine Answer
+                            </button>
+                            <button
+                              onClick={() => setInterviewWorkflowStep('improve')}
+                              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-lg shadow-purple-500/20"
+                            >
+                              <span>Next: Step 5 &rarr; Improve Phase</span>
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* WORKFLOW PHASE 5: IMPROVE */}
+                      {interviewWorkflowStep === 'improve' && (
+                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-6">
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-bold font-mono text-indigo-300 uppercase flex items-center gap-2">
+                              <Sparkles className="w-4 h-4 text-indigo-400" />
+                              <span>Phase 5: Improve &amp; Polish Delivery</span>
+                            </h4>
+                            <p className="text-xs text-slate-400">
+                              Elevate your answer by adopting executive vocabulary, removing fillers, and tightening sentence transitions.
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Vocabulary Upgrades */}
+                            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                              <span className="text-xs font-mono text-cyan-400 uppercase font-bold block">
+                                Recommended Vocabulary Upgrades:
+                              </span>
+                              <div className="space-y-2">
+                                {currentStudioQuestion.improvePhase.vocabularyUpgrades.map((item, vIdx) => (
+                                  <div
+                                    key={vIdx}
+                                    className="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 text-xs font-mono flex items-center justify-between gap-2"
+                                  >
+                                    <span className="text-rose-400 line-through">{item.from}</span>
+                                    <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                                    <span className="text-emerald-400 font-bold">{item.to}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Conciseness Tips */}
+                            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                              <span className="text-xs font-mono text-amber-400 uppercase font-bold block">
+                                Conciseness &amp; Flow Tips:
+                              </span>
+                              <ul className="space-y-2 text-xs text-slate-300 leading-relaxed list-disc list-inside">
+                                {currentStudioQuestion.improvePhase.concisenessTips.map((tip, tIdx) => (
+                                  <li key={tIdx}>{tip}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+
+                          {/* Next Actions */}
+                          <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="text-xs text-purple-200">
+                              Ready for the next challenge? Select another question or simulate a real interview round.
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setInterviewWorkflowStep('answer');
+                                  setStudioFreeformAnswer('');
+                                  setStudioStepAnswers({});
+                                }}
+                                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs font-mono text-slate-200"
+                              >
+                                Retry Answer
+                              </button>
+                              <button
+                                onClick={() => setInterviewSubTab('mock')}
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-mono font-bold"
+                              >
+                                Launch Mock Interview &rarr;
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ========================================================================= */}
+              {/* SUB-VIEW 2: MOCK INTERVIEW SIMULATOR */}
+              {/* ========================================================================= */}
+              {interviewSubTab === 'mock' && (
+                <div className="space-y-6">
+                  {!mockIsRunning && !mockSessionCompleted && (
+                    /* Mock Interview Setup Screen */
+                    <div className="max-w-3xl mx-auto p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-6">
+                      <div className="space-y-2 text-center sm:text-left">
+                        <span className="text-xs font-mono text-purple-400 uppercase font-bold tracking-wider">
+                          REAL-TIME SIMULATION ENGINE
+                        </span>
+                        <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                          Configure Mock Interview Round
+                        </h3>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          Test your answers under realistic conditions. One question at a time with instant multi-dimensional evaluation across Clarity, Structure, Relevance, Confidence, Technical Accuracy, and Conciseness.
+                        </p>
+                      </div>
+
+                      {/* Setup Grid: Track, Difficulty, Count */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {/* 1. Track Selector */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-mono font-bold text-slate-300">
+                            1. Interview Track:
+                          </label>
+                          <select
+                            value={mockConfig.category}
+                            onChange={(e) =>
+                              setMockConfig((prev) => ({ ...prev, category: e.target.value as any }))
+                            }
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="mixed">Mixed Tracks (Comprehensive)</option>
+                            {INTERVIEW_CATEGORIES_CONFIG.map((c) => (
+                              <option key={c.category} value={c.category}>
+                                {c.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* 2. Difficulty */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-mono font-bold text-slate-300">
+                            2. Difficulty Level:
+                          </label>
+                          <select
+                            value={mockConfig.difficulty}
+                            onChange={(e) =>
+                              setMockConfig((prev) => ({ ...prev, difficulty: e.target.value as any }))
+                            }
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="beginner">Beginner (Foundational)</option>
+                            <option value="intermediate">Intermediate (Standard)</option>
+                            <option value="advanced">Advanced (Senior / Staff)</option>
+                            <option value="mixed">Mixed Difficulties</option>
+                          </select>
+                        </div>
+
+                        {/* 3. Question Count */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-mono font-bold text-slate-300">
+                            3. Round Length:
+                          </label>
+                          <select
+                            value={mockConfig.questionCount}
+                            onChange={(e) =>
+                              setMockConfig((prev) => ({ ...prev, questionCount: Number(e.target.value) }))
+                            }
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
+                          >
+                            <option value={3}>3 Questions (Quick Sprint ~10m)</option>
+                            <option value={5}>5 Questions (Standard Round ~20m)</option>
+                            <option value={8}>8 Questions (Full Loop ~35m)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Launch Button */}
+                      <div className="pt-4 border-t border-slate-800 flex justify-center sm:justify-end">
+                        <button
+                          onClick={handleStartMockInterview}
+                          className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-sans font-bold text-sm rounded-2xl transition flex items-center justify-center gap-2 shadow-xl shadow-purple-500/25"
+                        >
+                          <Play className="w-4 h-4 fill-white" />
+                          <span>Start Mock Interview Session</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mock Interview Active Runner */}
+                  {mockIsRunning && mockQuestions.length > 0 && (
+                    <div className="max-w-4xl mx-auto space-y-6">
+                      {/* Top Timer & Progress Bar */}
+                      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-xs font-bold text-purple-400 bg-purple-950/60 border border-purple-800/40 px-3 py-1 rounded-xl">
+                            Question {mockCurrentIndex + 1} of {mockQuestions.length}
+                          </span>
+                          <span className="text-xs font-mono text-slate-400 hidden sm:inline">
+                            Track: {mockQuestions[mockCurrentIndex]?.category.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5 font-mono text-xs text-amber-400 bg-amber-950/40 border border-amber-800/40 px-3 py-1 rounded-xl">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>
+                              {Math.floor(mockTimerSeconds / 60)}:
+                              {(mockTimerSeconds % 60).toString().padStart(2, '0')}
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={handleCancelMockInterview}
+                            className="text-xs font-mono text-slate-500 hover:text-rose-400 transition"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Single Question Runner Card */}
+                      <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-slate-950 text-cyan-400 uppercase font-bold border border-slate-800">
+                              Framework: {mockQuestions[mockCurrentIndex]?.frameworkType.toUpperCase()}
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 text-amber-400 uppercase font-bold">
+                              {mockQuestions[mockCurrentIndex]?.difficulty}
+                            </span>
+                          </div>
+                          <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                            &ldquo;{mockQuestions[mockCurrentIndex]?.question}&rdquo;
+                          </h3>
+                          <p className="text-xs text-purple-300">
+                            Objective: {mockQuestions[mockCurrentIndex]?.objective || mockQuestions[mockCurrentIndex]?.thinkPhase?.whatInterviewerLooksFor || mockQuestions[mockCurrentIndex]?.categoryTitle}
+                          </p>
+                        </div>
+
+                        {/* Framework input fields */}
+                        <div className="space-y-3">
+                          <span className="text-xs font-mono text-slate-400 font-semibold block">
+                            Enter Structured Framework Response:
+                          </span>
+
+                          {getFrameworkStepList(mockQuestions[mockCurrentIndex]?.frameworkType).map((step) => (
+                            <div key={step.key} className="space-y-1">
+                              <label className="text-xs font-mono text-purple-300 font-bold flex items-center justify-between">
+                                <span>{step.label}</span>
+                                <span className="text-slate-500 font-normal text-[10px]">{step.hint || step.guidance || ''}</span>
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={mockStepAnswers[step.key] || ''}
+                                onChange={(e) =>
+                                  setMockStepAnswers((prev) => ({ ...prev, [step.key]: e.target.value }))
+                                }
+                                placeholder={step.placeholder}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 resize-none"
+                              />
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Freeform speech transcript */}
+                        <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                          <label className="text-xs font-mono text-slate-300 font-semibold">
+                            Or Full Freeform Spoken Answer:
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={mockFreeformAnswer}
+                            onChange={(e) => setMockFreeformAnswer(e.target.value)}
+                            placeholder="Type or paste your answer here..."
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 resize-none"
+                          />
+                        </div>
+
+                        {/* Confidence & Filler Controls */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+                          <div className="space-y-1.5">
+                            <span className="text-xs font-mono text-slate-400">Confidence:</span>
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((r) => (
+                                <button
+                                  key={r}
+                                  type="button"
+                                  onClick={() => setMockConfidenceScore(r)}
+                                  className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border ${
+                                    mockConfidenceScore === r
+                                      ? 'bg-purple-600 border-purple-400 text-white'
+                                      : 'bg-slate-950 border-slate-800 text-slate-400'
+                                  }`}
+                                >
+                                  {r}★
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <span className="text-xs font-mono text-slate-400">Filler Words:</span>
+                            <div className="flex items-center gap-1">
+                              {[0, 1, 2, 3, 5].map((cnt) => (
+                                <button
+                                  key={cnt}
+                                  type="button"
+                                  onClick={() => setMockFillerCount(cnt)}
+                                  className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border ${
+                                    mockFillerCount === cnt
+                                      ? 'bg-rose-600/30 border-rose-500 text-rose-300'
+                                      : 'bg-slate-950 border-slate-800 text-slate-400'
+                                  }`}
+                                >
+                                  {cnt === 5 ? '5+' : cnt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Submit Question */}
+                        <div className="flex justify-end pt-4 border-t border-slate-800">
+                          <button
+                            disabled={mockIsSubmittingCurrent}
+                            onClick={handleSubmitCurrentMockAnswer}
+                            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-lg shadow-purple-500/20"
+                          >
+                            {mockIsSubmittingCurrent ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>Evaluating Answer...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>
+                                  {mockCurrentIndex + 1 === mockQuestions.length
+                                    ? 'Submit & Finish Mock Interview'
+                                    : 'Submit & Next Question'}
+                                </span>
+                                <ChevronRight className="w-4 h-4" />
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mock Interview Completion Report Card */}
+                  {mockSessionCompleted && mockCompletedRecord && (
+                    <div className="max-w-4xl mx-auto space-y-6">
+                      <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                          <div>
+                            <span className="text-xs font-mono text-emerald-400 uppercase font-bold tracking-wider">
+                              SIMULATION COMPLETE
+                            </span>
+                            <h3 className="text-2xl font-bold font-display text-white mt-1">
+                              Mock Interview Performance Report
+                            </h3>
+                            <p className="text-xs text-slate-400">
+                              Evaluated across {mockCompletedRecord.totalQuestions} questions on {mockCompletedRecord.dateStr}
+                            </p>
+                          </div>
+
+                          <div className="p-4 rounded-2xl bg-purple-950/60 border border-purple-500/40 text-center">
+                            <span className="text-[10px] font-mono text-purple-300 uppercase block">
+                              Overall Readiness
+                            </span>
+                            <span className="text-3xl font-bold font-display text-white">
+                              {mockCompletedRecord.overallScore}
+                              <span className="text-lg text-purple-400">/100</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 6 Dimension Radar Breakdown */}
+                        <div className="space-y-3">
+                          <span className="text-xs font-mono text-slate-400 font-semibold block uppercase">
+                            6-Dimensional Communication Profile:
+                          </span>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {[
+                              { label: 'Clarity', score: mockCompletedRecord.dimensionScores.clarity, color: 'text-blue-400' },
+                              { label: 'Structure', score: mockCompletedRecord.dimensionScores.structure, color: 'text-indigo-400' },
+                              { label: 'Relevance', score: mockCompletedRecord.dimensionScores.relevance, color: 'text-emerald-400' },
+                              { label: 'Confidence', score: mockCompletedRecord.dimensionScores.confidence, color: 'text-amber-400' },
+                              { label: 'Technical Accuracy', score: mockCompletedRecord.dimensionScores.technicalAccuracy, color: 'text-purple-400' },
+                              { label: 'Conciseness', score: mockCompletedRecord.dimensionScores.conciseness, color: 'text-cyan-400' },
+                            ].map((dim, dIdx) => (
+                              <div
+                                key={dIdx}
+                                className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5"
+                              >
+                                <div className="flex items-center justify-between text-xs font-mono">
+                                  <span className="text-slate-400">{dim.label}</span>
+                                  <span className={`font-bold ${dim.color}`}>{dim.score}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full"
+                                    style={{ width: `${dim.score}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Weak Areas & Recommended Practice Drills */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-2">
+                            <span className="text-xs font-mono text-rose-400 uppercase font-bold flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              <span>Identified Weak Areas:</span>
+                            </span>
+                            <ul className="space-y-1.5 text-xs text-rose-200">
+                              {mockCompletedRecord.identifiedWeakAreas.map((w, wIdx) => (
+                                <li key={wIdx}>• {w}</li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-2">
+                            <span className="text-xs font-mono text-cyan-400 uppercase font-bold flex items-center gap-1.5">
+                              <Target className="w-3.5 h-3.5" />
+                              <span>Recommended Future Practice:</span>
+                            </span>
+                            <ul className="space-y-1.5 text-xs text-cyan-200">
+                              {mockCompletedRecord.recommendedDrills.map((r, rIdx) => (
+                                <li key={rIdx}>• {r}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+
+                        {/* Question by Question Summary */}
+                        <div className="space-y-3 pt-2 border-t border-slate-800">
+                          <span className="text-xs font-mono text-slate-400 font-semibold block uppercase">
+                            Question Summaries:
+                          </span>
+                          <div className="space-y-2">
+                            {mockCompletedRecord.questionSummaries.map((qSum, qIdx) => (
+                              <div
+                                key={qIdx}
+                                className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                              >
+                                <div className="space-y-0.5">
+                                  <span className="font-mono text-[10px] text-purple-400 uppercase font-bold">
+                                    Q{qIdx + 1} • {qSum.category.replace('_', ' ')}
+                                  </span>
+                                  <p className="font-bold text-slate-200">{qSum.questionText}</p>
+                                  <p className="text-slate-400 text-[11px] italic">{qSum.feedback}</p>
+                                </div>
+                                <div className="font-mono font-bold text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-purple-300 border border-slate-800 shrink-0">
+                                  {qSum.score}%
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Return / Retry Action */}
+                        <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+                          <button
+                            onClick={() => {
+                              setMockSessionCompleted(false);
+                              setInterviewSubTab('studio');
+                            }}
+                            className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 hover:text-white"
+                          >
+                            &larr; Back to Question Studio
+                          </button>
+                          <button
+                            onClick={() => {
+                              setMockSessionCompleted(false);
+                              setMockIsRunning(false);
+                            }}
+                            className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl"
+                          >
+                            New Mock Round
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ========================================================================= */}
+              {/* SUB-VIEW 3: HISTORY & PRACTICE LOGS */}
+              {/* ========================================================================= */}
+              {interviewSubTab === 'history' && (
+                <div className="space-y-6">
+                  {/* Mock Interview History */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-mono font-bold text-purple-400 uppercase flex items-center gap-2">
+                        <History className="w-4 h-4" />
+                        <span>Saved Mock Interview Sessions</span>
+                      </h3>
+                      <span className="text-xs font-mono text-slate-500">
+                        {userState?.mockInterviewHistory?.length || 0} Sessions Recorded
+                      </span>
+                    </div>
+
+                    {(!userState?.mockInterviewHistory || userState.mockInterviewHistory.length === 0) ? (
+                      <div className="p-8 text-center rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
+                        <Award className="w-8 h-8 text-slate-600 mx-auto" />
+                        <p className="text-xs text-slate-400 font-mono">
+                          No mock interview sessions recorded yet. Launch a mock interview to evaluate your readiness!
+                        </p>
+                        <button
+                          onClick={() => setInterviewSubTab('mock')}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-mono font-bold"
+                        >
+                          Start First Mock Interview
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {userState.mockInterviewHistory.map((session) => (
+                          <div
+                            key={session.id}
+                            className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-mono font-bold text-purple-400 uppercase">
+                                    {session.category.toUpperCase()} • {session.difficulty.toUpperCase()}
+                                  </span>
+                                  <span className="text-xs font-mono text-slate-500">• {session.dateStr}</span>
+                                </div>
+                                <span className="text-xs text-slate-400 font-mono">
+                                  {session.totalQuestions} Questions Evaluated
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <div className="px-3.5 py-1 rounded-xl bg-purple-950/60 border border-purple-500/40 font-mono font-bold text-xs text-purple-300">
+                                  Score: {session.overallScore}%
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteMockSession(session.id)}
+                                  className="text-slate-500 hover:text-rose-400 p-1.5 transition"
+                                  title="Delete session"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Dimension Mini Bars */}
+                            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                              {Object.entries(session.dimensionScores).map(([dim, score]) => (
+                                <div key={dim} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                                  <span className="text-[10px] font-mono text-slate-500 capitalize block truncate">
+                                    {dim.replace(/([A-Z])/g, ' $1')}
+                                  </span>
+                                  <span className="text-xs font-mono font-bold text-slate-200">{score}%</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Weak Areas & Recommendations */}
+                            {session.identifiedWeakAreas.length > 0 && (
+                              <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/20 text-xs text-rose-200">
+                                <b className="text-rose-400">Target Weak Areas: </b>
+                                {session.identifiedWeakAreas.join('; ')}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Individual Question Practice Logs */}
+                  <div className="space-y-4 pt-4 border-t border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-mono font-bold text-cyan-400 uppercase flex items-center gap-2">
+                        <CheckSquare className="w-4 h-4" />
+                        <span>Question Studio Practice Logs</span>
+                      </h3>
+                      <span className="text-xs font-mono text-slate-500">
+                        {userState?.questionPracticeHistory?.length || 0} Drills Logged
+                      </span>
+                    </div>
+
+                    {(!userState?.questionPracticeHistory || userState.questionPracticeHistory.length === 0) ? (
+                      <div className="p-6 text-center rounded-2xl bg-slate-900/40 border border-slate-800 text-xs font-mono text-slate-500">
+                        No studio practice evaluations logged yet. Practice a question in the Question Studio to record answers.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {userState.questionPracticeHistory.slice(0, 10).map((log) => (
+                          <div
+                            key={log.id}
+                            className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2 text-xs"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 text-purple-400 uppercase font-bold border border-slate-800">
+                                {log.category.replace('_', ' ')}
+                              </span>
+                              <span className="font-mono text-emerald-400 font-bold">
+                                {log.evaluation?.overallScore || 80}%
+                              </span>
+                            </div>
+                            <p className="text-slate-300 font-mono text-[11px] line-clamp-2">
+                              {log.userAnswer}
+                            </p>
+                            <span className="text-[10px] text-slate-500 font-mono block">
+                              {new Date(log.completedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
