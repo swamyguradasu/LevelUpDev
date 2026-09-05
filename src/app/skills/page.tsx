@@ -20,6 +20,7 @@ import {
   Binary,
 } from 'lucide-react';
 import { getSkillById } from '@/lib/content';
+import CmdCommandsBlock from '@/components/CmdCommandsBlock';
 
 export default function SkillsTrailHubPage() {
   const pythonSkill = getSkillById('python');
@@ -91,10 +92,10 @@ export default function SkillsTrailHubPage() {
             </p>
           </div>
 
-          {/* Primary Two Blocks Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+          {/* Primary Blocks Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
             {/* Block 1 — Technical Skills */}
-            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-8 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden">
+            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-7 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-all duration-500" />
 
               {/* Block Header */}
@@ -108,20 +109,20 @@ export default function SkillsTrailHubPage() {
                   </span>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-display font-bold text-white tracking-tight">
+                  <h2 className="text-xl sm:text-2xl font-display font-bold text-white tracking-tight">
                     Technical Skills
                   </h2>
                   <p className="text-sm font-medium text-blue-400 mt-0.5">
                     Build practical skills for your career
                   </p>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                <p className="text-xs text-slate-400 leading-relaxed">
                   Explore programming languages, development technologies, AI/ML tools, databases, and other career-focused technical skills.
                 </p>
               </div>
 
               {/* Active Skill Cards */}
-              <div className="py-6 flex-1 space-y-4">
+              <div className="py-6 flex-1 space-y-4 flex flex-col justify-between">
                 {/* Python Card (Active Primary) */}
                 <div className="rounded-2xl bg-slate-950/70 border border-blue-500/30 p-5 space-y-4 shadow-lg shadow-blue-950/30 hover:border-blue-500/60 transition-all group/card">
                   <div className="flex items-start justify-between">
@@ -131,18 +132,18 @@ export default function SkillsTrailHubPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-bold text-white group-hover/card:text-blue-300 transition-colors">
+                          <h3 className="text-base sm:text-lg font-bold text-white group-hover/card:text-blue-300 transition-colors">
                             Python
                           </h3>
                           <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
-                            Active Trail
+                            Active
                           </span>
                         </div>
                         <p className="text-xs text-slate-400">Python Programming</p>
                       </div>
                     </div>
                     <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
-                      {pythonModuleCount} Modules
+                      {pythonModuleCount} Mod
                     </span>
                   </div>
 
@@ -151,7 +152,7 @@ export default function SkillsTrailHubPage() {
                       Beginner → Advanced
                     </span>
                     <span className="text-slate-600">•</span>
-                    <span className="text-blue-400">Interactive Code Sandbox</span>
+                    <span className="text-blue-400">Interactive Sandbox</span>
                   </div>
 
                   <Link
@@ -175,11 +176,11 @@ export default function SkillsTrailHubPage() {
                       { name: 'C++', icon: '⚙️' },
                       { name: 'SQL', icon: '🗄️' },
                       { name: 'React', icon: '⚛️' },
-                      { name: 'Machine Learning', icon: '🧠' },
+                      { name: 'ML/AI', icon: '🧠' },
                     ].map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-950/40 border border-slate-800/60 text-slate-400 text-xs font-mono"
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950/40 border border-slate-800/60 text-slate-400 text-xs font-mono"
                       >
                         <span>{item.icon}</span>
                         <span className="truncate">{item.name}</span>
@@ -191,7 +192,7 @@ export default function SkillsTrailHubPage() {
             </div>
 
             {/* Block 2 — CS Foundations */}
-            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-8 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden">
+            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-7 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-cyan-500/10 transition-all duration-500" />
 
               {/* Block Header */}
@@ -205,15 +206,15 @@ export default function SkillsTrailHubPage() {
                   </span>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-display font-bold text-white tracking-tight">
+                  <h2 className="text-xl sm:text-2xl font-display font-bold text-white tracking-tight">
                     CS Foundations
                   </h2>
                   <p className="text-sm font-medium text-cyan-400 mt-0.5">
-                    Learn the fundamentals every computer science student should know
+                    Learn the fundamentals every CS student should know
                   </p>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                  Build the essential computer science foundation required to understand programming, DSA, software development, databases, operating systems, networking, and technical interviews.
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Build the essential computer science foundation required to understand programming, DSA, OS, and technical interviews.
                 </p>
               </div>
 
@@ -227,7 +228,7 @@ export default function SkillsTrailHubPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-bold text-white group-hover/card:text-cyan-300 transition-colors">
+                          <h3 className="text-base sm:text-lg font-bold text-white group-hover/card:text-cyan-300 transition-colors">
                             Computer Science Basics
                           </h3>
                           <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
@@ -242,8 +243,8 @@ export default function SkillsTrailHubPage() {
                     </span>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-mono">
-                    Start with the concepts that power modern software development — from Computer Architecture & DSA to Operating Systems & Networking.
+                  <p className="text-xs text-slate-300 leading-relaxed font-mono">
+                    From Computer Architecture & DSA to Operating Systems, Databases & Networking.
                   </p>
 
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-400 pt-1">
@@ -275,9 +276,96 @@ export default function SkillsTrailHubPage() {
                 </div>
               </div>
             </div>
+
+            {/* Block 3 — Command Prompt */}
+            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-7 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden md:col-span-2 lg:col-span-1">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-500" />
+
+              {/* Block Header */}
+              <div className="space-y-3 pb-6 border-b border-slate-800/80">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                    <Terminal className="w-6 h-6" />
+                  </div>
+                  <span className="text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
+                    63 Commands
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-display font-bold text-white tracking-tight">
+                    Command Prompt
+                  </h2>
+                  <p className="text-sm font-medium text-emerald-400 mt-0.5">
+                    Essential Windows CMD commands for developers
+                  </p>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Master commands for Git/GitHub, Python, Node.js, React/Vite dev servers, API testing, and troubleshooting.
+                </p>
+              </div>
+
+              {/* Featured Command Prompt Card */}
+              <div className="py-6 flex-1 flex flex-col justify-between space-y-4">
+                <div className="rounded-2xl bg-slate-950/70 border border-emerald-500/30 p-5 space-y-4 shadow-lg shadow-emerald-950/20 hover:border-emerald-500/60 transition-all group/card">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-mono font-bold text-lg">
+                        💻
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base sm:text-lg font-bold text-white group-hover/card:text-emerald-300 transition-colors">
+                            Command Reference
+                          </h3>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                            Visual
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400">Interactive CLI Explorer</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
+                      12 Cat
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed font-mono">
+                    Visual Before → Run → After execution breakdowns with practical examples and troubleshooting.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-400 pt-1">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Navigation & Files</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Git & GitHub Flow</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Python & Node.js</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Ports & Diagnostics</span>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/skills/cmd"
+                    className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold font-mono tracking-wide shadow-md shadow-emerald-600/30 transition group-hover/card:translate-x-0.5"
+                  >
+                    <span>Explore Commands</span>
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/card:translate-x-1" />
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
       </div>
     </div>
   );
 }
+
