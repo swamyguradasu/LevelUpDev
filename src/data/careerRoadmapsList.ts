@@ -10,6 +10,7 @@ export interface CareerRoleCard {
   projectCount?: number;
   status: 'active' | 'coming-soon';
   badgeLabel?: string;
+  foundationRequired?: string[];
 }
 
 export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
@@ -25,6 +26,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'active',
     badgeLabel: 'POPULAR PATH',
+    foundationRequired: ['Programming', 'DSA', 'SQL & Databases', 'CS Fundamentals', 'Git & GitHub'],
   },
   {
     id: 'python-developer',
@@ -38,6 +40,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'active',
     badgeLabel: 'POPULAR PATH',
+    foundationRequired: ['Programming', 'DSA', 'SQL & Databases', 'Git & GitHub', 'Linux & CLI'],
   },
   {
     id: 'data-analyst',
@@ -51,6 +54,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'active',
     badgeLabel: 'POPULAR PATH',
+    foundationRequired: ['Programming', 'SQL & Databases', 'Aptitude & Logic', 'Web & APIs'],
   },
   {
     id: 'data-scientist',
@@ -64,6 +68,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'active',
     badgeLabel: 'POPULAR PATH',
+    foundationRequired: ['Programming', 'DSA', 'SQL & Databases', 'Aptitude & Logic', 'Problem Solving'],
   },
   {
     id: 'ml-engineer',
@@ -77,6 +82,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'active',
     badgeLabel: 'POPULAR PATH',
+    foundationRequired: ['Programming', 'DSA', 'SQL & Databases', 'Linux & CLI', 'Git & GitHub'],
   },
   {
     id: 'frontend-engineer',
@@ -90,6 +96,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'coming-soon',
     badgeLabel: 'ROADMAP CURATING',
+    foundationRequired: ['Programming', 'Web & APIs', 'Git & GitHub', 'Problem Solving'],
   },
   {
     id: 'backend-engineer',
@@ -103,6 +110,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'coming-soon',
     badgeLabel: 'ROADMAP CURATING',
+    foundationRequired: ['Programming', 'DSA', 'SQL & Databases', 'CS Fundamentals', 'Web & APIs'],
   },
   {
     id: 'fullstack-developer',
@@ -116,6 +124,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'coming-soon',
     badgeLabel: 'ROADMAP CURATING',
+    foundationRequired: ['Programming', 'DSA', 'SQL & Databases', 'Web & APIs', 'Git & GitHub'],
   },
   {
     id: 'devops-cloud-engineer',
@@ -129,6 +138,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'coming-soon',
     badgeLabel: 'ROADMAP CURATING',
+    foundationRequired: ['Linux & CLI', 'Git & GitHub', 'Web & APIs', 'CS Fundamentals'],
   },
   {
     id: 'ai-engineer',
@@ -142,6 +152,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'active',
     badgeLabel: 'POPULAR PATH',
+    foundationRequired: ['Programming', 'DSA', 'SQL & Databases', 'Web & APIs', 'Git & GitHub'],
   },
   {
     id: 'generative-ai-engineer',
@@ -155,6 +166,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'active',
     badgeLabel: 'HOT PATH',
+    foundationRequired: ['Programming', 'Web & APIs', 'SQL & Databases', 'Git & GitHub', 'Problem Solving'],
   },
   {
     id: 'nlp-engineer',
@@ -168,6 +180,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'active',
     badgeLabel: 'HOT PATH',
+    foundationRequired: ['Programming', 'DSA', 'SQL & Databases', 'Problem Solving'],
   },
   {
     id: 'mlops-engineer',
@@ -181,6 +194,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 6,
     status: 'active',
     badgeLabel: 'HOT PATH',
+    foundationRequired: ['Programming', 'Linux & CLI', 'Git & GitHub', 'SQL & Databases', 'Web & APIs'],
   },
   {
     id: 'computer-vision-engineer',
@@ -194,6 +208,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 6,
     status: 'active',
     badgeLabel: 'HOT PATH',
+    foundationRequired: ['Programming', 'DSA', 'Problem Solving', 'Git & GitHub'],
   },
   {
     id: 'data-engineer',
@@ -207,6 +222,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 6,
     status: 'active',
     badgeLabel: 'HOT PATH',
+    foundationRequired: ['Programming', 'SQL & Databases', 'Linux & CLI', 'CS Fundamentals', 'Git & GitHub'],
   },
   {
     id: 'bi-analyst',
@@ -220,6 +236,7 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 6,
     status: 'active',
     badgeLabel: 'POPULAR PATH',
+    foundationRequired: ['SQL & Databases', 'Aptitude & Logic', 'Communication & Interview', 'Problem Solving'],
   },
   {
     id: 'cyber-security',
@@ -233,5 +250,6 @@ export const CAREER_ROADMAPS_LIST: CareerRoleCard[] = [
     projectCount: 5,
     status: 'coming-soon',
     badgeLabel: 'ROADMAP CURATING',
+    foundationRequired: ['CS Fundamentals', 'Linux & CLI', 'Web & APIs', 'Problem Solving'],
   },
 ];

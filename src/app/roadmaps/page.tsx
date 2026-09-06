@@ -3,6 +3,10 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { CAREER_ROADMAPS_LIST, CareerRoleCard } from '@/data/careerRoadmapsList';
+import { COMMON_FOUNDATION_CATEGORIES } from '@/data/commonFoundationData';
+import { useFoundationProgress } from '@/hooks/useFoundationProgress';
+import { CommonFoundationHero } from '@/components/roadmaps/CommonFoundationHero';
+import { FoundationRoadmap } from '@/components/roadmaps/FoundationRoadmap';
 import {
   Compass,
   ArrowLeft,
@@ -26,6 +30,8 @@ import {
   MessageSquare,
   Workflow,
   Camera,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -50,6 +56,20 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 
 export default function CareerRoadmapsHubPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFoundationOpen, setIsFoundationOpen] = useState(true);
+
+  const {
+    isTopicCompleted,
+    toggleTopic,
+    setCategoryTopics,
+    resetAllProgress,
+    getCategoryProgress,
+    totalTopicsCount,
+    completedTopicsCount,
+    progressPercentage,
+    completedCategoriesCount,
+    isAllCompleted,
+  } = useFoundationProgress();
 
   const filteredRoadmaps = CAREER_ROADMAPS_LIST.filter(
     (item) =>
@@ -57,6 +77,28 @@ export default function CareerRoadmapsHubPage() {
       item.tagline.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.keyTech.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  const handleToggleFoundationRoadmap = () => {
+    setIsFoundationOpen((prev) => {
+      const nextState = !prev;
+      if (nextState) {
+        setTimeout(() => {
+          const el = document.getElementById('foundation-roadmap-section');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      }
+      return nextState;
+    });
+  };
+
+  const scrollToSpecialization = () => {
+    const el = document.getElementById('career-specialization-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-[#006cd2] selection:text-white flex flex-col">
@@ -108,73 +150,197 @@ export default function CareerRoadmapsHubPage() {
         </header>
 
         {/* Content */}
-        <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12 space-y-12 flex-1">
-          {/* Header Banner */}
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#006cd2]/15 border border-[#006cd2]/30 text-blue-300 text-xs font-mono font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-[#006cd2]" />
-              <span>EXPLORE DEVELOPER PATHWAYS</span>
-            </div>
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight">
-              Developer Career Roadmaps
-            </h1>
-            <p className="font-sans text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl mx-auto">
-              Click any engineering role below to explore its step-by-step interactive learning roadmap, recommended
-              order of topics, curated tech stack, and hands-on project milestones.
-            </p>
+        <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 sm:py-12 space-y-14 flex-1">
+          {/* SECTION 1: TOP FEATURED CARD — COMMON SOFTWARE FOUNDATION */}
+          <CommonFoundationHero
+            isRoadmapOpen={isFoundationOpen}
+            onToggleRoadmap={handleToggleFoundationRoadmap}
+            progressPercentage={progressPercentage}
+            completedCategoriesCount={completedCategoriesCount}
+            totalCategoriesCount={COMMON_FOUNDATION_CATEGORIES.length}
+            completedTopicsCount={completedTopicsCount}
+            totalTopicsCount={totalTopicsCount}
+          />
 
-            {/* Search Input */}
-            <div className="max-w-md mx-auto pt-2">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search roadmaps, skills, or technologies (e.g. Python, SQL, React)..."
-                  className="w-full pl-11 pr-4 py-3 bg-slate-900/90 border border-slate-800 rounded-2xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#006cd2] focus:ring-1 focus:ring-[#006cd2] transition shadow-inner"
-                />
+          {/* SECTION 2: FOUNDATION ROADMAP (10 STAGES) */}
+          {isFoundationOpen && (
+            <div id="foundation-roadmap-section" className="scroll-mt-20">
+              <FoundationRoadmap
+                isTopicCompleted={isTopicCompleted}
+                onToggleTopic={toggleTopic}
+                onSetCategoryTopics={setCategoryTopics}
+                onResetAllProgress={resetAllProgress}
+                getCategoryProgress={getCategoryProgress}
+                progressPercentage={progressPercentage}
+                completedCategoriesCount={completedCategoriesCount}
+                totalCategoriesCount={COMMON_FOUNDATION_CATEGORIES.length}
+                completedTopicsCount={completedTopicsCount}
+                totalTopicsCount={totalTopicsCount}
+                isAllCompleted={isAllCompleted}
+                onScrollToSpecialization={scrollToSpecialization}
+              />
+            </div>
+          )}
+
+          {/* SECTION 3: CAREER SPECIALIZATION ROADMAPS */}
+          <div id="career-specialization-section" className="space-y-8 scroll-mt-20 pt-4">
+            {/* Header Banner */}
+            <div className="text-center space-y-4 max-w-3xl mx-auto">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#006cd2]/15 border border-[#006cd2]/30 text-blue-300 text-xs font-mono font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-[#006cd2]" />
+                <span>SPECIALIZE IN A CAREER TRACK</span>
+              </div>
+              <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
+                Developer Career Roadmaps
+              </h2>
+              <p className="font-sans text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl mx-auto">
+                Click any engineering role below to explore its step-by-step interactive learning roadmap, recommended
+                order of topics, curated tech stack, and hands-on project milestones.
+              </p>
+
+              {/* Search Input */}
+              <div className="max-w-md mx-auto pt-2">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search roadmaps, skills, or technologies (e.g. Python, SQL, React)..."
+                    className="w-full pl-11 pr-4 py-3 bg-slate-900/90 border border-slate-800 rounded-2xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#006cd2] focus:ring-1 focus:ring-[#006cd2] transition shadow-inner"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Career Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-            {filteredRoadmaps.map((card) => {
-              const isActive = card.status === 'active';
+            {/* Career Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+              {filteredRoadmaps.map((card) => {
+                const isActive = card.status === 'active';
 
-              if (isActive) {
+                if (isActive) {
+                  return (
+                    <Link
+                      key={card.id}
+                      href={`/roadmaps/${card.slug}`}
+                      className="group relative rounded-3xl p-7 bg-slate-900/80 border border-[#006cd2]/60 hover:border-[#006cd2] shadow-xl hover:shadow-2xl hover:shadow-[#006cd2]/20 transition-all duration-300 flex flex-col justify-between space-y-6 hover:-translate-y-1"
+                    >
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="w-14 h-14 rounded-2xl bg-[#006cd2]/20 border border-[#006cd2]/40 text-[#006cd2] flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform">
+                            {ICON_MAP[card.iconName] || <Code2 className="w-7 h-7" />}
+                          </div>
+                          <span className="px-3 py-1 rounded-full bg-[#006cd2] text-white text-[11px] font-mono font-bold uppercase tracking-wider shadow-sm">
+                            {card.badgeLabel || 'ACTIVE ROADMAP'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <h3 className="font-display text-2xl font-extrabold text-white group-hover:text-blue-300 transition-colors">
+                            {card.title}
+                          </h3>
+                          <p className="font-sans text-xs sm:text-sm text-slate-300 leading-relaxed">
+                            {card.tagline}
+                          </p>
+                        </div>
+
+                        {/* Foundation Required Chips */}
+                        {card.foundationRequired && card.foundationRequired.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider font-semibold block">
+                              Foundation Required:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {card.foundationRequired.map((req, rIdx) => (
+                                <span
+                                  key={rIdx}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-950/40 text-cyan-300 text-[10px] font-mono border border-cyan-800/40"
+                                >
+                                  <Check className="w-2.5 h-2.5 text-cyan-400" />
+                                  <span>{req}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tech Chips */}
+                        <div className="flex flex-wrap gap-1.5 pt-2">
+                          {card.keyTech.map((tech, tIdx) => (
+                            <span
+                              key={tIdx}
+                              className="px-2.5 py-1 rounded-lg bg-slate-950 text-slate-300 text-xs font-mono border border-slate-800"
+                            >
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-[#006cd2] group-hover:text-blue-300">
+                        <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
+                          <span>{card.stageCount} Stages</span>
+                          <span>•</span>
+                          <span>{card.projectCount} Projects</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span>Open Roadmap</span>
+                          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                }
+
                 return (
-                  <Link
+                  <div
                     key={card.id}
-                    href={`/roadmaps/${card.slug}`}
-                    className="group relative rounded-3xl p-7 bg-slate-900/80 border border-[#006cd2]/60 hover:border-[#006cd2] shadow-xl hover:shadow-2xl hover:shadow-[#006cd2]/20 transition-all duration-300 flex flex-col justify-between space-y-6 hover:-translate-y-1"
+                    className="rounded-3xl p-7 bg-slate-900/40 border border-slate-800 flex flex-col justify-between space-y-6 opacity-85 hover:border-slate-700 transition"
                   >
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="w-14 h-14 rounded-2xl bg-[#006cd2]/20 border border-[#006cd2]/40 text-[#006cd2] flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform">
+                        <div className="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 text-slate-400 flex items-center justify-center">
                           {ICON_MAP[card.iconName] || <Code2 className="w-7 h-7" />}
                         </div>
-                        <span className="px-3 py-1 rounded-full bg-[#006cd2] text-white text-[11px] font-mono font-bold uppercase tracking-wider shadow-sm">
-                          {card.badgeLabel || 'ACTIVE ROADMAP'}
+                        <span className="px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-400 text-[10px] font-mono uppercase border border-slate-700">
+                          {card.badgeLabel || 'Coming Soon'}
                         </span>
                       </div>
 
                       <div className="space-y-1.5">
-                        <h2 className="font-display text-2xl font-extrabold text-white group-hover:text-blue-300 transition-colors">
+                        <h3 className="font-display text-xl font-bold text-slate-200">
                           {card.title}
-                        </h2>
-                        <p className="font-sans text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        </h3>
+                        <p className="font-sans text-xs text-slate-400 leading-relaxed">
                           {card.tagline}
                         </p>
                       </div>
 
-                      {/* Tech Chips */}
+                      {/* Foundation Required Chips */}
+                      {card.foundationRequired && card.foundationRequired.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                            Foundation Required:
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {card.foundationRequired.map((req, rIdx) => (
+                              <span
+                                key={rIdx}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-950 text-slate-400 text-[10px] font-mono border border-slate-800/60"
+                              >
+                                <Check className="w-2.5 h-2.5 text-slate-500" />
+                                <span>{req}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap gap-1.5 pt-2">
                         {card.keyTech.map((tech, tIdx) => (
                           <span
                             key={tIdx}
-                            className="px-2.5 py-1 rounded-lg bg-slate-950 text-slate-300 text-xs font-mono border border-slate-800"
+                            className="px-2 py-0.5 rounded bg-slate-950/70 text-slate-500 text-xs font-mono border border-slate-800/60"
                           >
                             {tech}
                           </span>
@@ -182,64 +348,14 @@ export default function CareerRoadmapsHubPage() {
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-[#006cd2] group-hover:text-blue-300">
-                      <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
-                        <span>{card.stageCount} Stages</span>
-                        <span>•</span>
-                        <span>{card.projectCount} Projects</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span>Open Roadmap</span>
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                      </div>
+                    <div className="pt-4 border-t border-slate-800/60 flex items-center justify-between text-xs font-mono text-slate-500">
+                      <span>{card.stageCount} Stages</span>
+                      <span>Roadmap Curating</span>
                     </div>
-                  </Link>
+                  </div>
                 );
-              }
-
-              return (
-                <div
-                  key={card.id}
-                  className="rounded-3xl p-7 bg-slate-900/40 border border-slate-800 flex flex-col justify-between space-y-6 opacity-85 hover:border-slate-700 transition"
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 text-slate-400 flex items-center justify-center">
-                        {ICON_MAP[card.iconName] || <Code2 className="w-7 h-7" />}
-                      </div>
-                      <span className="px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-400 text-[10px] font-mono uppercase border border-slate-700">
-                        {card.badgeLabel || 'Coming Soon'}
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <h3 className="font-display text-xl font-bold text-slate-200">
-                        {card.title}
-                      </h3>
-                      <p className="font-sans text-xs text-slate-400 leading-relaxed">
-                        {card.tagline}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 pt-2">
-                      {card.keyTech.map((tech, tIdx) => (
-                        <span
-                          key={tIdx}
-                          className="px-2 py-0.5 rounded bg-slate-950/70 text-slate-500 text-xs font-mono border border-slate-800/60"
-                        >
-                          {tech}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-800/60 flex items-center justify-between text-xs font-mono text-slate-500">
-                    <span>{card.stageCount} Stages</span>
-                    <span>Roadmap Curating</span>
-                  </div>
-                </div>
-              );
-            })}
+              })}
+            </div>
           </div>
         </main>
 
@@ -247,7 +363,7 @@ export default function CareerRoadmapsHubPage() {
         <footer className="bg-slate-950 border-t border-slate-800 text-slate-500 font-mono text-xs py-8 px-6 md:px-12 mt-auto">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>© 2024 LevelUpDev • Career Roadmaps Hub</div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <Link href="/home" className="hover:text-slate-300 transition-colors">
                 Portfolio
               </Link>
