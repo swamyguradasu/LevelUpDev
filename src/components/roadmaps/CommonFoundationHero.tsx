@@ -2,36 +2,21 @@
 
 import React from 'react';
 import {
-  Sparkles,
-  ArrowRight,
-  Layers,
-  CheckCircle2,
   Rocket,
-  Compass,
-  Code2,
-  ChevronDown,
+  ArrowDown,
+  ArrowRight,
   BookOpen,
-  Target,
-  Zap,
 } from 'lucide-react';
 
 interface CommonFoundationHeroProps {
-  isRoadmapOpen: boolean;
-  onToggleRoadmap: () => void;
-  progressPercentage: number;
-  completedCategoriesCount: number;
+  onExploreClick: () => void;
   totalCategoriesCount: number;
-  completedTopicsCount: number;
   totalTopicsCount: number;
 }
 
 export function CommonFoundationHero({
-  isRoadmapOpen,
-  onToggleRoadmap,
-  progressPercentage,
-  completedCategoriesCount,
+  onExploreClick,
   totalCategoriesCount,
-  completedTopicsCount,
   totalTopicsCount,
 }: CommonFoundationHeroProps) {
   const pipelineSteps = [
@@ -43,33 +28,33 @@ export function CommonFoundationHero({
   ];
 
   return (
-    <div className="relative rounded-3xl overflow-hidden border border-[#006cd2]/50 bg-gradient-to-b from-slate-900/95 via-slate-900/80 to-slate-950/95 p-6 sm:p-8 md:p-10 shadow-2xl shadow-[#006cd2]/15">
+    <div
+      onClick={onExploreClick}
+      className="group/hero relative rounded-3xl overflow-hidden border border-[#006cd2]/50 hover:border-[#006cd2] bg-gradient-to-b from-slate-900/95 via-slate-900/80 to-slate-950/95 p-6 sm:p-8 md:p-10 shadow-2xl shadow-[#006cd2]/15 transition-all duration-300 cursor-pointer"
+    >
       {/* Background radial accent glow */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-[#006cd2]/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10 space-y-7">
-        {/* Top Tag & Progress Pill */}
+        {/* Top Tag & Stats Pill */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-blue-600/30 to-cyan-500/20 border border-[#006cd2]/40 text-cyan-300 text-xs font-mono font-bold uppercase tracking-wider shadow-inner">
             <Rocket className="w-3.5 h-3.5 text-cyan-400" />
             <span>🚀 START HERE • ESSENTIAL BASELINE</span>
           </div>
 
-          {/* User Progress Mini Badge */}
           <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-slate-950/90 border border-slate-800 text-xs font-mono">
             <span className="text-slate-400">Foundation:</span>
-            <span className="font-bold text-cyan-400">{progressPercentage}%</span>
+            <span className="font-bold text-cyan-300">{totalCategoriesCount} Core Modules</span>
             <span className="text-slate-600">•</span>
-            <span className="text-slate-300">
-              {completedCategoriesCount}/{totalCategoriesCount} Areas
-            </span>
+            <span className="text-slate-300">{totalTopicsCount}+ Topics</span>
           </div>
         </div>
 
         {/* Main Headings */}
         <div className="space-y-3 max-w-4xl">
-          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight uppercase leading-none">
+          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight uppercase leading-none group-hover/hero:text-blue-200 transition-colors">
             Common Software Foundation
           </h2>
           <p className="font-display text-base sm:text-xl font-bold text-blue-300 tracking-tight">
@@ -86,11 +71,11 @@ export function CommonFoundationHero({
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 font-mono text-xs text-slate-300">
           <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-cyan-400" />
-            <strong className="text-white">10 Core Areas</strong>
+            <strong className="text-white">{totalCategoriesCount} Core Areas</strong>
           </div>
           <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-blue-400" />
-            <strong className="text-white">100+ Topics</strong>
+            <strong className="text-white">{totalTopicsCount}+ Topics</strong>
           </div>
           <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
@@ -142,11 +127,14 @@ export function CommonFoundationHero({
 
           <button
             type="button"
-            onClick={onToggleRoadmap}
-            className="group relative inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#006cd2] to-cyan-500 hover:from-blue-600 hover:to-cyan-400 text-white font-mono font-bold text-sm shadow-xl shadow-[#006cd2]/30 hover:shadow-cyan-500/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExploreClick();
+            }}
+            className="group inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#006cd2] to-cyan-500 hover:from-blue-600 hover:to-cyan-400 text-white font-mono font-bold text-sm shadow-xl shadow-[#006cd2]/30 hover:shadow-cyan-500/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
           >
-            <span>{isRoadmapOpen ? 'Hide Foundation Roadmap' : 'Explore Foundation Roadmap'}</span>
-            <ArrowRight className={`w-4 h-4 transition-transform duration-300 ${isRoadmapOpen ? 'rotate-90' : 'group-hover:translate-x-1'}`} />
+            <span>Explore Foundation Roadmap</span>
+            <ArrowDown className="w-4 h-4 transition-transform duration-300 group-hover:translate-y-1" />
           </button>
         </div>
       </div>

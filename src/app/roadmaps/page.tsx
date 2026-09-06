@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { CAREER_ROADMAPS_LIST, CareerRoleCard } from '@/data/careerRoadmapsList';
-import { COMMON_FOUNDATION_CATEGORIES } from '@/data/commonFoundationData';
-import { useFoundationProgress } from '@/hooks/useFoundationProgress';
+import { COMMON_FOUNDATION_CATEGORIES, TOTAL_FOUNDATION_TOPICS_COUNT } from '@/data/commonFoundationData';
 import { CommonFoundationHero } from '@/components/roadmaps/CommonFoundationHero';
 import { FoundationRoadmap } from '@/components/roadmaps/FoundationRoadmap';
 import {
@@ -22,7 +21,6 @@ import {
   Brain,
   Shield,
   Search,
-  CheckCircle2,
   LineChart,
   BarChart3,
   Cpu,
@@ -31,7 +29,6 @@ import {
   Workflow,
   Camera,
   Check,
-  ChevronDown,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -56,20 +53,6 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 
 export default function CareerRoadmapsHubPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isFoundationOpen, setIsFoundationOpen] = useState(true);
-
-  const {
-    isTopicCompleted,
-    toggleTopic,
-    setCategoryTopics,
-    resetAllProgress,
-    getCategoryProgress,
-    totalTopicsCount,
-    completedTopicsCount,
-    progressPercentage,
-    completedCategoriesCount,
-    isAllCompleted,
-  } = useFoundationProgress();
 
   const filteredRoadmaps = CAREER_ROADMAPS_LIST.filter(
     (item) =>
@@ -78,19 +61,11 @@ export default function CareerRoadmapsHubPage() {
       item.keyTech.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const handleToggleFoundationRoadmap = () => {
-    setIsFoundationOpen((prev) => {
-      const nextState = !prev;
-      if (nextState) {
-        setTimeout(() => {
-          const el = document.getElementById('foundation-roadmap-section');
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 100);
-      }
-      return nextState;
-    });
+  const scrollToFoundationRoadmap = () => {
+    const el = document.getElementById('foundation-roadmap-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const scrollToSpecialization = () => {
@@ -153,34 +128,15 @@ export default function CareerRoadmapsHubPage() {
         <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 sm:py-12 space-y-14 flex-1">
           {/* SECTION 1: TOP FEATURED CARD — COMMON SOFTWARE FOUNDATION */}
           <CommonFoundationHero
-            isRoadmapOpen={isFoundationOpen}
-            onToggleRoadmap={handleToggleFoundationRoadmap}
-            progressPercentage={progressPercentage}
-            completedCategoriesCount={completedCategoriesCount}
+            onExploreClick={scrollToFoundationRoadmap}
             totalCategoriesCount={COMMON_FOUNDATION_CATEGORIES.length}
-            completedTopicsCount={completedTopicsCount}
-            totalTopicsCount={totalTopicsCount}
+            totalTopicsCount={TOTAL_FOUNDATION_TOPICS_COUNT}
           />
 
-          {/* SECTION 2: FOUNDATION ROADMAP (10 STAGES) */}
-          {isFoundationOpen && (
-            <div id="foundation-roadmap-section" className="scroll-mt-20">
-              <FoundationRoadmap
-                isTopicCompleted={isTopicCompleted}
-                onToggleTopic={toggleTopic}
-                onSetCategoryTopics={setCategoryTopics}
-                onResetAllProgress={resetAllProgress}
-                getCategoryProgress={getCategoryProgress}
-                progressPercentage={progressPercentage}
-                completedCategoriesCount={completedCategoriesCount}
-                totalCategoriesCount={COMMON_FOUNDATION_CATEGORIES.length}
-                completedTopicsCount={completedTopicsCount}
-                totalTopicsCount={totalTopicsCount}
-                isAllCompleted={isAllCompleted}
-                onScrollToSpecialization={scrollToSpecialization}
-              />
-            </div>
-          )}
+          {/* SECTION 2: FOUNDATION ROADMAP (10 STAGES) — ALWAYS VISIBLE */}
+          <div id="foundation-roadmap-section" className="scroll-mt-20">
+            <FoundationRoadmap onScrollToSpecialization={scrollToSpecialization} />
+          </div>
 
           {/* SECTION 3: CAREER SPECIALIZATION ROADMAPS */}
           <div id="career-specialization-section" className="space-y-8 scroll-mt-20 pt-4">

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FoundationCategory, FoundationTopic } from '@/data/commonFoundationData';
+import { FoundationCategory } from '@/data/commonFoundationData';
 import { RoadmapVisualFlow } from './RoadmapVisualFlow';
 import {
   Code2,
@@ -16,14 +16,9 @@ import {
   Users,
   ChevronDown,
   ChevronUp,
-  CheckCircle2,
-  Circle,
   Sparkles,
   Info,
-  CheckSquare,
-  Square,
   BookOpen,
-  ArrowRight,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -43,25 +38,12 @@ interface FoundationCategoryCardProps {
   category: FoundationCategory;
   isExpanded: boolean;
   onToggleExpand: () => void;
-  isTopicCompleted: (topicId: string) => boolean;
-  onToggleTopic: (topicId: string) => void;
-  onSetCategoryTopics: (category: FoundationCategory, markAll: boolean) => void;
-  progress: {
-    completed: number;
-    total: number;
-    percentage: number;
-    isFullyCompleted: boolean;
-  };
 }
 
 export function FoundationCategoryCard({
   category,
   isExpanded,
   onToggleExpand,
-  isTopicCompleted,
-  onToggleTopic,
-  onSetCategoryTopics,
-  progress,
 }: FoundationCategoryCardProps) {
   const [activeSubgroup, setActiveSubgroup] = useState<string>('all');
 
@@ -102,9 +84,7 @@ export function FoundationCategoryCard({
     <div
       id={`foundation-stage-${category.id}`}
       className={`rounded-3xl border transition-all duration-300 overflow-hidden ${
-        progress.isFullyCompleted
-          ? 'bg-slate-900/90 border-emerald-500/40 shadow-xl shadow-emerald-500/5'
-          : isExpanded
+        isExpanded
           ? 'bg-slate-900/95 border-[#006cd2]/70 shadow-2xl shadow-[#006cd2]/10 ring-1 ring-[#006cd2]/40'
           : 'bg-slate-900/70 border-slate-800 hover:border-slate-700 hover:bg-slate-900/90 shadow-lg'
       }`}
@@ -120,9 +100,7 @@ export function FoundationCategoryCard({
             <div className="relative flex-shrink-0">
               <div
                 className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 ${
-                  progress.isFullyCompleted
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                    : isExpanded
+                  isExpanded
                     ? 'bg-[#006cd2]/25 text-blue-300 border border-[#006cd2]/50 scale-105'
                     : 'bg-slate-800/90 text-slate-300 border border-slate-700/80'
                 }`}
@@ -136,57 +114,20 @@ export function FoundationCategoryCard({
 
             {/* Title & Tagline */}
             <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-display text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-                  {category.title}
-                </h3>
-                {progress.isFullyCompleted && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-500/40">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                    COMPLETED
-                  </span>
-                )}
-              </div>
+              <h3 className="font-display text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+                {category.title}
+              </h3>
               <p className="font-sans text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
                 {category.description}
               </p>
             </div>
           </div>
 
-          {/* Progress Pill & Expand Chevron */}
-          <div className="flex items-center justify-between sm:justify-end gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
-            <div className="text-right space-y-1">
-              <div className="flex items-center justify-end gap-2">
-                <span className="font-mono text-xs text-slate-400">
-                  <strong
-                    className={
-                      progress.isFullyCompleted
-                        ? 'text-emerald-400'
-                        : progress.completed > 0
-                        ? 'text-blue-400'
-                        : 'text-slate-300'
-                    }
-                  >
-                    {progress.completed}
-                  </strong>{' '}
-                  / {progress.total} Topics
-                </span>
-                <span className="font-mono text-xs font-bold text-slate-400">
-                  ({progress.percentage}%)
-                </span>
-              </div>
-              {/* Mini Progress Bar */}
-              <div className="w-32 sm:w-36 h-2 rounded-full bg-slate-800 overflow-hidden ml-auto">
-                <div
-                  className={`h-full transition-all duration-500 rounded-full ${
-                    progress.isFullyCompleted
-                      ? 'bg-emerald-400'
-                      : 'bg-gradient-to-r from-[#006cd2] to-cyan-400'
-                  }`}
-                  style={{ width: `${progress.percentage}%` }}
-                />
-              </div>
-            </div>
+          {/* Topics Count & Expand Trigger */}
+          <div className="flex items-center justify-between sm:justify-end gap-3.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
+            <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-300 font-semibold">
+              {category.topics.length} Topics
+            </span>
 
             <button
               type="button"
@@ -195,6 +136,7 @@ export function FoundationCategoryCard({
                   ? 'bg-[#006cd2]/20 border-[#006cd2] text-blue-300'
                   : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-white'
               }`}
+              aria-label={isExpanded ? 'Collapse section' : 'Expand section'}
             >
               {isExpanded ? (
                 <ChevronUp className="w-5 h-5 transition-transform" />
@@ -277,51 +219,26 @@ export function FoundationCategoryCard({
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs font-mono text-slate-400">
               <span>CORE TOPICS & KEY CONCEPTS ({filteredTopics.length})</span>
-              <span className="text-[11px] text-slate-400">Click checkboxes to track completion</span>
+              <span className="text-[11px] text-slate-400">Step-by-step syllabus</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {filteredTopics.map((topic, index) => {
-                const completed = isTopicCompleted(topic.id);
+                const topicNumber = index + 1 < 10 ? `0${index + 1}` : `${index + 1}`;
                 return (
                   <div
                     key={topic.id}
-                    onClick={() => onToggleTopic(topic.id)}
-                    className={`group relative rounded-2xl p-3.5 border cursor-pointer transition-all duration-200 flex items-center justify-between gap-3 ${
-                      completed
-                        ? 'bg-emerald-950/20 border-emerald-500/30 text-slate-200'
-                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300 hover:bg-slate-900'
-                    }`}
+                    className="group relative rounded-2xl p-3.5 border bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300 hover:bg-slate-900 transition-all duration-200 flex items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <button
-                        type="button"
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-all ${
-                          completed
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-sm'
-                            : 'bg-slate-950 border-slate-700 text-slate-500 group-hover:border-slate-500'
-                        }`}
-                        aria-label={completed ? 'Mark incomplete' : 'Mark complete'}
-                      >
-                        {completed ? (
-                          <CheckCircle2 className="w-4 h-4 fill-emerald-500 text-slate-950" />
-                        ) : (
-                          <Circle className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400" />
-                        )}
-                      </button>
+                      <span className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center font-mono text-xs font-bold text-slate-400 group-hover:text-cyan-300 group-hover:border-cyan-500/40 transition">
+                        {topicNumber}
+                      </span>
 
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`text-xs font-semibold leading-snug ${
-                              completed
-                                ? 'line-through text-slate-400'
-                                : 'text-white group-hover:text-blue-200'
-                            }`}
-                          >
-                            {topic.name}
-                          </span>
-                        </div>
+                        <span className="text-xs font-semibold leading-snug text-white group-hover:text-blue-200 transition">
+                          {topic.name}
+                        </span>
                         {topic.subgroup && (
                           <span className="text-[10px] font-mono text-slate-400 block truncate">
                             {topic.subgroup}
@@ -340,34 +257,13 @@ export function FoundationCategoryCard({
           </div>
 
           {/* Action Footer */}
-          <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onSetCategoryTopics(category, true)}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-slate-800 hover:border-emerald-500/30 transition flex items-center gap-1.5"
-              >
-                <CheckSquare className="w-3.5 h-3.5" />
-                <span>Mark All Complete</span>
-              </button>
-              {progress.completed > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onSetCategoryTopics(category, false)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-500/30 transition flex items-center gap-1.5"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                  <span>Clear Category</span>
-                </button>
-              )}
-            </div>
-
+          <div className="pt-3 border-t border-slate-800/80 flex items-center justify-end">
             <button
               type="button"
               onClick={onToggleExpand}
-              className="text-slate-400 hover:text-slate-200 transition flex items-center gap-1"
+              className="text-slate-400 hover:text-slate-200 transition flex items-center gap-1 text-xs font-mono"
             >
-              <span>Collapse Category</span>
+              <span>Collapse Module</span>
               <ChevronUp className="w-3.5 h-3.5" />
             </button>
           </div>

@@ -1,19 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { COMMON_FOUNDATION_CATEGORIES, FoundationCategory } from '@/data/commonFoundationData';
+import { COMMON_FOUNDATION_CATEGORIES } from '@/data/commonFoundationData';
 import { FoundationCategoryCard } from './FoundationCategoryCard';
 import {
   Layers,
   Sparkles,
   ArrowDown,
   ArrowRight,
-  CheckCircle2,
-  RotateCcw,
   Maximize2,
   Minimize2,
   Compass,
-  Trophy,
   Rocket,
   Code2,
   Cpu,
@@ -40,39 +37,10 @@ const NODE_ICONS: Record<string, React.ReactNode> = {
 };
 
 interface FoundationRoadmapProps {
-  isTopicCompleted: (topicId: string) => boolean;
-  onToggleTopic: (topicId: string) => void;
-  onSetCategoryTopics: (category: FoundationCategory, markAll: boolean) => void;
-  onResetAllProgress: () => void;
-  getCategoryProgress: (category: FoundationCategory) => {
-    completed: number;
-    total: number;
-    percentage: number;
-    isFullyCompleted: boolean;
-  };
-  progressPercentage: number;
-  completedCategoriesCount: number;
-  totalCategoriesCount: number;
-  completedTopicsCount: number;
-  totalTopicsCount: number;
-  isAllCompleted: boolean;
   onScrollToSpecialization: () => void;
 }
 
-export function FoundationRoadmap({
-  isTopicCompleted,
-  onToggleTopic,
-  onSetCategoryTopics,
-  onResetAllProgress,
-  getCategoryProgress,
-  progressPercentage,
-  completedCategoriesCount,
-  totalCategoriesCount,
-  completedTopicsCount,
-  totalTopicsCount,
-  isAllCompleted,
-  onScrollToSpecialization,
-}: FoundationRoadmapProps) {
+export function FoundationRoadmap({ onScrollToSpecialization }: FoundationRoadmapProps) {
   // Category expanded state (Default: 01 Programming open)
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     programming: true,
@@ -107,19 +75,19 @@ export function FoundationRoadmap({
 
   return (
     <div className="space-y-10">
-      {/* 1. Progress Header Card */}
-      <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-8 space-y-6 shadow-xl">
+      {/* 1. Overview Header Card */}
+      <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-8 space-y-4 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 font-bold uppercase tracking-wider">
               <Sparkles className="w-4 h-4 text-cyan-400" />
-              <span>FOUNDATION TRACKER</span>
+              <span>FOUNDATION SYLLABUS</span>
             </div>
             <h3 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              YOUR FOUNDATION PROGRESS
+              YOUR FOUNDATION ROADMAP
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 font-sans">
-              Master every core module at your own pace before diving into role-specific tracks.
+              10 interconnected engineering modules designed to build a solid baseline before selecting a specialized career track.
             </p>
           </div>
 
@@ -128,110 +96,36 @@ export function FoundationRoadmap({
             <button
               type="button"
               onClick={expandAll}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-mono transition flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-mono transition flex items-center gap-1.5"
             >
               <Maximize2 className="w-3.5 h-3.5" />
-              <span>Expand All</span>
+              <span>Expand All Modules</span>
             </button>
             <button
               type="button"
               onClick={collapseAll}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-mono transition flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-mono transition flex items-center gap-1.5"
             >
               <Minimize2 className="w-3.5 h-3.5" />
               <span>Collapse All</span>
             </button>
-            {completedTopicsCount > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Reset all foundation progress?')) {
-                    onResetAllProgress();
-                  }
-                }}
-                className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-mono transition flex items-center gap-1.5"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset</span>
-              </button>
-            )}
           </div>
         </div>
-
-        {/* Progress Metric Bars */}
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-slate-300 flex items-center gap-2 font-bold">
-              <span className="text-lg sm:text-xl text-white font-extrabold">
-                {progressPercentage}%
-              </span>{' '}
-              Complete
-            </span>
-            <span className="text-slate-400">
-              <strong className="text-cyan-300">{completedCategoriesCount}</strong> /{' '}
-              {totalCategoriesCount} Areas Completed •{' '}
-              <strong className="text-blue-300">{completedTopicsCount}</strong> / {totalTopicsCount}{' '}
-              Topics Mastered
-            </span>
-          </div>
-
-          {/* Large Multi-hue Progress Bar */}
-          <div className="w-full h-3.5 rounded-full bg-slate-950 border border-slate-800 p-0.5 overflow-hidden shadow-inner">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${
-                isAllCompleted
-                  ? 'bg-emerald-400'
-                  : 'bg-gradient-to-r from-[#006cd2] via-cyan-400 to-emerald-400'
-              }`}
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Completion Celebration State */}
-        {isAllCompleted && (
-          <div className="rounded-2xl bg-gradient-to-r from-emerald-950/40 via-emerald-900/30 to-slate-950 border border-emerald-500/50 p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 flex-shrink-0">
-                <Trophy className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="font-display text-lg font-black text-white">
-                  🎉 FOUNDATION COMPLETE!
-                </h4>
-                <p className="text-xs text-emerald-300 font-sans">
-                  You've built your core software foundation. You are now prepared to tackle any
-                  specialized career roadmap.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onScrollToSpecialization}
-              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-bold text-xs shadow-lg shadow-emerald-500/20 transition flex items-center gap-2 whitespace-nowrap"
-            >
-              <span>Your next step → Choose a Career Path</span>
-              <ArrowDown className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* 2. Connected Stage Navigator (Desktop Connected Nodes / Mobile Horizontal Carousel) */}
+      {/* 2. Connected Stage Navigator (10 Levels) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
           <span className="flex items-center gap-1.5 uppercase font-bold text-slate-300">
             <Compass className="w-4 h-4 text-[#006cd2]" />
             <span>FOUNDATION STAGE MAP (10 LEVELS)</span>
           </span>
-          <span className="text-[11px] hidden sm:inline">Click node to jump & expand</span>
+          <span className="text-[11px] hidden sm:inline">Click any stage to jump & explore</span>
         </div>
 
         {/* Node Pipeline Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-          {COMMON_FOUNDATION_CATEGORIES.map((cat, idx) => {
-            const catProgress = getCategoryProgress(cat);
+          {COMMON_FOUNDATION_CATEGORIES.map((cat) => {
             const isOpen = expandedCategories[cat.id];
 
             return (
@@ -239,9 +133,7 @@ export function FoundationRoadmap({
                 key={cat.id}
                 onClick={() => scrollToCategory(cat.id)}
                 className={`relative rounded-2xl p-3.5 text-left border transition-all duration-200 flex flex-col justify-between group ${
-                  catProgress.isFullyCompleted
-                    ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300 shadow-sm'
-                    : isOpen
+                  isOpen
                     ? 'bg-[#006cd2]/20 border-[#006cd2] text-white shadow-md shadow-[#006cd2]/20 ring-1 ring-[#006cd2]'
                     : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-900'
                 }`}
@@ -259,26 +151,9 @@ export function FoundationRoadmap({
                   <div className="font-display text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate">
                     {cat.shortName}
                   </div>
-                  <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-                    <span>
-                      {catProgress.completed}/{catProgress.total}
-                    </span>
-                    {catProgress.isFullyCompleted ? (
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                    ) : (
-                      <span>{catProgress.percentage}%</span>
-                    )}
+                  <div className="text-[10px] font-mono text-slate-400">
+                    {cat.topics.length} Topics
                   </div>
-                </div>
-
-                {/* Bottom mini indicator */}
-                <div className="w-full h-1 bg-slate-950 rounded-full mt-2 overflow-hidden">
-                  <div
-                    className={`h-full transition-all ${
-                      catProgress.isFullyCompleted ? 'bg-emerald-400' : 'bg-cyan-400'
-                    }`}
-                    style={{ width: `${catProgress.percentage}%` }}
-                  />
                 </div>
               </button>
             );
@@ -289,7 +164,6 @@ export function FoundationRoadmap({
       {/* 3. The 10 Foundation Stage Expandable Cards */}
       <div className="space-y-6">
         {COMMON_FOUNDATION_CATEGORIES.map((category) => {
-          const catProgress = getCategoryProgress(category);
           const isExpanded = !!expandedCategories[category.id];
 
           return (
@@ -298,10 +172,6 @@ export function FoundationRoadmap({
               category={category}
               isExpanded={isExpanded}
               onToggleExpand={() => toggleCategory(category.id)}
-              isTopicCompleted={isTopicCompleted}
-              onToggleTopic={onToggleTopic}
-              onSetCategoryTopics={onSetCategoryTopics}
-              progress={catProgress}
             />
           );
         })}
@@ -325,7 +195,7 @@ export function FoundationRoadmap({
             Now choose your career path.
           </p>
           <p className="text-xs sm:text-sm text-slate-300 font-sans leading-relaxed">
-            With your software fundamentals locked in, select the engineering discipline below that
+            With your software fundamentals covered, select the engineering discipline below that
             matches your passion and goals.
           </p>
         </div>
