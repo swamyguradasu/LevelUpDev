@@ -1,21 +1,22 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import {
   Rocket,
-  ArrowDown,
   ArrowRight,
+  Sparkles,
   BookOpen,
+  Layers,
+  ChevronRight,
 } from 'lucide-react';
 
 interface CommonFoundationHeroProps {
-  onExploreClick: () => void;
   totalCategoriesCount: number;
   totalTopicsCount: number;
 }
 
 export function CommonFoundationHero({
-  onExploreClick,
   totalCategoriesCount,
   totalTopicsCount,
 }: CommonFoundationHeroProps) {
@@ -28,13 +29,13 @@ export function CommonFoundationHero({
   ];
 
   return (
-    <div
-      onClick={onExploreClick}
-      className="group/hero relative rounded-3xl overflow-hidden border border-[#006cd2]/50 hover:border-[#006cd2] bg-gradient-to-b from-slate-900/95 via-slate-900/80 to-slate-950/95 p-6 sm:p-8 md:p-10 shadow-2xl shadow-[#006cd2]/15 transition-all duration-300 cursor-pointer"
+    <Link
+      href="/roadmaps/common-software-foundation"
+      className="group relative block rounded-3xl overflow-hidden border border-[#006cd2]/50 hover:border-[#006cd2] bg-gradient-to-b from-slate-900/95 via-slate-900/80 to-slate-950/95 p-6 sm:p-8 md:p-10 shadow-2xl shadow-[#006cd2]/15 transition-all duration-300 hover:shadow-cyan-500/20 hover:-translate-y-0.5"
     >
       {/* Background radial accent glow */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[#006cd2]/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[#006cd2]/15 rounded-full blur-3xl pointer-events-none group-hover:bg-[#006cd2]/25 transition-all duration-500" />
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-cyan-500/20 transition-all duration-500" />
 
       <div className="relative z-10 space-y-7">
         {/* Top Tag & Stats Pill */}
@@ -45,7 +46,7 @@ export function CommonFoundationHero({
           </div>
 
           <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-slate-950/90 border border-slate-800 text-xs font-mono">
-            <span className="text-slate-400">Foundation:</span>
+            <span className="text-slate-400">Curriculum:</span>
             <span className="font-bold text-cyan-300">{totalCategoriesCount} Core Modules</span>
             <span className="text-slate-600">•</span>
             <span className="text-slate-300">{totalTopicsCount}+ Topics</span>
@@ -54,7 +55,7 @@ export function CommonFoundationHero({
 
         {/* Main Headings */}
         <div className="space-y-3 max-w-4xl">
-          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight uppercase leading-none group-hover/hero:text-blue-200 transition-colors">
+          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight uppercase leading-none group-hover:text-blue-200 transition-colors">
             Common Software Foundation
           </h2>
           <p className="font-display text-base sm:text-xl font-bold text-blue-300 tracking-tight">
@@ -122,22 +123,15 @@ export function CommonFoundationHero({
         <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           <div className="text-xs text-slate-300 font-sans">
             <span className="font-semibold text-white">Everyone starts with the foundation.</span>{' '}
-            Then you choose your path.
+            Click to open the complete interactive syllabus.
           </div>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onExploreClick();
-            }}
-            className="group inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#006cd2] to-cyan-500 hover:from-blue-600 hover:to-cyan-400 text-white font-mono font-bold text-sm shadow-xl shadow-[#006cd2]/30 hover:shadow-cyan-500/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-          >
+          <div className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#006cd2] to-cyan-500 group-hover:from-blue-600 group-hover:to-cyan-400 text-white font-mono font-bold text-sm shadow-xl shadow-[#006cd2]/30 group-hover:shadow-cyan-500/30 transition-all duration-300">
             <span>Explore Foundation Roadmap</span>
-            <ArrowDown className="w-4 h-4 transition-transform duration-300 group-hover:translate-y-1" />
-          </button>
+            <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1.5" />
+          </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
