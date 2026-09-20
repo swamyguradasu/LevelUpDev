@@ -2,7 +2,7 @@
   "skillId": "python",
   "title": "Python Programming",
   "icon": "python",
-  "description": "Master Python from fundamental syntax and control flow to data structures, string manipulation, and function definitions.",
+  "description": "Master Python from fundamental syntax, data structures, and function definitions to OOP, exception handling, and generator pipelines.",
   "modules": [
     {
       "moduleId": "m1",
@@ -312,6 +312,596 @@
             "question": "What unique property distinguishes a set from a list in Python?",
             "options": ["Sets allow index slicing", "Sets contain no duplicate elements", "Sets are immutable", "Sets preserve order"],
             "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m8",
+      "title": "Module 8: Functions Advanced",
+      "topics": [
+        {
+          "name": "Default Arguments",
+          "summary": "Default arguments assign fallback values to function parameters, making arguments optional and avoiding function overloading."
+        },
+        {
+          "name": "Keyword Arguments",
+          "summary": "Keyword arguments pass values by parameter name for order independence, explicit code documentation, and skipping default values."
+        },
+        {
+          "name": "*args (Variable Positional)",
+          "summary": "The *args syntax bundles arbitrary extra positional arguments into an immutable tuple for variadic function handling."
+        },
+        {
+          "name": "**kwargs (Variable Keyword)",
+          "summary": "The **kwargs syntax bundles arbitrary named arguments into a dictionary for flexible configuration and parameter forwarding."
+        },
+        {
+          "name": "Lambda Functions",
+          "summary": "Anonymous, inline single-expression functions commonly used with higher-order functions like map(), filter(), and sorted()."
+        },
+        {
+          "name": "Recursion",
+          "summary": "Functions that call themselves to solve problems via divide-and-conquer using base and recursive cases."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m8-q1",
+            "question": "What data type is `args` received as inside a function defined with `def f(*args):`?",
+            "options": ["list", "tuple", "dict", "set"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m8-q2",
+            "question": "What data type is `kwargs` received as inside a function defined with `def f(**kwargs):`?",
+            "options": ["list", "tuple", "dict", "str"],
+            "correctAnswer": 2
+          },
+          {
+            "id": "m8-q3",
+            "question": "What error occurs if a recursive function lacks a base case?",
+            "options": ["ValueError", "RecursionError", "IndexError", "ZeroDivisionError"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m9",
+      "title": "Module 9: Modules & Packages",
+      "topics": [
+        {
+          "name": "Importing Modules",
+          "summary": "Importing code from other files, managing namespaces with aliases, and understanding sys.modules caching."
+        },
+        {
+          "name": "Python pip",
+          "summary": "Package installation, requirements.txt, and dependency management using Python's official package installer."
+        },
+        {
+          "name": "Creating Your Own Module",
+          "summary": "Structuring multi-file Python applications and using the if __name__ == '__main__' entry-point idiom."
+        },
+        {
+          "name": "Standard Library Overview",
+          "summary": "Exploring essential built-in modules: math, random, datetime, os, sys, and collections."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m9-q1",
+            "question": "Which command installs packages from a requirements.txt file?",
+            "options": ["pip install -r requirements.txt", "pip install requirements.txt", "pip get requirements.txt", "pip load requirements.txt"],
+            "correctAnswer": 0
+          },
+          {
+            "id": "m9-q2",
+            "question": "What is __name__ set to when a script is executed directly as the entry point?",
+            "options": ["'__main__'", "'__module__'", "'root'", "'main.py'"],
+            "correctAnswer": 0
+          },
+          {
+            "id": "m9-q3",
+            "question": "Which standard library class counts element frequencies in an iterable?",
+            "options": ["collections.Counter", "math.count", "sys.counter", "os.tally"],
+            "correctAnswer": 0
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m10",
+      "title": "Module 10: File Handling",
+      "topics": [
+        {
+          "name": "Reading Text Files",
+          "summary": "Opening files in read mode, read(), readline(), and readlines() line processing."
+        },
+        {
+          "name": "Writing Text Files",
+          "summary": "Write ('w') and append ('a') file modes, write(), writelines(), and output buffers."
+        },
+        {
+          "name": "The with Statement",
+          "summary": "Context managers and guaranteed automatic file closure upon block exit."
+        },
+        {
+          "name": "CSV Files",
+          "summary": "Processing comma-separated tabular data with csv.reader, csv.writer, DictReader, and DictWriter."
+        },
+        {
+          "name": "JSON Files",
+          "summary": "Serialization and deserialization with json.load, json.dump, json.loads, and json.dumps."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m10-q1",
+            "question": "Which mode opens a file for writing and overwrites all existing content?",
+            "options": ["'r'", "'w'", "'a'", "'x'"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m10-q2",
+            "question": "Why is the with statement preferred for file operations?",
+            "options": ["It automatically closes the file even if exceptions occur", "It speeds up disk I/O", "It encrypts files", "It enables binary mode"],
+            "correctAnswer": 0
+          },
+          {
+            "id": "m10-q3",
+            "question": "Which function converts a Python dictionary into a JSON formatted string?",
+            "options": ["json.dumps()", "json.loads()", "json.dump()", "json.load()"],
+            "correctAnswer": 0
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m11",
+      "title": "Module 11: Exception Handling",
+      "topics": [
+        {
+          "name": "The try Block",
+          "summary": "Wrapping risky runtime code to detect exceptions and prevent program crashes."
+        },
+        {
+          "name": "The except Block",
+          "summary": "Catching specific errors, multi-exception handlers, and exception hierarchy inspection."
+        },
+        {
+          "name": "The else Block",
+          "summary": "Executing success-only code when no exceptions were raised in the try block."
+        },
+        {
+          "name": "The finally Block",
+          "summary": "Guaranteed execution for cleanup, teardown, and resource release."
+        },
+        {
+          "name": "Custom Exceptions",
+          "summary": "Defining domain-specific exception classes inheriting from Exception and using raise."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m11-q1",
+            "question": "Which block executes ONLY if no exceptions were raised in the try block?",
+            "options": ["except", "else", "finally", "catch"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m11-q2",
+            "question": "Which block is GUARANTEED to execute under all circumstances for cleanup?",
+            "options": ["finally", "else", "except", "always"],
+            "correctAnswer": 0
+          },
+          {
+            "id": "m11-q3",
+            "question": "Which keyword is used to trigger an exception in Python?",
+            "options": ["throw", "raise", "trigger", "error"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m12",
+      "title": "Module 12: Object-Oriented Programming I",
+      "topics": [
+        {
+          "name": "Classes",
+          "summary": "Defining class blueprints, encapsulation, methods, and attributes."
+        },
+        {
+          "name": "Objects",
+          "summary": "Instantiating objects, memory identity with id and is, and state isolation."
+        },
+        {
+          "name": "The __init__ Constructor",
+          "summary": "Initializing object state, constructor parameters, and understanding self."
+        },
+        {
+          "name": "Instance Attributes",
+          "summary": "Instance-specific variables stored in instance.__dict__."
+        },
+        {
+          "name": "Class Attributes",
+          "summary": "Shared class-level state and understanding class attribute shadowing."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m12-q1",
+            "question": "What is the mandatory first parameter of instance methods in Python?",
+            "options": ["this", "self", "cls", "instance"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m12-q2",
+            "question": "What must the __init__ method return in Python?",
+            "options": ["self", "None", "dict", "True"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m12-q3",
+            "question": "Where are class attributes defined?",
+            "options": ["Directly inside the class body outside methods", "Inside __init__", "In global scope", "In __del__"],
+            "correctAnswer": 0
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m13",
+      "title": "Module 13: Object-Oriented Programming II",
+      "topics": [
+        {
+          "name": "Inheritance",
+          "summary": "Parent/child classes, method overriding, and super() constructor chaining."
+        },
+        {
+          "name": "Polymorphism",
+          "summary": "Uniform interfaces, duck typing, and runtime dynamic method dispatch."
+        },
+        {
+          "name": "Encapsulation",
+          "summary": "Public, protected (_var), private (__var) name mangling, and @property getters/setters."
+        },
+        {
+          "name": "Magic / Dunder Methods",
+          "summary": "Operator overloading with __str__, __repr__, __len__, __add__, and __eq__."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m13-q1",
+            "question": "Which function delegates execution to the parent class method?",
+            "options": ["parent()", "super()", "base()", "inherit()"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m13-q2",
+            "question": "Which decorator defines a managed getter property on a method in Python?",
+            "options": ["@getter", "@property", "@attribute", "@field"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m13-q3",
+            "question": "Which dunder method is called by the built-in len() function?",
+            "options": ["__length__", "__len__", "__size__", "__count__"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m14",
+      "title": "Module 14: Comprehensions, Iterators & Generators",
+      "topics": [
+        {
+          "name": "List Comprehensions",
+          "summary": "Concise sequence creation, transformation, filtering, and matrix flattening."
+        },
+        {
+          "name": "Dictionary Comprehensions",
+          "summary": "Constructing and transforming dictionaries with {k: v for ...} syntax."
+        },
+        {
+          "name": "Set Comprehensions",
+          "summary": "Creating deduplicated unique sets with {x for ...} syntax."
+        },
+        {
+          "name": "Iterators",
+          "summary": "The Iterator protocol (__iter__ and __next__), iter(), next(), and StopIteration."
+        },
+        {
+          "name": "Generators",
+          "summary": "Lazy evaluation, generator expressions, and O(1) memory streaming."
+        },
+        {
+          "name": "The yield Statement",
+          "summary": "Pausing/resuming generator state, infinite sequences, and data pipelines."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m14-q1",
+            "question": "What exception is raised when an iterator is completely exhausted?",
+            "options": ["IndexError", "StopIteration", "EOFError", "GeneratorExit"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m14-q2",
+            "question": "What syntax creates a Generator Expression?",
+            "options": ["[x for x in seq]", "(x for x in seq)", "{x for x in seq}", "<x for x in seq>"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m14-q3",
+            "question": "What statement converts a normal function into a generator in Python?",
+            "options": ["return", "yield", "generate", "stream"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m15",
+      "title": "Module 15: Regular Expressions",
+      "topics": [
+        {
+          "name": "re Module Basics",
+          "summary": "Importing re, raw strings (r''), and fundamental pattern mechanics."
+        },
+        {
+          "name": "Pattern Matching",
+          "summary": "Character classes, quantifiers (*, +, ?, {n,m}), anchors (^, $), and capture groups."
+        },
+        {
+          "name": "search()",
+          "summary": "Finding first pattern occurrence anywhere in a string and extracting Match object groups."
+        },
+        {
+          "name": "findall()",
+          "summary": "Extracting all matching substrings into a list of occurrences."
+        },
+        {
+          "name": "sub()",
+          "summary": "Replacing regex pattern matches with substitution strings and transformation callbacks."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m15-q1",
+            "question": "Which quantifier matches one or more occurrences in regular expressions?",
+            "options": ["*", "+", "?", "{0,1}"],
+            "correctAnswer": 1
+          },
+          {
+            "id": "m15-q2",
+            "question": "Why should raw strings (r'') be used when defining regex patterns in Python?",
+            "options": ["To make regex execute 10x faster", "To prevent Python string literal backslash escaping collisions", "Raw strings are required by PEP 8", "To convert strings to integers"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m16",
+      "title": "Module 16: Decorators & Context Managers",
+      "topics": [
+        {
+          "name": "Higher-Order Functions",
+          "summary": "First-class functions, passing functions as arguments, and closures."
+        },
+        {
+          "name": "Decorator Basics",
+          "summary": "The @ syntax, wrapper functions, and preserving metadata with @functools.wraps."
+        },
+        {
+          "name": "Decorators with Arguments",
+          "summary": "Creating three-level parameterized decorator factories."
+        },
+        {
+          "name": "Context Managers",
+          "summary": "The with statement protocol, __enter__, __exit__, and guaranteed cleanup."
+        },
+        {
+          "name": "Custom Context Managers",
+          "summary": "Building context managers using class protocols and the @contextlib.contextmanager generator."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m16-q1",
+            "question": "Why should @functools.wraps(func) be used inside custom decorator wrappers?",
+            "options": ["To compile code to C", "To preserve the original function name and docstring metadata", "To enforce type hints", "To allow recursion"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m17",
+      "title": "Module 17: Working with APIs",
+      "topics": [
+        {
+          "name": "The requests Module",
+          "summary": "Installing and using Python's requests library for HTTP communication."
+        },
+        {
+          "name": "HTTP GET & POST",
+          "summary": "Query params, JSON payloads, request headers, and authentication."
+        },
+        {
+          "name": "Status Codes & Error Handling",
+          "summary": "Interpreting status codes, raise_for_status(), timeouts, and network exceptions."
+        },
+        {
+          "name": "Working with JSON APIs",
+          "summary": "Parsing response.json() into native Python dictionaries and lists."
+        },
+        {
+          "name": "Building a Simple API Client",
+          "summary": "Designing modular API client wrapper classes with robust exception handling."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m17-q1",
+            "question": "Which method on a requests Response object raises an HTTPError for 4xx or 5xx codes?",
+            "options": ["raise_error()", "raise_for_status()", "check_status()", "throw_exception()"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m18",
+      "title": "Module 18: Databases with Python",
+      "topics": [
+        {
+          "name": "SQLite Basics",
+          "summary": "Embedded databases, sqlite3 module, connections, and cursors."
+        },
+        {
+          "name": "CRUD Operations",
+          "summary": "CREATE TABLE, INSERT, SELECT, UPDATE, DELETE in SQLite."
+        },
+        {
+          "name": "Parameterized Queries",
+          "summary": "Preventing SQL injection vulnerabilities using parameterized ? tuples."
+        },
+        {
+          "name": "Database Best Practices",
+          "summary": "Transactions, commit/rollback, index optimization, and Row factories."
+        },
+        {
+          "name": "Integrating Database with Python Applications",
+          "summary": "Repository pattern and building database-backed domain service layers."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m18-q1",
+            "question": "Why must you always use parameterized queries with ? placeholders in sqlite3?",
+            "options": ["To make the query lowercase", "To prevent SQL injection attacks and handle data escaping safely", "Because SQLite cannot read strings", "To enable multi-threading"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m19",
+      "title": "Module 19: Virtual Environments & Project Structure",
+      "topics": [
+        {
+          "name": "Why Virtual Environments Matter",
+          "summary": "Dependency conflicts, system isolation, and version locking."
+        },
+        {
+          "name": "Creating Virtual Environments with venv",
+          "summary": "python -m venv .venv, activation across operating systems, and deactivation."
+        },
+        {
+          "name": "pip freeze & requirements.txt",
+          "summary": "Exporting dependencies, pinning package versions, and batch installations."
+        },
+        {
+          "name": "Structuring a Python Project",
+          "summary": "Standard src/ layout, tests/, .gitignore, and pyproject.toml configuration."
+        },
+        {
+          "name": "Environment Variables & Configuration",
+          "summary": "Loading configuration via os.environ and python-dotenv (.env files)."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m19-q1",
+            "question": "Which command freezes installed project dependencies into requirements.txt?",
+            "options": ["pip export > requirements.txt", "pip freeze > requirements.txt", "python save reqs", "pip dump"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m20",
+      "title": "Module 20: Testing & Debugging",
+      "topics": [
+        {
+          "name": "Why Testing Matters",
+          "summary": "Bug prevention, regression safety, and test-driven development workflows."
+        },
+        {
+          "name": "unittest Framework",
+          "summary": "TestCase, setUp(), tearDown(), and test runner methods."
+        },
+        {
+          "name": "pytest Basics",
+          "summary": "Simple test_ functions, plain assertions, fixtures, and pytest CLI runner."
+        },
+        {
+          "name": "assert Statements & Test Cases",
+          "summary": "Testing boundary values, expected exceptions with pytest.raises(), and parametrize."
+        },
+        {
+          "name": "Debugging Techniques",
+          "summary": "Reading tracebacks, pdb breakpoint(), print debugging, and logging module."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m20-q1",
+            "question": "In pytest, how do you verify that a function raises a specific exception?",
+            "options": ["assert raises(Exception):", "with pytest.raises(ExpectedException):", "try ... catch Exception", "pytest.expect_error()"],
+            "correctAnswer": 1
+          }
+        ]
+      }
+    },
+    {
+      "moduleId": "m21",
+      "title": "Module 21: Python Capstone Project",
+      "topics": [
+        {
+          "name": "Capstone Project Selection & Scope",
+          "summary": "Choose from 5 industry-grade project tracks or define a custom scope."
+        },
+        {
+          "name": "System Architecture & Data Modeling",
+          "summary": "Design SQLite relational schema, OOP class structures, and layered modules."
+        },
+        {
+          "name": "Implementation & Automated Testing",
+          "summary": "Implement business logic, regex validation, custom decorators, and pytest test suites."
+        },
+        {
+          "name": "Verification & Capstone Certification",
+          "summary": "Complete the 10-point checklist, push to GitHub, and submit for evaluation."
+        }
+      ],
+      "assessment": {
+        "questions": [
+          {
+            "id": "m21-q1",
+            "question": "What is required before submitting the Python Capstone project for certification?",
+            "options": ["Ensuring all automated tests pass, requirements.txt is included, and code is in a public GitHub repository", "Deleting all test files", "Hardcoding database credentials", "Removing documentation"],
+            "correctAnswer": 0
           }
         ]
       }

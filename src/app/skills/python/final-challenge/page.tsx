@@ -67,12 +67,12 @@ export default function PythonFinalChallengePage() {
     loadData();
   }, [userData]);
 
-  // Check if Module 7 is completed before allowing access
+  // Check if Module 14 is completed before allowing access
   const isUnlocked = useMemo(() => {
     if (!dynamicData) return false;
     const pyProgress = dynamicData.progress?.python || {};
-    const mod7Record = pyProgress['m7'] || pyProgress['module-7'];
-    return !!mod7Record?.assignmentPassed || mod7Record?.status === 'completed';
+    const mod14Record = pyProgress['m14'] || pyProgress['module-14'];
+    return !!mod14Record?.assignmentPassed || mod14Record?.status === 'completed';
   }, [dynamicData]);
 
   const handleCopySample = () => {

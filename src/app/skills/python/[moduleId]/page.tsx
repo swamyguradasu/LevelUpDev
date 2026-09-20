@@ -53,13 +53,34 @@ export default function PythonModulePage() {
   }, [userData, loading, router]);
 
   useEffect(() => {
+    if (moduleMeta?.isCapstone) {
+      router.replace('/skills/python/m21');
+    }
+  }, [moduleMeta, router]);
+
+  useEffect(() => {
+    let mounted = true;
     async function loadData() {
       if (userData?.email) {
         const d = await fetchUserDynamicData(userData.email);
-        setDynamicData(d);
+        if (mounted) setDynamicData(d);
       }
     }
     loadData();
+
+    const handleUpdate = (e: any) => {
+      if (e?.detail?.data) {
+        setDynamicData(e.detail.data);
+      } else {
+        loadData();
+      }
+    };
+
+    window.addEventListener('levelupdev:dynamic_update', handleUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener('levelupdev:dynamic_update', handleUpdate);
+    };
   }, [userData]);
 
   // Compute unlock & completion status for all modules to protect routes and navigation
