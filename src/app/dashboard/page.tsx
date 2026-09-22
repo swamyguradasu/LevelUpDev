@@ -22,6 +22,10 @@ import {
 } from '@/lib/internshipStorage';
 import { InternshipApplication } from '@/data/internshipsData';
 import {
+  getUserResourceRecords,
+  UserCareerHubResourceRecord,
+} from '@/lib/careerHubStorage';
+import {
   calculateDSAStats,
   calculateCareerReadiness,
   generateRecommendedActions,
@@ -56,6 +60,7 @@ import {
   Lightbulb,
   Check,
   KeyRound,
+  Compass,
 } from 'lucide-react';
 
 const CATEGORY_ICON_MAP: Record<string, React.ReactNode> = {
@@ -78,6 +83,7 @@ export default function StudentDashboardPage() {
   const [foundationLevels, setFoundationLevels] = useState<FoundationLevel[]>([]);
   const [dailyChallenges, setDailyChallenges] = useState<DailyChallenge[]>([]);
   const [userApplications, setUserApplications] = useState<InternshipApplication[]>([]);
+  const [userCareerRecords, setUserCareerRecords] = useState<UserCareerHubResourceRecord[]>([]);
 
   // LeetCode Sync state
   const [leetcodeInput, setLeetcodeInput] = useState('');
@@ -98,14 +104,28 @@ export default function StudentDashboardPage() {
     setFoundationLevels(getAllFoundationLevels());
     setDailyChallenges(getAllDailyChallenges());
 
-    if (userData?.email) {
-      getApplicationsByUser(userData.email).then((apps) => {
+    const uid = userData?.email || userData?.uid;
+    if (uid) {
+      getApplicationsByUser(uid).then((apps) => {
         setUserApplications(apps);
       });
-      if (userData.leetcodeId) {
+      getUserResourceRecords(uid).then((records) => {
+        setUserCareerRecords(records);
+      });
+      if (userData?.leetcodeId) {
         setLeetcodeInput(userData.leetcodeId);
       }
     }
+
+    const handleCareerUpdated = () => {
+      if (uid) {
+        getUserResourceRecords(uid).then((records) => {
+          setUserCareerRecords(records);
+        });
+      }
+    };
+    window.addEventListener('career_resources_updated', handleCareerUpdated);
+    return () => window.removeEventListener('career_resources_updated', handleCareerUpdated);
   }, [userData]);
 
   // Compute dynamic statistics
@@ -114,8 +134,8 @@ export default function StudentDashboardPage() {
   }, [userData, foundationLevels, dailyChallenges]);
 
   const careerReadiness: CareerReadinessReport = useMemo(() => {
-    return calculateCareerReadiness(userData, allSkills, foundationLevels, userApplications);
-  }, [userData, allSkills, foundationLevels, userApplications]);
+    return calculateCareerReadiness(userData, allSkills, foundationLevels, userApplications, userCareerRecords);
+  }, [userData, allSkills, foundationLevels, userApplications, userCareerRecords]);
 
   const recommendedActions: RecommendedAction[] = useMemo(() => {
     return generateRecommendedActions(userData, foundationLevels, dsaStats, careerReadiness, userApplications);
@@ -204,7 +224,7 @@ export default function StudentDashboardPage() {
               Career Roadmaps
             </Link>
             <Link className="text-slate-300 hover:text-white transition" href="/internships">
-              Internships
+              Career Hub
             </Link>
             <Link className="text-slate-300 hover:text-white transition" href="/skills">
               Skills Trail
@@ -332,6 +352,55 @@ export default function StudentDashboardPage() {
                   <span className="text-[10px] font-mono text-slate-500 block">Active Days</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ======================================================================= */}
+          {/* CAREER HUB SUMMARY CARD */}
+          {/* ======================================================================= */}
+          <div className="rounded-3xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/40 border border-blue-900/40 p-6 sm:p-8 backdrop-blur-xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold">
+                <Compass className="w-3.5 h-3.5" />
+                <span>Career Hub</span>
+              </div>
+              <h3 className="text-xl font-bold text-white font-display">
+                Curated External Credentials &amp; Learning Paths
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-400 max-w-2xl leading-relaxed">
+                Connect your career goals with recognized industry certifications, practical badges, hands-on sandboxes, and portfolio capstones.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+              <div className="flex items-center gap-4 text-xs font-mono">
+                <div className="text-center p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <span className="text-lg sm:text-xl font-black text-emerald-400 block">
+                    {userCareerRecords.filter((r) => r.planStatus === 'completed').length}
+                  </span>
+                  <span className="text-slate-400 text-[10px]">Completed</span>
+                </div>
+                <div className="text-center p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <span className="text-lg sm:text-xl font-black text-cyan-400 block">
+                    {userCareerRecords.filter((r) => r.planStatus === 'in_progress').length}
+                  </span>
+                  <span className="text-slate-400 text-[10px]">In Progress</span>
+                </div>
+                <div className="text-center p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <span className="text-lg sm:text-xl font-black text-amber-400 block">
+                    {userCareerRecords.filter((r) => r.isSaved).length}
+                  </span>
+                  <span className="text-slate-400 text-[10px]">Saved</span>
+                </div>
+              </div>
+
+              <Link
+                href="/internships"
+                className="flex items-center gap-2 py-3 px-5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-xs font-bold text-white shadow-lg shadow-blue-500/20 transition active:scale-95 whitespace-nowrap"
+              >
+                <span>Open Career Hub</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           </div>
 

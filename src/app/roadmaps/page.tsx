@@ -107,7 +107,7 @@ export default function CareerRoadmapsHubPage() {
                 href="/internships"
                 className="text-xs font-mono text-slate-400 hover:text-white px-3 py-1.5 rounded-xl border border-slate-800 hover:bg-slate-900 transition"
               >
-                🎓 Internships
+                🧭 Career Hub
               </Link>
               <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400">
                 <Compass className="w-4 h-4 text-[#006cd2]" />

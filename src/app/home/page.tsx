@@ -575,7 +575,7 @@ export default function HomePage() {
               Career Roadmaps
             </Link>
             <Link className="text-slate-300 hover:text-white transition" href="/internships">
-              Internships
+              Career Hub
             </Link>
             <Link className="text-slate-300 hover:text-white transition" href="/skills">
               Skills Trail

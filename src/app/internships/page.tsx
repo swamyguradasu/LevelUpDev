@@ -1,939 +1,1049 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import {
-  INTERNSHIP_OPPORTUNITIES,
-  InternshipOpportunity,
-  InternshipApplication,
-  ApplicationStatus,
-} from '@/data/internshipsData';
+  CareerHubResource,
+  CareerPathId,
+  ProviderId,
+  DifficultyLevel,
+  CostType,
+  ResourceType,
+  getAllActiveResources,
+  calculateCatalogStats,
+  filterResources,
+  PROVIDER_LIST,
+  CAREER_PATHS_LIST,
+  CAREER_PATHS_CATALOG,
+  matchStudentCareerPath,
+  DETAILED_CAREER_PATHS,
+  DetailedCareerPath,
+} from '@/data/careerHub';
+import ResourceCard from '@/components/career-hub/ResourceCard';
+import ResourceDetailModal from '@/components/career-hub/ResourceDetailModal';
+import ResourceGlossaryCard from '@/components/career-hub/ResourceGlossaryCard';
+import CareerPathCard from '@/components/career-hub/CareerPathCard';
+import CareerPathJourneyModal from '@/components/career-hub/CareerPathJourneyModal';
+import MyResourcesManager from '@/components/career-hub/MyResourcesManager';
+import CareerMatchBanner from '@/components/career-hub/CareerMatchBanner';
+import RecommendedNextCard from '@/components/career-hub/RecommendedNextCard';
+import ResourceCompareModal from '@/components/career-hub/ResourceCompareModal';
 import {
-  getInternshipApplications,
-  getApplicationsByUser,
-  submitInternshipApplication,
-} from '@/lib/internshipStorage';
-import { isAdminEmail } from '@/lib/content';
-import {
-  Briefcase,
-  GraduationCap,
   Sparkles,
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  Clock,
-  MapPin,
   Search,
-  Filter,
-  Code2,
-  LineChart,
-  Brain,
-  Globe,
-  X,
-  Send,
-  Building,
-  AlertCircle,
-  FileCheck2,
-  RefreshCw,
-  UserCheck,
+  ShieldCheck,
+  Compass,
+  Award,
+  BookOpen,
+  Layers,
+  Flame,
+  RotateCcw,
+  Bookmark,
+  Zap,
+  Target,
   ChevronRight,
-  Laptop,
+  Cpu,
+  ArrowRight,
+  FolderGit2,
+  CheckSquare,
+  Check,
+  Clock,
+  ExternalLink,
+  Eye,
+  X,
+  Filter,
 } from 'lucide-react';
+import { isPlacementPrepAllowed, isEnglishCareerAllowed } from '@/lib/content';
+import {
+  UserCareerHubResourceRecord,
+  ResourcePlanStatus,
+  getUserResourceRecords,
+  toggleSaveResource,
+  updateResourcePlanStatus,
+  getRecentlyViewedResourceIds,
+  addRecentlyViewedResourceId,
+  trackCareerHubMetric,
+} from '@/lib/careerHubStorage';
 
-const ICON_MAP: Record<string, React.ReactNode> = {
-  Code2: <Code2 className="w-6 h-6 text-[#006cd2]" />,
-  LineChart: <LineChart className="w-6 h-6 text-emerald-400" />,
-  Brain: <Brain className="w-6 h-6 text-purple-400" />,
-  Globe: <Globe className="w-6 h-6 text-cyan-400" />,
-  Sparkles: <Sparkles className="w-6 h-6 text-amber-400" />,
-};
+type TabType =
+  | 'recommended'
+  | 'career-paths'
+  | 'free'
+  | 'certifications'
+  | 'courses'
+  | 'badges'
+  | 'hands-on'
+  | 'my-resources';
 
-export default function InternshipsPage() {
+export default function CareerHubPage() {
   const { userData } = useAuth();
 
-  // Active view tab: 'explore' | 'my-applications'
-  const [activeTab, setActiveTab] = useState<'explore' | 'my-applications'>('explore');
+  // Navigation Tabs
+  const [activeTab, setActiveTab] = useState<TabType>('recommended');
 
-  // Search & Filters
+  // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedProvider, setSelectedProvider] = useState<ProviderId | 'all'>('all');
+  const [selectedCareer, setSelectedCareer] = useState<CareerPathId | 'all'>('all');
+  const [selectedLevel, setSelectedLevel] = useState<DifficultyLevel | 'all'>('all');
+  const [selectedCost, setSelectedCost] = useState<CostType | 'all'>('all');
 
-  // Modal States
-  const [selectedInternship, setSelectedInternship] = useState<InternshipOpportunity | null>(null);
-  const [isApplying, setIsApplying] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedApp, setSubmittedApp] = useState<InternshipApplication | null>(null);
-  const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  // Interactive Modals & Active Records
+  const [selectedResource, setSelectedResource] = useState<CareerHubResource | null>(null);
+  const [selectedCareerJourney, setSelectedCareerJourney] = useState<DetailedCareerPath | null>(null);
+  const [userResourceRecords, setUserResourceRecords] = useState<UserCareerHubResourceRecord[]>([]);
 
-  // Form inputs
-  const [formName, setFormName] = useState('');
-  const [formEmail, setFormEmail] = useState('');
-  const [formPhone, setFormPhone] = useState('');
-  const [formEducation, setFormEducation] = useState('');
-  const [formSkills, setFormSkills] = useState('');
-  const [formError, setFormError] = useState('');
+  // Smart Feature States
+  const [inspectedCareerId, setInspectedCareerId] = useState<CareerPathId | null>(null);
+  const [freeOnlyMode, setFreeOnlyMode] = useState(false);
+  const [comparedResourceIds, setComparedResourceIds] = useState<string[]>([]);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>([]);
+  const [externalLinkToast, setExternalLinkToast] = useState<{ name: string; domain: string } | null>(null);
 
-  // Applications list
-  const [myApplications, setMyApplications] = useState<InternshipApplication[]>([]);
-  const [loadingApps, setLoadingApps] = useState(true);
+  // Load all active catalog resources
+  const activeCatalog = useMemo(() => getAllActiveResources(), []);
+  const allCareerPaths = useMemo(() => Object.values(DETAILED_CAREER_PATHS), []);
 
-  // Load user applications
-  const loadApplications = async () => {
-    setLoadingApps(true);
-    const identifier = userData?.email || userData?.uid || 'guest';
-    const list = await getApplicationsByUser(identifier);
-    setMyApplications(list);
-    setLoadingApps(false);
-  };
+  const userId = userData?.email || userData?.uid || 'guest_user';
+
+  // Load student tracking records
+  const loadUserRecords = useCallback(async () => {
+    if (!userId) return;
+    const records = await getUserResourceRecords(userId);
+    setUserResourceRecords(records);
+  }, [userId]);
 
   useEffect(() => {
-    loadApplications();
+    loadUserRecords();
 
-    // Listen for updates from other tabs / admin actions
-    const handleUpdate = () => loadApplications();
-    window.addEventListener('internship_applications_updated', handleUpdate);
-    return () => window.removeEventListener('internship_applications_updated', handleUpdate);
+    const handleUpdated = () => loadUserRecords();
+    window.addEventListener('career_resources_updated', handleUpdated);
+    return () => window.removeEventListener('career_resources_updated', handleUpdated);
+  }, [loadUserRecords]);
+
+  // Load recently viewed resources
+  useEffect(() => {
+    setRecentlyViewedIds(getRecentlyViewedResourceIds());
+    const handleRecent = () => setRecentlyViewedIds(getRecentlyViewedResourceIds());
+    window.addEventListener('career_recent_updated', handleRecent);
+    return () => window.removeEventListener('career_recent_updated', handleRecent);
+  }, []);
+
+  // Handle Save / Bookmark
+  const handleToggleSave = async (resource: CareerHubResource) => {
+    const isCurrentlySaved = userRecordMap.get(resource.id)?.isSaved || false;
+    await toggleSaveResource(userId, resource);
+    await loadUserRecords();
+    trackCareerHubMetric(isCurrentlySaved ? 'resource_unsaved' : 'resource_saved', {
+      resourceId: resource.id,
+      name: resource.name,
+    });
+  };
+
+  // Handle Plan Status Update
+  const handleUpdatePlanStatus = async (
+    resource: CareerHubResource,
+    status: ResourcePlanStatus | null,
+    details?: {
+      completedAt?: string;
+      credentialUrl?: string;
+      verificationUrl?: string;
+      studentNotes?: string;
+    }
+  ) => {
+    await updateResourcePlanStatus(userId, resource, status, details);
+    await loadUserRecords();
+    if (status === 'completed') {
+      trackCareerHubMetric('resource_completed', { resourceId: resource.id, name: resource.name });
+    } else if (status) {
+      trackCareerHubMetric('resource_status_updated', { resourceId: resource.id, status });
+    }
+  };
+
+  // Handle View Details with Recently Viewed Tracking
+  const handleViewDetails = (resource: CareerHubResource) => {
+    setSelectedResource(resource);
+    addRecentlyViewedResourceId(resource.id);
+    trackCareerHubMetric('resource_viewed', { resourceId: resource.id, name: resource.name });
+  };
+
+  // Handle Toggle Compare (up to 3 items)
+  const handleToggleCompare = (resourceId: string) => {
+    setComparedResourceIds((prev) => {
+      if (prev.includes(resourceId)) {
+        return prev.filter((id) => id !== resourceId);
+      }
+      if (prev.length >= 3) {
+        return [prev[1], prev[2], resourceId];
+      }
+      const nextList = [...prev, resourceId];
+      trackCareerHubMetric('compare_opened', { comparedCount: nextList.length });
+      return nextList;
+    });
+  };
+
+  // Handle Inspecting Alternative Career
+  const handleInspectCareer = (careerId: CareerPathId | null) => {
+    setInspectedCareerId(careerId);
+    if (careerId) {
+      trackCareerHubMetric('career_switched', { inspectedCareerId: careerId });
+    }
+  };
+
+  // Quick lookup map for user tracking records
+  const userRecordMap = useMemo(() => {
+    const map = new Map<string, UserCareerHubResourceRecord>();
+    userResourceRecords.forEach((r) => map.set(r.resourceId, r));
+    return map;
+  }, [userResourceRecords]);
+
+  // Determine Student's Matched Career Path ID
+  const matchedStudentCareerId = useMemo(() => {
+    if (!userData) return null;
+    return (
+      matchStudentCareerPath(userData.careerInterest) ||
+      matchStudentCareerPath(userData.currentRole) ||
+      null
+    );
   }, [userData]);
 
-  // Autofill form when applying
-  const handleOpenApplyModal = (internship: InternshipOpportunity) => {
-    setSelectedInternship(internship);
-    setIsApplying(true);
-    setSubmissionSuccess(false);
-    setFormError('');
+  const activeSelectedCareerId = inspectedCareerId || matchedStudentCareerId;
 
-    // Pre-fill inputs with logged-in user profile if available
-    setFormName(userData?.name || '');
-    setFormEmail(userData?.email || '');
-    setFormPhone('');
-    const eduStr = [userData?.branch, userData?.college].filter(Boolean).join(', ');
-    setFormEducation(eduStr || 'B.Tech Computer Science / AI & ML');
-    const skillsStr = (userData?.skillsCompleted || []).join(', ');
-    setFormSkills(skillsStr || internship.skills.join(', '));
+  const studentCareerDefinition = activeSelectedCareerId
+    ? DETAILED_CAREER_PATHS[activeSelectedCareerId] || CAREER_PATHS_CATALOG[activeSelectedCareerId]
+    : null;
+
+  // Dynamic Live Statistics
+  const stats = useMemo(() => {
+    return calculateCatalogStats(activeCatalog);
+  }, [activeCatalog]);
+
+  // Filter Logic via Catalog Service Layer
+  const filteredResources = useMemo(() => {
+    return activeCatalog.filter((res) => {
+      const record = userRecordMap.get(res.id);
+
+      // 0. Free-Only Mode (Toggle)
+      if (freeOnlyMode) {
+        const isFree =
+          res.isFree ||
+          res.costType === 'free' ||
+          res.costType === 'free_training' ||
+          res.costType === 'free_credential';
+        if (!isFree) return false;
+      }
+
+      // 1. Tab filtering
+      if (activeTab === 'recommended') {
+        if (activeSelectedCareerId) {
+          const matchesCareer = res.careerPaths.includes(activeSelectedCareerId);
+          if (!matchesCareer && !res.isFeatured) return false;
+        }
+      } else if (activeTab === 'free') {
+        const isFree =
+          res.isFree ||
+          res.costType === 'free' ||
+          res.costType === 'free_credential' ||
+          res.costType === 'free_training' ||
+          res.costType === 'free_with_eligibility';
+        if (!isFree) return false;
+      } else if (activeTab === 'certifications') {
+        if (res.resourceType !== 'certification' && res.resourceType !== 'certificate') return false;
+      } else if (activeTab === 'courses') {
+        if (res.resourceType !== 'course' && res.resourceType !== 'learning_path') return false;
+      } else if (activeTab === 'badges') {
+        if (res.resourceType !== 'skill_badge' && res.resourceType !== 'applied_skill') return false;
+      } else if (activeTab === 'hands-on') {
+        if (res.resourceType !== 'hands_on_lab' && res.resourceType !== 'applied_skill') return false;
+      } else if (activeTab === 'my-resources') {
+        if (!record || (!record.isSaved && !record.planStatus)) return false;
+      }
+
+      // 2. Search query filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesQuery =
+          res.name.toLowerCase().includes(q) ||
+          res.provider.toLowerCase().includes(q) ||
+          res.shortDescription.toLowerCase().includes(q) ||
+          res.longDescription.toLowerCase().includes(q) ||
+          res.skills.some((s) => s.toLowerCase().includes(q)) ||
+          res.careerPaths.some((c) => c.toLowerCase().includes(q)) ||
+          res.tags.some((t) => t.toLowerCase().includes(q));
+        if (!matchesQuery) return false;
+      }
+
+      // 3. Provider filter
+      if (selectedProvider !== 'all' && res.provider !== selectedProvider) {
+        return false;
+      }
+
+      // 4. Career filter
+      if (selectedCareer !== 'all' && !res.careerPaths.includes(selectedCareer)) {
+        return false;
+      }
+
+      // 5. Level filter
+      if (selectedLevel !== 'all' && res.difficulty !== selectedLevel) {
+        return false;
+      }
+
+      // 6. Cost filter
+      if (selectedCost !== 'all') {
+        if (selectedCost === 'free') {
+          const isFree =
+            res.isFree ||
+            res.costType === 'free' ||
+            res.costType === 'free_credential' ||
+            res.costType === 'free_training';
+          if (!isFree) return false;
+        } else if (res.costType !== selectedCost) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    activeCatalog,
+    activeTab,
+    activeSelectedCareerId,
+    freeOnlyMode,
+    searchQuery,
+    selectedProvider,
+    selectedCareer,
+    selectedLevel,
+    selectedCost,
+    userRecordMap,
+  ]);
+
+  // Filtered Career Paths for the 'career-paths' view
+  const filteredCareerPaths = useMemo(() => {
+    return allCareerPaths.filter((cp) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchTitle = cp.title.toLowerCase().includes(q);
+        const matchDesc = cp.description.toLowerCase().includes(q);
+        const matchSkills = cp.skills.some((s) => s.toLowerCase().includes(q));
+        if (!matchTitle && !matchDesc && !matchSkills) return false;
+      }
+      if (selectedCareer !== 'all' && cp.careerId !== selectedCareer) {
+        return false;
+      }
+      return true;
+    });
+  }, [allCareerPaths, searchQuery, selectedCareer]);
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedProvider('all');
+    setSelectedCareer('all');
+    setSelectedLevel('all');
+    setSelectedCost('all');
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    selectedProvider !== 'all' ||
+    selectedCareer !== 'all' ||
+    selectedLevel !== 'all' ||
+    selectedCost !== 'all';
 
-    if (!formName.trim() || !formEmail.trim() || !formPhone.trim() || !formEducation.trim() || !formSkills.trim()) {
-      setFormError('Please fill in all required fields.');
-      return;
-    }
-
-    if (!selectedInternship) return;
-
-    setIsSubmitting(true);
-    try {
-      const newApp = await submitInternshipApplication({
-        user_id: userData?.uid || 'guest',
-        internship_id: selectedInternship.id,
-        internship_title: selectedInternship.title,
-        full_name: formName,
-        email: formEmail,
-        phone: formPhone,
-        education: formEducation,
-        skills: formSkills,
-      });
-
-      setSubmittedApp(newApp);
-      setSubmissionSuccess(true);
-      await loadApplications();
-    } catch (err) {
-      console.error('Submission error:', err);
-      setFormError('Failed to submit application. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Filtered internships
-  const filteredInternships = INTERNSHIP_OPPORTUNITIES.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.skills.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-
-    return matchesSearch && matchesCategory;
-  });
-
-  const categories = ['All', 'Software Development', 'Data & Analytics', 'Artificial Intelligence', 'Web Development', 'Generative AI'];
-
-  // Check if current user has applied to an internship
-  const getApplicationForInternship = (internshipId: string) => {
-    return myApplications.find((a) => a.internship_id === internshipId);
-  };
-
-  const getStatusBadge = (status: ApplicationStatus) => {
-    switch (status) {
-      case 'Interested':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-            Interested
-          </span>
-        );
-      case 'Under Review':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            Under Review
-          </span>
-        );
-      case 'Selected':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Selected
-          </span>
-        );
-      case 'Not Selected':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">
-            <X className="w-3.5 h-3.5" />
-            Not Selected
-          </span>
-        );
-    }
-  };
+  const savedAndTrackedCount = userResourceRecords.filter(
+    (r) => r.isSaved || r.planStatus !== null
+  ).length;
 
   return (
-    <div className="relative min-h-screen bg-slate-950 text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-[#006cd2] selection:text-white flex flex-col">
-      {/* Background Decor Gradients */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[850px] h-[500px] bg-[#006cd2]/15 rounded-full blur-[140px]" />
-        <div className="absolute top-[40%] -left-40 w-[600px] h-[600px] bg-cyan-600/10 rounded-full blur-[160px]" />
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: `radial-gradient(rgba(255,255,255,0.8) 1px, transparent 1px)`,
-            backgroundSize: '24px 24px',
-          }}
-        />
-      </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-mobile-nav selection:bg-cyan-500/30">
+      {/* Top Header Navigation */}
+      <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-8 py-3.5">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/home" className="flex items-center gap-2 group">
+              <span className="font-display font-black text-xl tracking-tight text-white group-hover:text-cyan-300 transition">
+                Level<span className="text-[#006cd2]">Up</span>Dev
+              </span>
+              <span className="text-xs font-mono bg-[#006cd2]/15 text-cyan-300 border border-[#006cd2]/30 px-2 py-0.5 rounded-full font-bold">
+                Career Hub
+              </span>
+            </Link>
+          </div>
 
-      <div className="relative z-10 flex flex-col min-h-screen pb-mobile-nav">
-        {/* Top Header */}
-        <header className="sticky top-0 z-50 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
+            <Link href="/home" className="hover:text-white transition">
+              Portfolio
+            </Link>
+            <Link href="/dashboard" className="hover:text-white transition">
+              Dashboard
+            </Link>
+            <Link href="/roadmaps" className="hover:text-white transition">
+              Career Roadmaps
+            </Link>
+            <Link
+              href="/internships"
+              className="text-cyan-400 font-semibold flex items-center gap-1.5"
+            >
+              <Compass className="w-4 h-4 text-cyan-400" />
+              <span>Career Hub</span>
+            </Link>
+            <Link href="/skills" className="hover:text-white transition">
+              Skills Trail
+            </Link>
+            <Link href="/daily" className="hover:text-white transition">
+              Daily Challenge
+            </Link>
+            <Link href="/leaderboard" className="hover:text-white transition">
+              Leaderboard
+            </Link>
+            {isPlacementPrepAllowed(userData?.email) && (
               <Link
-                href="/home"
-                className="flex items-center gap-2 text-xs font-mono font-medium text-slate-400 hover:text-white transition-colors bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl"
+                href="/placement-preparation"
+                className="text-amber-300 font-bold hover:text-white transition flex items-center gap-1 bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30 text-xs"
               >
-                <ArrowLeft className="w-4 h-4 text-[#006cd2]" />
-                <span>Return to Portfolio</span>
+                <Target className="w-3.5 h-3.5 text-amber-400" />
+                <span>Placement Prep</span>
               </Link>
-              <span className="text-slate-700 hidden sm:inline">•</span>
-              <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400">
-                <Briefcase className="w-4 h-4 text-[#006cd2]" />
-                <span>Internship Experience</span>
-              </div>
+            )}
+            {isEnglishCareerAllowed(userData?.email) && (
+              <Link
+                href="/english-career"
+                className="text-blue-300 font-bold hover:text-white transition flex items-center gap-1 bg-blue-500/15 px-2.5 py-0.5 rounded-full border border-blue-500/30 text-xs"
+              >
+                <span>English &amp; Career</span>
+              </Link>
+            )}
+          </nav>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="relative overflow-hidden pt-10 pb-12 px-4 sm:px-8 border-b border-slate-800/80 bg-gradient-to-b from-slate-900/50 via-slate-950 to-slate-950">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-64 bg-[#006cd2]/10 blur-[100px] pointer-events-none" />
+
+        <div className="max-w-6xl mx-auto text-center relative z-10">
+          {/* Trust Disclaimer Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs text-slate-300 mb-6 shadow-sm">
+            <ShieldCheck className="w-4 h-4 text-cyan-400" />
+            <span>Curated from official provider learning platforms</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+            <span className="text-slate-400 font-mono text-[11px]">External Verified Credentials</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight max-w-4xl mx-auto mb-4 font-display">
+            Build Skills. Earn Credentials.{' '}
+            <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+              Become Job Ready.
+            </span>
+          </h1>
+
+          <p className="text-base sm:text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed mb-8">
+            Discover curated courses, certifications, skill badges, hands-on credentials and
+            learning paths connecting your career to real-world projects.
+          </p>
+
+          {/* Primary Hero Actions */}
+          <div className="flex flex-wrap items-center justify-center gap-3.5 mb-10">
+            <button
+              onClick={() => {
+                setActiveTab('career-paths');
+                setSelectedCareer('all');
+              }}
+              className="flex items-center gap-2 py-3 px-6 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white text-sm font-bold shadow-lg shadow-blue-500/25 transition active:scale-95"
+            >
+              <Compass className="w-4 h-4" />
+              <span>Explore Career Paths</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('free');
+                setSelectedCost('all');
+              }}
+              className="flex items-center gap-2 py-3 px-6 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white text-sm font-semibold border border-slate-700/80 transition active:scale-95"
+            >
+              <Zap className="w-4 h-4 text-amber-400" />
+              <span>Explore Free Resources</span>
+            </button>
+          </div>
+
+          {/* Philosophy Banner */}
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-inner">
+            <span className="text-[11px] font-mono font-bold text-slate-400 uppercase px-2">
+              Career Journey:
+            </span>
+            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+              CAREER
+            </span>
+            <span className="text-slate-600 font-mono">→</span>
+            <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300">
+              SKILLS
+            </span>
+            <span className="text-slate-600 font-mono">→</span>
+            <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300">
+              COURSES
+            </span>
+            <span className="text-slate-600 font-mono">→</span>
+            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              CREDENTIALS
+            </span>
+            <span className="text-slate-600 font-mono">→</span>
+            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              PROJECTS
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Top Quick Stats */}
+      <section className="px-4 sm:px-8 -mt-6 relative z-20">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-xl shadow-xl flex items-center gap-3.5">
+            <div className="p-3 rounded-xl bg-blue-500/10 text-cyan-400 border border-blue-500/20 shrink-0">
+              <Award className="w-5 h-5" />
             </div>
-
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboard"
-                className="text-xs font-mono text-cyan-400 hover:text-white px-3 py-1.5 rounded-xl border border-slate-800 hover:bg-slate-900 transition flex items-center gap-1.5"
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>Dashboard</span>
-              </Link>
-              <Link
-                href="/roadmaps"
-                className="text-xs font-mono text-slate-400 hover:text-white px-3 py-1.5 rounded-xl border border-slate-800 hover:bg-slate-900 transition"
-              >
-                Career Roadmaps
-              </Link>
-              {isAdminEmail(userData?.email || '') && (
-                <Link
-                  href="/admin"
-                  className="px-3 py-1.5 rounded-full bg-[#006cd2]/20 border border-[#006cd2]/40 text-blue-300 hover:text-white font-mono text-xs font-bold transition flex items-center gap-1.5"
-                >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  <span>Admin Console</span>
-                </Link>
-              )}
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-white font-display">
+                {stats.totalResources}
+              </div>
+              <div className="text-xs text-slate-400">Curated Resources</div>
             </div>
           </div>
-        </header>
 
-        {/* Main Content Body */}
-        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 sm:py-14 space-y-10">
-          {/* ========================================================================= */}
-          {/* 1. HERO SECTION */}
-          {/* ========================================================================= */}
-          <section className="text-center space-y-4 max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#006cd2]/15 border border-[#006cd2]/30 text-blue-300 text-xs font-mono font-bold uppercase tracking-wider">
-              <Briefcase className="w-3.5 h-3.5 text-[#006cd2]" />
-              <span>SIMULATED WORKPLACE EXPERIENCE</span>
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-xl shadow-xl flex items-center gap-3.5">
+            <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+              <Compass className="w-5 h-5" />
             </div>
-
-            <h1 className="font-display text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-[1.1]">
-              Internships
-            </h1>
-
-            <p className="font-sans text-base sm:text-lg text-slate-300 leading-relaxed">
-              Explore internship opportunities and experience how the internship application process works.
-            </p>
-
-            {/* Educational Demo Banner */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-blue-950/40 border border-[#006cd2]/40 text-left flex items-start gap-3 shadow-lg shadow-[#006cd2]/5">
-              <div className="w-9 h-9 rounded-xl bg-[#006cd2]/20 border border-[#006cd2]/40 text-[#006cd2] flex items-center justify-center shrink-0 mt-0.5">
-                <GraduationCap className="w-5 h-5" />
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-white font-display">
+                {allCareerPaths.length} Roles
               </div>
-              <div className="space-y-0.5 text-xs sm:text-sm">
-                <div className="font-display font-bold text-white flex items-center gap-2">
-                  <span>🎓 Demo Experience</span>
-                  <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[10px] uppercase font-bold">
-                    Educational Simulation
-                  </span>
-                </div>
-                <p className="text-slate-300 leading-relaxed">
-                  This section is designed for educational purposes. Submit your interest in an internship to experience
-                  a simplified internship application workflow.
+              <div className="text-xs text-slate-400">Structured Pathways</div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-xl shadow-xl flex items-center gap-3.5">
+            <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+              <Cpu className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-white font-display">
+                {stats.providers}
+              </div>
+              <div className="text-xs text-slate-400">Technology Providers</div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-xl shadow-xl flex items-center gap-3.5">
+            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-emerald-400 font-display">
+                {stats.freeOpportunities}
+              </div>
+              <div className="text-xs text-slate-400">Opportunities Available</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Content Area */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-10 space-y-8">
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800/80 scrollbar-none">
+          <button
+            onClick={() => setActiveTab('recommended')}
+            className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
+              activeTab === 'recommended'
+                ? 'bg-[#006cd2] text-white shadow-md shadow-blue-500/20'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Recommended</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('career-paths')}
+            className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
+              activeTab === 'career-paths'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+            <span>Career Paths ({allCareerPaths.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('free')}
+            className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
+              activeTab === 'free'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            <span>Free Resources</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('certifications')}
+            className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
+              activeTab === 'certifications'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            <span>Certifications</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('courses')}
+            className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
+              activeTab === 'courses'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Courses</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('badges')}
+            className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
+              activeTab === 'badges'
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Flame className="w-4 h-4" />
+            <span>Skill Badges</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('hands-on')}
+            className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
+              activeTab === 'hands-on'
+                ? 'bg-teal-600 text-white shadow-md shadow-teal-500/20'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Hands-on</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('my-resources')}
+            className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
+              activeTab === 'my-resources'
+                ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Bookmark className="w-4 h-4" />
+            <span>My Resources ({savedAndTrackedCount})</span>
+          </button>
+        </div>
+
+        {/* Top Career Match & Recommendation Sections */}
+        {activeTab === 'recommended' && (
+          <div className="space-y-6">
+            <CareerMatchBanner
+              primaryCareerId={matchedStudentCareerId}
+              inspectedCareerId={inspectedCareerId}
+              onInspectCareer={handleInspectCareer}
+              catalog={activeCatalog}
+              onViewCareerJourney={(cp) => setSelectedCareerJourney(cp)}
+              detailedPath={studentCareerDefinition ? (studentCareerDefinition as DetailedCareerPath) : null}
+            />
+
+            <RecommendedNextCard
+              careerId={activeSelectedCareerId}
+              userRecords={userResourceRecords}
+              allResources={activeCatalog}
+              onOpenResource={(res) => handleViewDetails(res)}
+            />
+          </div>
+        )}
+
+        {/* CAREER PATHS TAB CONTENT */}
+        {activeTab === 'career-paths' ? (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-bold text-white font-display">
+                  Explore 16 Structured Career Pathways
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Select a career role to view the complete journey from foundations to credentials &amp; projects.
                 </p>
               </div>
-            </div>
-          </section>
 
-          {/* ========================================================================= */}
-          {/* 2. TAB SWITCHER & FILTER BAR */}
-          {/* ========================================================================= */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-            {/* Tabs */}
-            <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 w-fit">
-              <button
-                onClick={() => setActiveTab('explore')}
-                className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 ${
-                  activeTab === 'explore'
-                    ? 'bg-[#006cd2] text-white shadow-sm shadow-[#006cd2]/40'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Briefcase className="w-3.5 h-3.5" />
-                <span>Explore Internships</span>
-                <span className="ml-1 px-1.5 py-0.2 rounded bg-slate-950 text-slate-300 text-[10px]">
-                  {INTERNSHIP_OPPORTUNITIES.length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('my-applications')}
-                className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 ${
-                  activeTab === 'my-applications'
-                    ? 'bg-[#006cd2] text-white shadow-sm shadow-[#006cd2]/40'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <FileCheck2 className="w-3.5 h-3.5" />
-                <span>My Applications</span>
-                {myApplications.length > 0 && (
-                  <span className="ml-1 px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 text-[11px] font-bold">
-                    {myApplications.length}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* Quick Search */}
-            {activeTab === 'explore' && (
+              {/* Career quick search */}
               <div className="relative w-full sm:w-72">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search role or skill..."
-                  className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#006cd2] focus:ring-1 focus:ring-[#006cd2]"
+                  placeholder="Filter career paths..."
+                  className="w-full bg-slate-900 border border-slate-800 focus:border-cyan-500/60 text-xs text-white placeholder-slate-500 rounded-xl py-2 pl-9 pr-3 outline-none"
                 />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredCareerPaths.map((careerPath) => (
+                <CareerPathCard
+                  key={careerPath.careerId}
+                  careerPath={careerPath}
+                  isStudentSelected={matchedStudentCareerId === careerPath.careerId}
+                  onSelectPath={(cp) => setSelectedCareerJourney(cp)}
+                />
+              ))}
+            </div>
+          </div>
+        ) : activeTab === 'my-resources' ? (
+          /* MY RESOURCES TAB CONTENT */
+          <MyResourcesManager
+            records={userResourceRecords}
+            onViewDetails={(res) => handleViewDetails(res)}
+            onToggleSave={handleToggleSave}
+            onUpdatePlanStatus={handleUpdatePlanStatus}
+          />
+        ) : (
+          <>
+            {/* Recently Viewed Resources Bar (if any) */}
+            {recentlyViewedIds.length > 0 && (
+              <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-300">
+                    <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>RECENTLY VIEWED</span>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-500">
+                    {recentlyViewedIds.length} stored locally (max 10)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {recentlyViewedIds
+                    .map((id) => activeCatalog.find((r) => r.id === id))
+                    .filter((r): r is CareerHubResource => Boolean(r))
+                    .map((res) => (
+                      <button
+                        key={res.id}
+                        onClick={() => handleViewDetails(res)}
+                        className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-cyan-500/40 text-left shrink-0 max-w-[200px] transition group"
+                      >
+                        <div className="text-[10px] font-mono text-cyan-400 truncate uppercase">
+                          {res.provider}
+                        </div>
+                        <div className="text-xs font-semibold text-white group-hover:text-cyan-300 truncate">
+                          {res.name}
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Search & Filter Bar for Resources */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-4 sm:p-6 space-y-4 shadow-xl">
+              {/* Top Search Input & Free Only Mode Toggle */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search courses, certifications, skills, companies (e.g. Python, Azure, GenAI, Docker)..."
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500/60 focus:ring-2 focus:ring-cyan-500/20 text-sm text-white placeholder-slate-500 rounded-2xl py-3 pl-12 pr-4 transition outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400 hover:text-white"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Free Only Prominent Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setFreeOnlyMode((prev) => !prev)}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-xs font-mono font-bold transition border shrink-0 ${
+                    freeOnlyMode
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-md shadow-emerald-500/10'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  }`}
+                >
+                  <Zap className={`w-4 h-4 ${freeOnlyMode ? 'text-emerald-400' : 'text-slate-500'}`} />
+                  <span>Show only free opportunities</span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      freeOnlyMode ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Filter Dropdowns & Chips */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800/60">
+                {/* Provider Filter */}
+                <div>
+                  <label className="block text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5">
+                    Provider
+                  </label>
+                  <select
+                    value={selectedProvider}
+                    onChange={(e) => setSelectedProvider(e.target.value as ProviderId | 'all')}
+                    className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl p-2.5 outline-none focus:border-cyan-500/60 transition"
                   >
-                    ✕
+                    <option value="all">All Providers ({PROVIDER_LIST.length})</option>
+                    {PROVIDER_LIST.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Career Filter */}
+                <div>
+                  <label className="block text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5">
+                    Career Role
+                  </label>
+                  <select
+                    value={selectedCareer}
+                    onChange={(e) => setSelectedCareer(e.target.value as CareerPathId | 'all')}
+                    className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl p-2.5 outline-none focus:border-cyan-500/60 transition"
+                  >
+                    <option value="all">All Career Roles ({CAREER_PATHS_LIST.length})</option>
+                    {CAREER_PATHS_LIST.map((career) => (
+                      <option key={career.id} value={career.id}>
+                        {career.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Difficulty Level */}
+                <div>
+                  <label className="block text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5">
+                    Level
+                  </label>
+                  <select
+                    value={selectedLevel}
+                    onChange={(e) => setSelectedLevel(e.target.value as DifficultyLevel | 'all')}
+                    className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl p-2.5 outline-none focus:border-cyan-500/60 transition"
+                  >
+                    <option value="all">All Levels</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+
+                {/* Cost Filter */}
+                <div>
+                  <label className="block text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5">
+                    Cost Status
+                  </label>
+                  <select
+                    value={selectedCost}
+                    onChange={(e) => setSelectedCost(e.target.value as CostType | 'all')}
+                    className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl p-2.5 outline-none focus:border-cyan-500/60 transition"
+                  >
+                    <option value="all">All Costs</option>
+                    <option value="free">Free / Free Access</option>
+                    <option value="free_credential">Free Credential</option>
+                    <option value="free_training">Free Training</option>
+                    <option value="free_with_eligibility">Free with Aid / Eligibility</option>
+                    <option value="paid">Paid / Exam Required</option>
+                    <option value="check_provider">Check Provider</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Active Filter Chips & Reset */}
+              {hasActiveFilters && (
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/40 text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-slate-400 font-mono text-[11px]">Active Filters:</span>
+                    {searchQuery && (
+                      <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">
+                        "{searchQuery}"
+                      </span>
+                    )}
+                    {freeOnlyMode && (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 font-mono">
+                        Free Only
+                      </span>
+                    )}
+                    {selectedProvider !== 'all' && (
+                      <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+                        Provider: {selectedProvider}
+                      </span>
+                    )}
+                    {selectedCareer !== 'all' && (
+                      <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+                        Role: {CAREER_PATHS_CATALOG[selectedCareer]?.name || selectedCareer}
+                      </span>
+                    )}
+                    {selectedLevel !== 'all' && (
+                      <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-mono uppercase">
+                        Level: {selectedLevel}
+                      </span>
+                    )}
+                    {selectedCost !== 'all' && (
+                      <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-mono uppercase">
+                        Cost: {selectedCost.replace('_', ' ')}
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleResetFilters}
+                    className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 font-semibold transition"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset All Filters</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Educational Glossary Explainer */}
+            <ResourceGlossaryCard />
+
+            {/* Results Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-white">
+                  {activeTab === 'recommended' && 'Recommended Resources'}
+                  {activeTab === 'free' && 'Free Opportunities & Credentials'}
+                  {activeTab === 'certifications' && 'Industry Certifications & Certificates'}
+                  {activeTab === 'courses' && 'Curated Courses & Learning Paths'}
+                  {activeTab === 'badges' && 'Verifiable Digital Badges & Applied Skills'}
+                  {activeTab === 'hands-on' && 'Hands-on Labs & Practical Sandboxes'}
+                </h3>
+                <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
+                  {filteredResources.length} {filteredResources.length === 1 ? 'Resource' : 'Resources'}
+                </span>
+              </div>
+            </div>
+
+            {/* Resource Cards Grid */}
+            {filteredResources.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredResources.map((resource) => (
+                  <ResourceCard
+                    key={resource.id}
+                    resource={resource}
+                    isSaved={userRecordMap.get(resource.id)?.isSaved || false}
+                    onToggleSave={() => handleToggleSave(resource)}
+                    onViewDetails={(res) => handleViewDetails(res)}
+                    highlightCareerId={activeSelectedCareerId || undefined}
+                    isCompared={comparedResourceIds.includes(resource.id)}
+                    onToggleCompare={handleToggleCompare}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-12 text-center space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800/80 text-slate-400 flex items-center justify-center mx-auto">
+                  <Search className="w-6 h-6" />
+                </div>
+                <h4 className="text-base font-bold text-white">No Matching Resources Found</h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  Try adjusting your search terms, clear active filters, or explore our free resources tab.
+                </p>
+                {hasActiveFilters && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition"
+                  >
+                    Clear Active Filters
                   </button>
                 )}
               </div>
             )}
-          </div>
-
-          {/* ========================================================================= */}
-          {/* TAB 1: EXPLORE INTERNSHIPS */}
-          {/* ========================================================================= */}
-          {activeTab === 'explore' && (
-            <div className="space-y-6">
-              {/* Category Filter Pills */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0 mr-1" />
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-xl font-mono text-xs font-medium whitespace-nowrap transition border ${
-                      selectedCategory === cat
-                        ? 'bg-blue-950/70 border-[#006cd2] text-blue-300 ring-1 ring-[#006cd2]/40'
-                        : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Internship Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredInternships.map((internship) => {
-                  const existingApp = getApplicationForInternship(internship.id);
-
-                  return (
-                    <div
-                      key={internship.id}
-                      className="rounded-3xl p-6 sm:p-7 bg-slate-900/70 border border-slate-800 hover:border-[#006cd2]/60 hover:bg-slate-900 transition-all duration-300 flex flex-col justify-between space-y-6 group shadow-lg shadow-black/40"
-                    >
-                      <div className="space-y-4">
-                        {/* Header Badge Row */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-950/60 border border-blue-500/30 text-blue-300 text-[10px] font-mono font-bold uppercase">
-                            <Sparkles className="w-3 h-3" />
-                            Demo Internship
-                          </span>
-
-                          <span className="px-2.5 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-400">
-                            {internship.category}
-                          </span>
-                        </div>
-
-                        {/* Title & Icon */}
-                        <div className="flex items-start gap-3.5">
-                          <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                            {ICON_MAP[internship.iconName] || <Briefcase className="w-6 h-6 text-[#006cd2]" />}
-                          </div>
-                          <div>
-                            <h3 className="font-display text-lg font-bold text-white group-hover:text-blue-300 transition-colors leading-snug">
-                              {internship.title}
-                            </h3>
-                            <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-400 font-mono">
-                              <span className="flex items-center gap-1 text-emerald-400">
-                                <MapPin className="w-3 h-3" />
-                                {internship.mode}
-                              </span>
-                              <span>•</span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-slate-500" />
-                                {internship.duration}
-                              </span>
-                              <span>•</span>
-                              <span className="text-slate-300">{internship.level}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Description */}
-                        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed line-clamp-3">
-                          {internship.description}
-                        </p>
-
-                        {/* Skills Chips */}
-                        <div className="space-y-1.5 pt-1">
-                          <div className="font-mono text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                            Required Skills
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {internship.skills.map((sk, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 rounded-md bg-slate-950 text-slate-300 font-mono text-[11px] border border-slate-800"
-                              >
-                                {sk}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Bottom Action Footer */}
-                      <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-3">
-                        {existingApp ? (
-                          <div className="flex items-center justify-between w-full">
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] font-mono text-slate-500 uppercase">Your Status</span>
-                              <div>{getStatusBadge(existingApp.status)}</div>
-                            </div>
-                            <button
-                              onClick={() => setSelectedInternship(internship)}
-                              className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-mono font-medium border border-slate-800 transition"
-                            >
-                              View Details
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => setSelectedInternship(internship)}
-                              className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white font-sans text-xs font-semibold border border-slate-800 transition flex-1 text-center"
-                            >
-                              View Internship
-                            </button>
-                            <button
-                              onClick={() => handleOpenApplyModal(internship)}
-                              className="px-4 py-2 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-bold transition shadow-sm shadow-[#006cd2]/30 flex items-center gap-1.5"
-                            >
-                              <span>Apply</span>
-                              <ArrowRight className="w-3.5 h-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {filteredInternships.length === 0 && (
-                <div className="p-12 text-center rounded-3xl bg-slate-900/50 border border-slate-800 space-y-3">
-                  <Search className="w-8 h-8 text-slate-600 mx-auto" />
-                  <h4 className="font-display text-base font-bold text-white">No internships found</h4>
-                  <p className="text-xs text-slate-400">Try adjusting your search keywords or category filters.</p>
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSelectedCategory('All');
-                    }}
-                    className="px-4 py-1.5 rounded-xl bg-slate-800 text-xs font-mono text-slate-300 hover:text-white"
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* TAB 2: MY APPLICATIONS */}
-          {/* ========================================================================= */}
-          {activeTab === 'my-applications' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-display text-xl font-bold text-white flex items-center gap-2">
-                    <FileCheck2 className="w-5 h-5 text-[#006cd2]" />
-                    <span>My Internship Applications</span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Track the real-time review status of your demo applications.
-                  </p>
-                </div>
-                <button
-                  onClick={loadApplications}
-                  disabled={loadingApps}
-                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-mono text-xs border border-slate-800 transition flex items-center gap-1.5"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingApps ? 'animate-spin' : ''}`} />
-                  <span>Refresh</span>
-                </button>
-              </div>
-
-              {myApplications.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {myApplications.map((app) => (
-                    <div
-                      key={app.id}
-                      className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition space-y-4 shadow-lg shadow-black/30"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[10px] text-blue-300 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-500/30 uppercase font-bold">
-                              Demo Application
-                            </span>
-                            <span className="font-mono text-[10px] text-slate-500">
-                              Applied {new Date(app.submitted_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <h4 className="font-display text-lg font-bold text-white">{app.internship_title}</h4>
-                        </div>
-                        {getStatusBadge(app.status)}
-                      </div>
-
-                      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-2 text-xs font-mono">
-                        <div className="flex items-center justify-between text-slate-400">
-                          <span className="text-slate-500">Applicant:</span>
-                          <span className="text-white font-medium">{app.full_name}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-slate-400">
-                          <span className="text-slate-500">Email:</span>
-                          <span className="text-slate-300">{app.email}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-slate-400">
-                          <span className="text-slate-500">Education:</span>
-                          <span className="text-slate-300 text-right truncate max-w-[200px]">{app.education}</span>
-                        </div>
-                        <div className="pt-1 border-t border-slate-800/60">
-                          <span className="text-slate-500 block mb-1">Submitted Skills:</span>
-                          <div className="text-slate-300 font-sans text-xs">{app.skills}</div>
-                        </div>
-                      </div>
-
-                      {app.admin_notes && (
-                        <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-900/40 text-xs">
-                          <span className="font-mono text-[10px] text-blue-300 font-bold uppercase block mb-0.5">
-                            Mentor / Review Feedback
-                          </span>
-                          <p className="text-slate-300 text-xs">{app.admin_notes}</p>
-                        </div>
-                      )}
-
-                      <div className="pt-2 flex items-center justify-between text-xs text-slate-400 font-mono">
-                        <span>Application ID: {app.id.substring(0, 14)}...</span>
-                        <span className="text-emerald-400 flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          Registered
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-12 text-center rounded-3xl bg-slate-900/50 border border-slate-800 space-y-4">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-slate-800 text-slate-500 flex items-center justify-center mx-auto">
-                    <Briefcase className="w-6 h-6" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="font-display text-lg font-bold text-white">No Applications Yet</h4>
-                    <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                      You have not applied for any simulated demo internships yet. Explore available roles and submit your
-                      interest to experience the workflow.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('explore')}
-                    className="px-6 py-2.5 bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-bold rounded-full transition shadow-md shadow-[#006cd2]/30 inline-flex items-center gap-2"
-                  >
-                    <span>Browse Internships</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-
-        {/* ========================================================================= */}
-        {/* MODAL 1: DETAILED INTERNSHIP OVERVIEW */}
-        {/* ========================================================================= */}
-        {selectedInternship && !isApplying && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-            <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-              <button
-                onClick={() => setSelectedInternship(null)}
-                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
-              >
-                ✕
-              </button>
-
-              {/* Modal Header */}
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-blue-950 text-blue-300 font-mono text-xs font-bold uppercase border border-blue-500/30">
-                    🎓 Demo Internship
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-slate-950 text-slate-400 font-mono text-xs border border-slate-800">
-                    {selectedInternship.category}
-                  </span>
-                </div>
-                <h3 className="font-display text-2xl font-bold text-white">{selectedInternship.title}</h3>
-                <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-400 pt-1">
-                  <span className="flex items-center gap-1 text-emerald-400">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {selectedInternship.mode}
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    {selectedInternship.duration}
-                  </span>
-                  <span>•</span>
-                  <span>Level: {selectedInternship.level}</span>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <h4 className="font-mono text-xs font-bold text-slate-400 uppercase">Role Overview</h4>
-                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">{selectedInternship.description}</p>
-              </div>
-
-              {/* What You Will Learn */}
-              <div className="space-y-2">
-                <h4 className="font-mono text-xs font-bold text-blue-300 uppercase flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>What You Will Learn &amp; Build</span>
-                </h4>
-                <ul className="space-y-1.5">
-                  {selectedInternship.learningOutcomes.map((item, idx) => (
-                    <li key={idx} className="text-xs sm:text-sm text-slate-300 flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Required Skills */}
-              <div className="space-y-2">
-                <h4 className="font-mono text-xs font-bold text-slate-400 uppercase">Required Skills</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedInternship.skills.map((sk, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2.5 py-1 rounded-lg bg-slate-950 text-slate-200 font-mono text-xs border border-slate-800"
-                    >
-                      {sk}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Simulation Notice */}
-              <div className="p-3.5 rounded-2xl bg-blue-950/40 border border-[#006cd2]/40 text-xs text-blue-200">
-                <strong>🎓 Demo Simulation: </strong>
-                This is an educational simulation. Applying allows you to experience the application workflow and
-                connect with learning mentors.
-              </div>
-
-              {/* Modal Actions */}
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
-                <button
-                  onClick={() => setSelectedInternship(null)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-mono font-semibold"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => handleOpenApplyModal(selectedInternship)}
-                  className="px-6 py-2.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-bold shadow-lg shadow-[#006cd2]/30 flex items-center gap-2"
-                >
-                  <span>Apply for Demo Internship</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+          </>
         )}
+      </main>
 
-        {/* ========================================================================= */}
-        {/* MODAL 2: APPLICATION FORM & SUCCESS STATE */}
-        {/* ========================================================================= */}
-        {isApplying && selectedInternship && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
-            <div className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-              {!submissionSuccess ? (
-                <>
-                  <button
-                    onClick={() => setIsApplying(false)}
-                    className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
-                  >
-                    ✕
-                  </button>
-
-                  <div className="space-y-1">
-                    <span className="font-mono text-xs font-bold text-[#006cd2] uppercase tracking-wider">
-                      INTERNSHIP APPLICATION
-                    </span>
-                    <h3 className="font-display text-2xl font-bold text-white">{selectedInternship.title}</h3>
-                    <p className="text-xs text-slate-400">
-                      Submit your student details to register your interest for this simulated internship role.
-                    </p>
-                  </div>
-
-                  {formError && (
-                    <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{formError}</span>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleFormSubmit} className="space-y-4 text-left">
-                    {/* 1. Full Name */}
-                    <div className="space-y-1.5">
-                      <label className="font-mono text-xs text-slate-300 font-medium block">
-                        Full Name <span className="text-[#006cd2]">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formName}
-                        onChange={(e) => setFormName(e.target.value)}
-                        placeholder="e.g. Swamy Guradasu"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#006cd2]"
-                      />
-                    </div>
-
-                    {/* 2. Email Address */}
-                    <div className="space-y-1.5">
-                      <label className="font-mono text-xs text-slate-300 font-medium block">
-                        Email Address <span className="text-[#006cd2]">*</span>
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        value={formEmail}
-                        onChange={(e) => setFormEmail(e.target.value)}
-                        placeholder="e.g. yourname@gmail.com"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#006cd2]"
-                      />
-                    </div>
-
-                    {/* 3. Phone Number */}
-                    <div className="space-y-1.5">
-                      <label className="font-mono text-xs text-slate-300 font-medium block">
-                        Phone Number <span className="text-[#006cd2]">*</span>
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        value={formPhone}
-                        onChange={(e) => setFormPhone(e.target.value)}
-                        placeholder="e.g. +91 98765 43210"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#006cd2]"
-                      />
-                    </div>
-
-                    {/* 4. Education */}
-                    <div className="space-y-1.5">
-                      <label className="font-mono text-xs text-slate-300 font-medium block">
-                        Education / Degree &amp; College <span className="text-[#006cd2]">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formEducation}
-                        onChange={(e) => setFormEducation(e.target.value)}
-                        placeholder="e.g. B.Tech Artificial Intelligence, Swarnandhra College"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#006cd2]"
-                      />
-                    </div>
-
-                    {/* 5. Skills */}
-                    <div className="space-y-1.5">
-                      <label className="font-mono text-xs text-slate-300 font-medium block">
-                        Skills &amp; Technologies <span className="text-[#006cd2]">*</span>
-                      </label>
-                      <textarea
-                        required
-                        rows={3}
-                        value={formSkills}
-                        onChange={(e) => setFormSkills(e.target.value)}
-                        placeholder="e.g. Python, SQL, FastAPI, Git, Problem Solving, Data Structures"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#006cd2]"
-                      />
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIsApplying(false)}
-                        className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="px-6 py-2.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-bold shadow-lg shadow-[#006cd2]/30 flex items-center gap-2 disabled:opacity-50"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Submitting Application...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-3.5 h-3.5" />
-                            <span>Submit Application</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                </>
-              ) : (
-                /* SUCCESS STATE */
-                <div className="text-center space-y-5 py-4">
-                  <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10 animate-bounce">
-                    <CheckCircle2 className="w-8 h-8" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="font-display text-2xl font-bold text-white">
-                      Application Submitted Successfully! 🎉
-                    </h3>
-                    <p className="font-sans text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-                      You have successfully registered your interest in this demo internship.
-                    </p>
-                    <p className="font-mono text-xs text-blue-300 bg-blue-950/40 p-3 rounded-xl border border-blue-900/40 max-w-md mx-auto">
-                      An admin can now see your application in the Internship Management section.
-                    </p>
-                  </div>
-
-                  <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
-                    <button
-                      onClick={() => {
-                        setIsApplying(false);
-                        setSelectedInternship(null);
-                        setActiveTab('my-applications');
-                      }}
-                      className="px-6 py-2.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white font-sans text-xs font-bold shadow-md shadow-[#006cd2]/30 flex items-center gap-2"
-                    >
-                      <FileCheck2 className="w-4 h-4" />
-                      <span>View My Applications</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setIsApplying(false);
-                        setSelectedInternship(null);
-                      }}
-                      className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white font-sans text-xs font-medium"
-                    >
-                      Browse More Internships
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+      {/* Floating Resource Comparison Bar */}
+      {comparedResourceIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 border border-cyan-500/40 rounded-2xl p-3 sm:px-6 sm:py-3.5 shadow-2xl backdrop-blur-xl flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-cyan-400" />
+            <span className="font-bold text-white">
+              {comparedResourceIds.length} {comparedResourceIds.length === 1 ? 'Resource' : 'Resources'} in Compare
+            </span>
           </div>
-        )}
 
-        {/* Footer */}
-        <footer className="bg-slate-950 border-t border-slate-800 text-slate-500 font-mono text-xs py-8 px-6 md:px-12 mt-auto">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>© 2024 LevelUpDev • Simulated Internship Learning Portal</div>
-            <div className="flex items-center gap-4">
-              <Link href="/home" className="hover:text-slate-300 transition-colors">
-                Portfolio
-              </Link>
-              <span>•</span>
-              <Link href="/roadmaps" className="hover:text-slate-300 transition-colors">
-                Roadmaps
-              </Link>
-              <span>•</span>
-              <Link href="/daily" className="hover:text-slate-300 transition-colors">
-                Daily Challenge
-              </Link>
-              <span>•</span>
-              <Link href="/leaderboard" className="hover:text-slate-300 transition-colors">
-                Leaderboard
-              </Link>
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCompareModal(true)}
+              className="py-1.5 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold transition shadow-md shadow-cyan-500/20"
+            >
+              Compare Side-by-Side
+            </button>
+            <button
+              onClick={() => setComparedResourceIds([])}
+              className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition"
+              title="Clear comparison"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-        </footer>
-      </div>
+        </div>
+      )}
+
+      {/* Resource Comparison Modal */}
+      {showCompareModal && (
+        <ResourceCompareModal
+          resources={comparedResourceIds
+            .map((id) => activeCatalog.find((r) => r.id === id))
+            .filter((r): r is CareerHubResource => Boolean(r))}
+          onClose={() => setShowCompareModal(false)}
+          onRemoveResource={handleToggleCompare}
+          onViewDetails={(res) => {
+            setShowCompareModal(false);
+            handleViewDetails(res);
+          }}
+        />
+      )}
+
+      {/* Career Path Journey Modal */}
+      {selectedCareerJourney && (
+        <CareerPathJourneyModal
+          careerPath={selectedCareerJourney}
+          isStudentSelected={matchedStudentCareerId === selectedCareerJourney.careerId}
+          onClose={() => setSelectedCareerJourney(null)}
+          onViewResourceDetails={(res) => handleViewDetails(res)}
+        />
+      )}
+
+      {/* Resource Detail Modal */}
+      {selectedResource && (
+        <ResourceDetailModal
+          resource={selectedResource}
+          userRecord={userRecordMap.get(selectedResource.id) || null}
+          onClose={() => setSelectedResource(null)}
+          onToggleSave={handleToggleSave}
+          onUpdatePlanStatus={handleUpdatePlanStatus}
+        />
+      )}
     </div>
   );
 }

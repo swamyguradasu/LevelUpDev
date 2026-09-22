@@ -275,7 +275,7 @@ export default function MobileBottomNav() {
                     Learning & Growth
                   </div>
 
-                  {/* Internships */}
+                  {/* Career Hub */}
                   <Link
                     href="/internships"
                     className={`flex items-center justify-between p-3 rounded-2xl transition border ${
@@ -286,11 +286,11 @@ export default function MobileBottomNav() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                        <Briefcase className="w-4 h-4" />
+                        <Compass className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="text-sm font-semibold">Internships</div>
-                        <div className="text-xs text-slate-400">Apply & build real-world project portfolios</div>
+                        <div className="text-sm font-semibold">Career Hub</div>
+                        <div className="text-xs text-slate-400">Curated certifications, badges &amp; career learning</div>
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-500" />

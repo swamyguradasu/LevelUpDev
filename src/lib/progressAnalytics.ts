@@ -2,6 +2,7 @@ import { UserProfileData } from '@/context/AuthContext';
 import { Skill, DailyChallenge } from '@/lib/content';
 import { FoundationLevel, getTotalTopicsCount } from '@/data/csFoundationsData';
 import { InternshipApplication } from '@/data/internshipsData';
+import { UserCareerHubResourceRecord } from '@/lib/careerHubStorage';
 
 export interface DSAStatistics {
   totalSolved: number;
@@ -221,7 +222,8 @@ export function calculateCareerReadiness(
   userData: UserProfileData | null,
   allSkills: Skill[],
   foundationsLevels: FoundationLevel[],
-  userApplications: InternshipApplication[] = []
+  userApplications: InternshipApplication[] = [],
+  userCareerRecords: UserCareerHubResourceRecord[] = []
 ): CareerReadinessReport {
   if (!userData) {
     const emptyCategory = (id: string, name: string, desc: string, icon: string): ReadinessCategory => ({
@@ -360,7 +362,11 @@ export function calculateCareerReadiness(
   const interviewScore = Math.min(100, interviewPoints);
 
   // OVERALL WEIGHTED CAREER READINESS
-  const overallPercentage = Math.round(
+  // Completed Career Hub credentials serve as modest supporting evidence (max +3% bonus)
+  const completedCredentialsCount = userCareerRecords.filter((r) => r.planStatus === 'completed').length;
+  const credentialSupportingBonus = Math.min(3, completedCredentialsCount * 1);
+
+  const basePercentage = Math.round(
     programmingScore * 0.20 +
     dsaScore * 0.20 +
     csFundamentalsScore * 0.15 +
@@ -369,6 +375,8 @@ export function calculateCareerReadiness(
     communicationScore * 0.075 +
     interviewScore * 0.075
   );
+
+  const overallPercentage = Math.min(100, basePercentage + credentialSupportingBonus);
 
   const getStatus = (score: number): 'Needs Focus' | 'In Progress' | 'Proficient' | 'Mastered' => {
     if (score >= 80) return 'Mastered';
@@ -580,12 +588,12 @@ export function generateRecommendedActions(
     });
   } else if (userApplications.length === 0) {
     actions.push({
-      id: 'apply-internship',
-      title: 'Apply for Verified Internship Program',
+      id: 'explore-career-hub',
+      title: 'Explore Career Credentials & Certifications',
       category: 'Interview',
       priority: 'Medium',
-      reason: 'Submit an internship application to unlock technical interview screening and resume review.',
-      actionText: 'Explore Internships',
+      reason: 'Discover curated skill badges, applied skills, and certifications from Microsoft, Google Cloud, AWS, and IBM.',
+      actionText: 'Explore Career Hub',
       href: '/internships',
       iconName: 'Sparkles',
     });

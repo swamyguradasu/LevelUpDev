@@ -51,12 +51,20 @@ import {
   FileCode,
   Lock,
   KeyRound,
+  Compass,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getHistoricalManifest } from '@/lib/historicalData';
+import {
+  getAllActiveResources,
+  calculateCatalogStats,
+  CareerHubResource,
+  PROVIDER_CATALOG,
+} from '@/data/careerHub';
 
 type AdminTab =
   | 'dashboard'
+  | 'career-hub'
   | 'internships'
   | 'students'
   | 'projects'
@@ -85,6 +93,12 @@ export default function AdminDashboardPage() {
   const [appSearch, setAppSearch] = useState('');
   const [appStatusFilter, setAppStatusFilter] = useState('All');
   const [projectSearch, setProjectSearch] = useState('');
+  const [careerHubSearch, setCareerHubSearch] = useState('');
+  const [careerHubProviderFilter, setCareerHubProviderFilter] = useState('all');
+
+  // Career Hub Catalog
+  const careerCatalog = useMemo(() => getAllActiveResources(), []);
+  const careerStats = useMemo(() => calculateCatalogStats(careerCatalog), [careerCatalog]);
 
   // Selected Detail Modals
   const [selectedStudent, setSelectedStudent] = useState<StaticUserProfile | null>(null);
@@ -635,7 +649,7 @@ export default function AdminDashboardPage() {
             href="/internships"
             className="hidden sm:inline-flex text-xs font-mono text-slate-400 hover:text-white bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl hover:border-slate-700 transition"
           >
-            Public Internships
+            Public Career Hub
           </Link>
           <Link
             href="/home"
@@ -675,6 +689,7 @@ export default function AdminDashboardPage() {
           <nav className="space-y-1.5">
             {[
               { id: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
+              { id: 'career-hub', label: 'Career Hub Catalog', icon: Compass, badge: careerCatalog.length },
               { id: 'internships', label: 'Internship Applicants', icon: Briefcase, badge: applications.length },
               { id: 'students', label: 'Students Roster', icon: Users, badge: staticProfiles.length },
               { id: 'projects', label: '7-Day Projects', icon: FolderGit2 },
@@ -725,7 +740,7 @@ export default function AdminDashboardPage() {
 
         {/* Mobile Tab Pills */}
         <div className="md:hidden sticky top-16 z-40 bg-slate-950 border-b border-slate-800 px-4 py-2 flex items-center gap-2 overflow-x-auto">
-          {(['dashboard', 'internships', 'students', 'projects', 'skills', 'achievements', 'export', 'settings'] as AdminTab[]).map((tab) => (
+          {(['dashboard', 'career-hub', 'internships', 'students', 'projects', 'skills', 'achievements', 'export', 'settings'] as AdminTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -733,7 +748,7 @@ export default function AdminDashboardPage() {
                 activeTab === tab ? 'bg-[#006cd2] text-white font-bold' : 'text-slate-400 bg-slate-900 border border-slate-800'
               }`}
             >
-              {tab}
+              {tab.replace('-', ' ')}
             </button>
           ))}
         </div>
@@ -898,6 +913,164 @@ export default function AdminDashboardPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB: CAREER HUB CATALOG MANAGEMENT */}
+          {/* ========================================================================= */}
+          {activeTab === 'career-hub' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                  <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-2.5">
+                    <Compass className="w-7 h-7 text-cyan-400" />
+                    <span>Career Hub Resource Catalog</span>
+                  </h1>
+                  <p className="font-sans text-xs sm:text-sm text-slate-400 mt-1">
+                    Manage curated industry certifications, badges, courses, and applied credentials.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Link
+                    href="/internships"
+                    className="px-4 py-2 bg-[#006cd2] hover:bg-[#005bb5] text-white text-xs font-sans font-semibold rounded-xl transition flex items-center gap-1.5 shadow-md shadow-[#006cd2]/30"
+                  >
+                    <span>Preview Student Hub</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Career Hub Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-[11px] font-mono text-slate-400 uppercase">Curated Resources</span>
+                  <div className="text-2xl font-black text-white font-display">{careerStats.totalResources}</div>
+                  <span className="text-[10px] text-slate-500 font-mono">Verified catalog items</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-[11px] font-mono text-slate-400 uppercase">Free Opportunities</span>
+                  <div className="text-2xl font-black text-emerald-400 font-display">{careerStats.freeOpportunities}</div>
+                  <span className="text-[10px] text-slate-500 font-mono">Free training &amp; badges</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-[11px] font-mono text-slate-400 uppercase">Providers</span>
+                  <div className="text-2xl font-black text-indigo-400 font-display">{careerStats.providers}</div>
+                  <span className="text-[10px] text-slate-500 font-mono">Tech platforms &amp; clouds</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-[11px] font-mono text-slate-400 uppercase">Verified Sources</span>
+                  <div className="text-2xl font-black text-cyan-400 font-display">
+                    {careerCatalog.filter((r) => r.lastVerified).length}
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono">Checked official links</span>
+                </div>
+              </div>
+
+              {/* Catalog Search & Filters */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="relative flex-1 w-full">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={careerHubSearch}
+                      onChange={(e) => setCareerHubSearch(e.target.value)}
+                      placeholder="Search resources by name, skill, or tag..."
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 text-xs text-white placeholder-slate-500 rounded-xl py-2 pl-10 pr-4 outline-none"
+                    />
+                  </div>
+
+                  <select
+                    value={careerHubProviderFilter}
+                    onChange={(e) => setCareerHubProviderFilter(e.target.value)}
+                    className="w-full sm:w-48 bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl p-2 outline-none"
+                  >
+                    <option value="all">All Providers</option>
+                    {Object.values(PROVIDER_CATALOG).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Resources Table */}
+                <div className="overflow-x-auto rounded-xl border border-slate-800/80">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950 text-slate-400 font-mono uppercase text-[11px] border-b border-slate-800">
+                        <th className="p-3">Resource Name</th>
+                        <th className="p-3">Provider</th>
+                        <th className="p-3">Type</th>
+                        <th className="p-3">Cost Status</th>
+                        <th className="p-3">Difficulty</th>
+                        <th className="p-3">Last Verified</th>
+                        <th className="p-3 text-right">Official Site</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 bg-slate-900/40">
+                      {careerCatalog
+                        .filter((res) => {
+                          if (careerHubProviderFilter !== 'all' && res.provider !== careerHubProviderFilter) return false;
+                          if (careerHubSearch.trim()) {
+                            const q = careerHubSearch.toLowerCase().trim();
+                            const matchName = res.name.toLowerCase().includes(q);
+                            const matchSkills = res.skills.some((s) => s.toLowerCase().includes(q));
+                            const matchTags = res.tags.some((t) => t.toLowerCase().includes(q));
+                            if (!matchName && !matchSkills && !matchTags) return false;
+                          }
+                          return true;
+                        })
+                        .map((res) => {
+                          const prov = PROVIDER_CATALOG[res.provider] || PROVIDER_CATALOG.other;
+                          return (
+                            <tr key={res.id} className="hover:bg-slate-800/30 transition">
+                              <td className="p-3 font-semibold text-white max-w-[240px]">
+                                <div className="truncate">{res.name}</div>
+                                <div className="text-[10px] text-slate-500 font-mono truncate">{res.id}</div>
+                              </td>
+                              <td className="p-3">
+                                <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${prov.badgeBg} ${prov.badgeBorder} ${prov.textColor}`}>
+                                  {prov.name}
+                                </span>
+                              </td>
+                              <td className="p-3 font-mono text-[11px] text-slate-300 capitalize">
+                                {res.resourceType.replace('_', ' ')}
+                              </td>
+                              <td className="p-3 font-mono text-[11px]">
+                                <span className={res.isFree || res.costType.includes('free') ? 'text-emerald-400' : 'text-slate-400'}>
+                                  {res.costType.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="p-3 uppercase font-mono text-[10px] text-slate-400">
+                                {res.difficulty}
+                              </td>
+                              <td className="p-3 font-mono text-[11px] text-slate-400">
+                                {res.lastVerified || 'Verified'}
+                              </td>
+                              <td className="p-3 text-right">
+                                <a
+                                  href={res.officialUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 font-mono"
+                                >
+                                  <span>Open</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
