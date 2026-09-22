@@ -48,11 +48,15 @@ export default function SkillPathMapPage() {
   }, [userData, loading, router]);
 
   useEffect(() => {
+    if (skillId === 'java') {
+      router.replace('/skills/java');
+      return;
+    }
     if (skillId) {
       const data = getSkillById(skillId);
       setSkill(data);
     }
-  }, [skillId]);
+  }, [skillId, router]);
 
   // Load dynamic progress data and listen for instant real-time updates
   useEffect(() => {

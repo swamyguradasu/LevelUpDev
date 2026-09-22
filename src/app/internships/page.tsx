@@ -52,9 +52,7 @@ import {
   ExternalLink,
   Eye,
   X,
-  Filter,
 } from 'lucide-react';
-import { isPlacementPrepAllowed, isEnglishCareerAllowed } from '@/lib/content';
 import {
   UserCareerHubResourceRecord,
   ResourcePlanStatus,
@@ -397,23 +395,6 @@ export default function CareerHubPage() {
             <Link href="/leaderboard" className="hover:text-white transition">
               Leaderboard
             </Link>
-            {isPlacementPrepAllowed(userData?.email) && (
-              <Link
-                href="/placement-preparation"
-                className="text-amber-300 font-bold hover:text-white transition flex items-center gap-1 bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30 text-xs"
-              >
-                <Target className="w-3.5 h-3.5 text-amber-400" />
-                <span>Placement Prep</span>
-              </Link>
-            )}
-            {isEnglishCareerAllowed(userData?.email) && (
-              <Link
-                href="/english-career"
-                className="text-blue-300 font-bold hover:text-white transition flex items-center gap-1 bg-blue-500/15 px-2.5 py-0.5 rounded-full border border-blue-500/30 text-xs"
-              >
-                <span>English &amp; Career</span>
-              </Link>
-            )}
           </nav>
         </div>
       </header>
@@ -983,8 +964,8 @@ export default function CareerHubPage() {
 
       {/* Floating Resource Comparison Bar */}
       {comparedResourceIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 border border-cyan-500/40 rounded-2xl p-3 sm:px-6 sm:py-3.5 shadow-2xl backdrop-blur-xl flex items-center gap-4 text-xs">
-          <div className="flex items-center gap-2">
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 border border-cyan-500/40 rounded-2xl p-3 sm:px-6 sm:py-3.5 shadow-2xl backdrop-blur-xl flex items-center gap-4 text-xs max-w-[92vw] overflow-x-auto">
+          <div className="flex items-center gap-2 shrink-0">
             <Layers className="w-4 h-4 text-cyan-400" />
             <span className="font-bold text-white">
               {comparedResourceIds.length} {comparedResourceIds.length === 1 ? 'Resource' : 'Resources'} in Compare

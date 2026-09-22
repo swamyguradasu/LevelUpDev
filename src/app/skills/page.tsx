@@ -7,20 +7,11 @@ import {
   ArrowLeft,
   ArrowRight,
   Code2,
-  Cpu,
-  Layers,
   Sparkles,
-  BookOpen,
   CheckCircle2,
   Terminal,
-  Database,
-  Globe,
-  Bot,
-  Brain,
-  Binary,
 } from 'lucide-react';
 import { getSkillById } from '@/lib/content';
-import CmdCommandsBlock from '@/components/CmdCommandsBlock';
 
 export default function SkillsTrailHubPage() {
   const pythonSkill = getSkillById('python');
@@ -88,14 +79,14 @@ export default function SkillsTrailHubPage() {
               Skills <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-500">Trail</span>
             </h1>
             <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
-              Structured learning roadmaps designed to help you build solid computer science foundations and master practical industry-grade technical skills.
+              Structured learning roadmaps designed to help you master practical industry-grade technical skills and developer workflows.
             </p>
           </div>
 
           {/* Primary Blocks Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
             {/* Block 1 — Technical Skills */}
-            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-7 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden">
+            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-8 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-all duration-500" />
 
               {/* Block Header */}
@@ -121,164 +112,121 @@ export default function SkillsTrailHubPage() {
                 </p>
               </div>
 
-              {/* Active Skill Cards */}
-              <div className="py-6 flex-1 space-y-4 flex flex-col justify-between">
-                {/* Python Card (Active Primary) */}
-                <div className="rounded-2xl bg-slate-950/70 border border-blue-500/30 p-5 space-y-4 shadow-lg shadow-blue-950/30 hover:border-blue-500/60 transition-all group/card">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-12 h-12 rounded-xl bg-[#006cd2]/20 border border-[#006cd2]/40 flex items-center justify-center text-blue-400 font-mono font-bold text-lg">
-                        🐍
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base sm:text-lg font-bold text-white group-hover/card:text-blue-300 transition-colors">
-                            Python
-                          </h3>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
-                            Active
-                          </span>
+                {/* Active Skill Cards */}
+                <div className="py-6 flex-1 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    {/* Python Card (Active) */}
+                    <div className="rounded-2xl bg-slate-950/70 border border-blue-500/30 p-5 space-y-4 shadow-lg shadow-blue-950/30 hover:border-blue-500/60 transition-all group/card">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-12 h-12 rounded-xl bg-[#006cd2]/20 border border-[#006cd2]/40 flex items-center justify-center text-blue-400 font-mono font-bold text-lg">
+                            🐍
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-base sm:text-lg font-bold text-white group-hover/card:text-blue-300 transition-colors">
+                                Python
+                              </h3>
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                                Active
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400">Python Programming</p>
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-400">Python Programming</p>
+                        <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
+                          {pythonModuleCount} Mod
+                        </span>
                       </div>
-                    </div>
-                    <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
-                      {pythonModuleCount} Mod
-                    </span>
-                  </div>
 
-                  <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-                    <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
-                      Beginner → Advanced
-                    </span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-blue-400">Interactive Sandbox</span>
-                  </div>
+                      <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
+                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
+                          Beginner → Advanced
+                        </span>
+                        <span className="text-slate-600">•</span>
+                        <span className="text-blue-400">Interactive Sandbox</span>
+                      </div>
 
-                  <Link
-                    href="/skills/python"
-                    className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white text-xs font-semibold font-mono tracking-wide shadow-md shadow-[#006cd2]/30 transition group-hover/card:translate-x-0.5"
-                  >
-                    <span>Continue Learning</span>
-                    <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/card:translate-x-1" />
-                  </Link>
-                </div>
-
-                {/* Upcoming Future Skills Preview */}
-                <div className="pt-2">
-                  <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block mb-2">
-                    Coming Soon to Skills Trail
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {[
-                      { name: 'JavaScript', icon: '⚡' },
-                      { name: 'Java', icon: '☕' },
-                      { name: 'C++', icon: '⚙️' },
-                      { name: 'SQL', icon: '🗄️' },
-                      { name: 'React', icon: '⚛️' },
-                      { name: 'ML/AI', icon: '🧠' },
-                    ].map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950/40 border border-slate-800/60 text-slate-400 text-xs font-mono"
+                      <Link
+                        href="/skills/python"
+                        className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#006cd2] hover:bg-[#005bb5] text-white text-xs font-semibold font-mono tracking-wide shadow-md shadow-[#006cd2]/30 transition group-hover/card:translate-x-0.5"
                       >
-                        <span>{item.icon}</span>
-                        <span className="truncate">{item.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+                        <span>Continue Learning</span>
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/card:translate-x-1" />
+                      </Link>
+                    </div>
 
-            {/* Block 2 — CS Foundations */}
-            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-7 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-cyan-500/10 transition-all duration-500" />
-
-              {/* Block Header */}
-              <div className="space-y-3 pb-6 border-b border-slate-800/80">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-2xl bg-cyan-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                    <Cpu className="w-6 h-6" />
-                  </div>
-                  <span className="text-xs font-mono px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-semibold">
-                    12 Level Roadmap
-                  </span>
-                </div>
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-display font-bold text-white tracking-tight">
-                    CS Foundations
-                  </h2>
-                  <p className="text-sm font-medium text-cyan-400 mt-0.5">
-                    Learn the fundamentals every CS student should know
-                  </p>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Build the essential computer science foundation required to understand programming, DSA, OS, and technical interviews.
-                </p>
-              </div>
-
-              {/* Featured Foundation Card */}
-              <div className="py-6 flex-1 flex flex-col justify-between space-y-4">
-                <div className="rounded-2xl bg-slate-950/70 border border-cyan-500/30 p-5 space-y-4 shadow-lg shadow-cyan-950/20 hover:border-cyan-500/60 transition-all group/card">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-12 h-12 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-mono font-bold text-lg">
-                        🎓
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base sm:text-lg font-bold text-white group-hover/card:text-cyan-300 transition-colors">
-                            Computer Science Basics
-                          </h3>
-                          <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
-                            Foundation
-                          </span>
+                    {/* Java Card (Active) */}
+                    <div className="rounded-2xl bg-slate-950/70 border border-amber-500/30 p-5 space-y-4 shadow-lg shadow-amber-950/30 hover:border-amber-500/60 transition-all group/card">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-mono font-bold text-lg">
+                            ☕
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-base sm:text-lg font-bold text-white group-hover/card:text-amber-300 transition-colors">
+                                Java
+                              </h3>
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                                Active
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400">Master Java & Enterprise Engineering</p>
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-400">Core Engineering Curriculum</p>
+                        <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
+                          7 Active Mod
+                        </span>
                       </div>
+
+                      <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
+                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
+                          57 Topics
+                        </span>
+                        <span className="text-slate-600">•</span>
+                        <span className="text-amber-400">Interactive Visualizers</span>
+                      </div>
+
+                      <Link
+                        href="/skills/java"
+                        className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-slate-950 text-xs font-bold font-mono tracking-wide shadow-md shadow-amber-500/20 transition group-hover/card:translate-x-0.5"
+                      >
+                        <span>Start Java Trail</span>
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/card:translate-x-1" />
+                      </Link>
                     </div>
-                    <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
-                      12 Levels
+                  </div>
+
+                  {/* Upcoming Future Skills Preview */}
+                  <div className="pt-2">
+                    <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block mb-2">
+                      Coming Soon to Skills Trail
                     </span>
-                  </div>
-
-                  <p className="text-xs text-slate-300 leading-relaxed font-mono">
-                    From Computer Architecture & DSA to Operating Systems, Databases & Networking.
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-400 pt-1">
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Data Structures & Alg</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Operating Systems</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Databases & SQL</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Computer Networks</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {[
+                        { name: 'JavaScript', icon: '⚡' },
+                        { name: 'C++', icon: '⚙️' },
+                        { name: 'SQL', icon: '🗄️' },
+                        { name: 'React', icon: '⚛️' },
+                        { name: 'Spring Boot', icon: '🍃' },
+                        { name: 'ML/AI', icon: '🧠' },
+                      ].map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950/40 border border-slate-800/60 text-slate-400 text-xs font-mono"
+                        >
+                          <span>{item.icon}</span>
+                          <span className="truncate">{item.name}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-
-                  <Link
-                    href="/skills/foundations"
-                    className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold font-mono tracking-wide shadow-md shadow-cyan-600/30 transition group-hover/card:translate-x-0.5"
-                  >
-                    <span>Explore Foundations</span>
-                    <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/card:translate-x-1" />
-                  </Link>
                 </div>
-              </div>
             </div>
 
-            {/* Block 3 — Command Prompt */}
-            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-7 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden md:col-span-2 lg:col-span-1">
+            {/* Block 2 — Command Prompt */}
+            <div className="flex flex-col rounded-3xl bg-slate-900/60 border border-slate-800/90 p-6 sm:p-8 backdrop-blur-xl shadow-xl shadow-black/40 hover:border-slate-700/80 transition-all duration-300 relative group overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-500" />
 
               {/* Block Header */}
@@ -305,7 +253,7 @@ export default function SkillsTrailHubPage() {
               </div>
 
               {/* Featured Command Prompt Card */}
-              <div className="py-6 flex-1 flex flex-col justify-between space-y-4">
+              <div className="py-6 flex-1 flex flex-col justify-between space-y-5">
                 <div className="rounded-2xl bg-slate-950/70 border border-emerald-500/30 p-5 space-y-4 shadow-lg shadow-emerald-950/20 hover:border-emerald-500/60 transition-all group/card">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3.5">

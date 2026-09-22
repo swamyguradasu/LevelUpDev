@@ -1,0 +1,108 @@
+{
+  "skillId": "java",
+  "title": "Java Programming",
+  "icon": "coffee",
+  "description": "Master Java from programming fundamentals and object-oriented architecture to Spring Boot backend engineering and enterprise systems.",
+  "modules": [
+    {
+      "moduleId": "m1",
+      "title": "Module 1: Java Basics",
+      "topics": [
+        { "name": "What is Java?", "summary": "Overview of Java, platform independence, Write Once Run Anywhere (WORA), and core principles." },
+        { "name": "JDK, JRE and JVM", "summary": "The 3 pillars of Java execution, bytecode mechanics, and JIT compilation." },
+        { "name": "Installing Java and Setting Up an IDE", "summary": "Configuring OpenJDK, JAVA_HOME, PATH, and IntelliJ IDEA or VS Code." },
+        { "name": "First Java Program", "summary": "Deconstructing public static void main, class boilerplate, and console printing." },
+        { "name": "Variables", "summary": "Variable declaration, memory allocation on Stack, and camelCase naming conventions." },
+        { "name": "Data Types", "summary": "8 Primitive Data Types vs Reference Types and memory capacities." },
+        { "name": "Input and Output", "summary": "Interactive console I/O using java.util.Scanner and resolving the nextLine trap." }
+      ]
+    },
+    {
+      "moduleId": "m2",
+      "title": "Module 2: Operators & Type Conversion",
+      "topics": [
+        { "name": "Arithmetic Operators", "summary": "Addition, subtraction, multiplication, division (integer truncation vs double), and modulus." },
+        { "name": "Relational & Logical Operators", "summary": "Comparison operators and boolean logic truth tables." },
+        { "name": "Assignment & Compound Operators", "summary": "Compound arithmetic assignments with implicit casting." },
+        { "name": "Unary & Increment/Decrement Operators", "summary": "Prefix vs Postfix evaluation order." },
+        { "name": "Bitwise & Bit Shift Operators", "summary": "Bit manipulation: AND, OR, XOR, NOT, left shift, and arithmetic right shift." },
+        { "name": "Type Conversion & Casting", "summary": "Automatic widening vs explicit narrowing type casting." },
+        { "name": "Short-Circuit Evaluation", "summary": "Guard conditions and short-circuit && and || evaluation." },
+        { "name": "Operator Precedence & Associativity", "summary": "Evaluation rules and expression precedence matrix." }
+      ]
+    },
+    {
+      "moduleId": "m3",
+      "title": "Module 3: Conditional Statements",
+      "topics": [
+        { "name": "Decision Making in Java", "summary": "Control flow branching based on boolean conditions." },
+        { "name": "if, else if, else Structures", "summary": "Single, alternative, and chained multi-way conditional branches." },
+        { "name": "Nested Conditionals", "summary": "Multi-tier decision trees and boundary validation." },
+        { "name": "The switch Statement", "summary": "Classic switch vs modern Java 14+ switch expressions with arrow syntax." },
+        { "name": "The Ternary Operator (?:)", "summary": "Compact conditional assignment and expression embedding." },
+        { "name": "String Comparison: .equals() vs ==", "summary": "Reference identity versus character content equality." },
+        { "name": "Conditional Pitfalls & Anti-Patterns", "summary": "Dead code, dangling else, and float comparison hazards." }
+      ]
+    },
+    {
+      "moduleId": "m4",
+      "title": "Module 4: Loops & Iterations",
+      "topics": [
+        { "name": "Need for Repetition in Programming", "summary": "The DRY principle and loop lifecycle components." },
+        { "name": "The while Loop", "summary": "Entry-controlled loop for state-driven condition iterations." },
+        { "name": "The do-while Loop", "summary": "Exit-controlled loop with guaranteed minimum 1 execution." },
+        { "name": "The for Loop", "summary": "Standard for-loop with compact initialization, condition, and update header." },
+        { "name": "Nested Loops", "summary": "Outer vs inner loop execution, 2D grid matrix traversals, and star patterns." },
+        { "name": "Break, Continue & Labeled Statements", "summary": "Flow jumping and escaping nested loop levels." },
+        { "name": "Infinite Loops & Iteration Pitfalls", "summary": "Precision drift, off-by-one errors, and safe event loops." },
+        { "name": "Iterative Algorithms", "summary": "Factorial, Fibonacci series, and O(sqrt(N)) Prime checking." }
+      ]
+    },
+    {
+      "moduleId": "m5",
+      "title": "Module 5: Arrays & String Handling",
+      "topics": [
+        { "name": "Array Fundamentals & Memory Allocation", "summary": "Fixed-size indexed collections on Heap with Stack references." },
+        { "name": "Array Traversal: Classic vs For-Each", "summary": "Indexed loop modification versus clean enhanced for-each read-only iteration." },
+        { "name": "Core Array Operations & Search", "summary": "Min/Max search, in-place reversal, and Linear vs Binary Search." },
+        { "name": "Multi-Dimensional & Jagged Arrays", "summary": "2D rectangular matrices and non-rectangular jagged arrays." },
+        { "name": "java.util.Arrays Utility Toolkit", "summary": "Static utilities: Arrays.sort, Arrays.toString, Arrays.binarySearch." },
+        { "name": "String Fundamentals & Immutability", "summary": "Heap String Constant Pool caching, thread safety, and immutability." },
+        { "name": "Essential String Methods", "summary": "length, charAt, substring, indexOf, trim, split, and replace." },
+        { "name": "StringBuilder & StringBuffer", "summary": "Mutable string buffers, loop efficiency, and thread-safety differences." },
+        { "name": "Array & String Problem Solving", "summary": "Two-pointer Palindromes, Anagram frequency arrays, and letter counts." }
+      ]
+    },
+    {
+      "moduleId": "m6",
+      "title": "Module 6: Methods & Program Structure",
+      "topics": [
+        { "name": "Method Declaration & Signatures", "summary": "Modular functions, parameter lists, and return types." },
+        { "name": "Call-by-Value in Java", "summary": "Strict 100% Pass-by-Value for primitives and object memory references." },
+        { "name": "Method Overloading", "summary": "Compile-time polymorphism with distinct parameter signatures." },
+        { "name": "Variable Scope & Shadowing", "summary": "Block scope, instance fields, and resolving shadowing with this." },
+        { "name": "Recursion & The Call Stack", "summary": "Base case design, JVM stack frames, and StackOverflowError prevention." },
+        { "name": "Variable Arguments (Varargs ...)", "summary": "Flexible argument lists and compiler array translation." },
+        { "name": "Packages & Access Modifiers", "summary": "Namespaces, imports, and 4 visibility levels (public, protected, default, private)." },
+        { "name": "Capstone: Modular Utility Toolkit", "summary": "Production-grade utility class with defensive copies and static math methods." }
+      ]
+    },
+    {
+      "moduleId": "m7",
+      "title": "Module 7: Exception & File Handling",
+      "topics": [
+        { "name": "The Java Exception Hierarchy", "summary": "Throwable, Error vs Exception, and Checked vs Unchecked exceptions." },
+        { "name": "Try, Catch & Finally Flow Control", "summary": "Structured error handling and guaranteed finally block cleanup." },
+        { "name": "Multi-Catch & Union Catch Syntax", "summary": "Unified error handlers with pipe | syntax." },
+        { "name": "Throw vs Throws", "summary": "Explicit body triggers and method signature propagation." },
+        { "name": "Custom & Domain Exceptions", "summary": "Domain business exceptions and exception chaining." },
+        { "name": "Try-With-Resources", "summary": "Automatic resource management with AutoCloseable interface." },
+        { "name": "Java I/O Streams Architecture", "summary": "Byte Streams (InputStream) vs Character Streams (Reader)." },
+        { "name": "Reading Files", "summary": "High-throughput reading with BufferedReader and token parsing with Scanner." },
+        { "name": "Writing Files", "summary": "FileWriter append mode, BufferedWriter, and formatted PrintWriter." },
+        { "name": "Modern Java NIO.2", "summary": "Filesystem manipulation with Path.of and java.nio.file.Files." },
+        { "name": "Capstone: Student Record File Manager", "summary": "File-backed CRUD system with custom exceptions and CSV serialization." }
+      ]
+    }
+  ]
+}

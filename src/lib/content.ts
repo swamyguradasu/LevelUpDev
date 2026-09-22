@@ -1,4 +1,5 @@
 import pythonSkill from '@/../content/skills/python.json';
+import javaSkill from '@/../content/skills/java.json';
 import jsSkill from '@/../content/skills/javascript.json';
 import dailyChallengesData from '@/../content/daily-challenges.json';
 import projectsData from '@/../content/projects.json';
@@ -65,6 +66,7 @@ export interface ProjectIdea {
 
 const SKILL_MAP: Record<string, Skill> = {
   python: pythonSkill as Skill,
+  java: javaSkill as Skill,
   javascript: jsSkill as Skill,
 };
 
@@ -114,18 +116,6 @@ export function isAdminEmail(email: string): boolean {
   const cleanEmail = email.trim().toLowerCase();
   const list = (adminEmailsData as string[]) || [];
   return list.some((e) => e.trim().toLowerCase() === cleanEmail);
-}
-
-export function isPlacementPrepAllowed(email?: string | null): boolean {
-  if (!email) return false;
-  const cleanEmail = email.trim().toLowerCase();
-  return cleanEmail === 'swamy@levelupdev.com';
-}
-
-export function isEnglishCareerAllowed(email?: string | null): boolean {
-  if (!email) return false;
-  const cleanEmail = email.trim().toLowerCase();
-  return cleanEmail === 'swamy@levelupdev.com';
 }
 
 
